@@ -1,0 +1,6 @@
+{
+  "name": "BuildPulse Construction ERP",
+  "description": "Cloud-based Construction Management ERP for multi-project tracking, site operations, material inventory ledger, and cement brand stock management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
