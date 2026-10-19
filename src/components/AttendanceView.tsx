@@ -156,6 +156,29 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     loadData();
   }, []);
 
+  // Keep an already-open attendance screen current when another system saves
+  // groups, employees, attendance, or payments to the shared cloud snapshot.
+  useEffect(() => {
+    let active = true;
+    const refreshFromCloud = async () => {
+      if (!active || document.visibilityState !== 'visible') return;
+      try {
+        await dataService.syncCloudState();
+        if (active) await loadData();
+      } catch (err) {
+        console.warn('Attendance cloud refresh failed:', err);
+      }
+    };
+
+    const interval = window.setInterval(refreshFromCloud, 10000);
+    window.addEventListener('focus', refreshFromCloud);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshFromCloud);
+    };
+  }, []);
+
   const activeGroup = useMemo(() => {
     return groups.find(g => g.id === selectedGroupId) || null;
   }, [groups, selectedGroupId]);

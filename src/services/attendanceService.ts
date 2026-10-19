@@ -768,6 +768,7 @@ class AttendanceService {
     const updated = [newGroup, ...groups];
     localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(updated));
     this.recordAudit('create_group', newGroup.id, { name: newGroup.name });
+    await dataService.persistCloudState();
     return newGroup;
   }
 
@@ -827,6 +828,7 @@ class AttendanceService {
     }
 
     this.recordAudit('update_group', groupId, { name: updatedGroup.name });
+    await dataService.persistCloudState();
     return updatedGroup;
   }
 
@@ -850,6 +852,7 @@ class AttendanceService {
     const filtered = groups.filter(g => g.id !== groupId);
     localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(filtered));
     this.recordAudit('delete_group', groupId, {});
+    await dataService.persistCloudState();
   }
 
   // ==========================================
@@ -969,6 +972,7 @@ class AttendanceService {
     const updated = [newEmp, ...employees];
     localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(updated));
     this.recordAudit('create_employee', newEmp.id, { name: newEmp.full_name, code: newEmp.employee_code, group: newEmp.group_name || 'Individual' });
+    await dataService.persistCloudState();
     return newEmp;
   }
 
@@ -1053,6 +1057,7 @@ class AttendanceService {
     employees[idx] = updatedEmp;
     localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
     this.recordAudit('update_employee', employeeId, { name: updatedEmp.full_name, group: targetGroupName || 'Individual' });
+    await dataService.persistCloudState();
     return updatedEmp;
   }
 
@@ -1098,6 +1103,7 @@ class AttendanceService {
       name: updatedEmp.full_name,
       newGroup: targetGroupName || 'Ungrouped / Individual'
     });
+    await dataService.persistCloudState();
     return updatedEmp;
   }
 
@@ -1410,6 +1416,8 @@ class AttendanceService {
       amount: amt,
       type: newPayment.payment_type
     });
+
+    await dataService.persistCloudState();
 
     return newPayment;
   }
