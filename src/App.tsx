@@ -151,6 +151,11 @@ export default function App() {
     }
   }, [selectedProject]);
 
+  const handleRefreshData = useCallback(async () => {
+    await dataService.syncCloudState();
+    await loadData();
+  }, [loadData]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -478,7 +483,7 @@ export default function App() {
         onNavigateUserManagement={() => setCurrentView('user_management')}
         onLogout={handleLogout}
         supabaseConfig={supabaseConfig}
-        onRefreshData={loadData}
+        onRefreshData={handleRefreshData}
         isRefreshing={isRefreshing}
       />
 

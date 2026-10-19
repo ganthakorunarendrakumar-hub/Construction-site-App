@@ -32,6 +32,19 @@ import {
   REGULAR_SITE_USE_DETAILED_ITEMS
 } from './materialCatalog';
 
+const generateUuid = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+
 // Default standard Indian Cement Brands specified in Section 8:
 export const INITIAL_CEMENT_BRANDS = [
   { id: 'brand-1', name: 'Dalmia Bharat / Dalmia Cement', code: 'DALMIA', order: 1 },
@@ -808,6 +821,9 @@ class DataService {
   };
 
   private currentUser: UserProfile = PRESET_USERS.admin;
+  private cloudStateSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  private isRestoringCloudState = false;
+  private storageSyncInstalled = false;
 
   constructor() {
     this.initSupabaseClient();
@@ -843,6 +859,7 @@ class DataService {
     };
 
     if (url && anonKey) {
+      this.installCloudStateSync();
       try {
         this.supabase = createClient(url, anonKey);
         this.checkLiveConnection();
@@ -920,6 +937,129 @@ class DataService {
 
   public isCloudConnected(): boolean {
     return this.config.isConnected;
+  }
+
+  /**
+   * Signs the current browser into Supabase Auth so RLS policies can identify
+   * the user that is reading or writing shared company data.
+   */
+  public async signInWithSupabase(email: string, password: string): Promise<UserProfile> {
+    if (!this.supabase || !this.config.isConnected) {
+      throw new Error('Supabase is not connected. Configure the cloud database first.');
+    }
+
+    const { data, error } = await this.supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) {
+      throw new Error(error?.message || 'Supabase authentication failed.');
+    }
+
+    const { data: profile, error: profileError } = await this.supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      await this.supabase.auth.signOut();
+      throw new Error(profileError?.message || 'No Supabase profile exists for this user.');
+    }
+
+    const cloudUser: UserProfile = {
+      id: profile.id,
+      auth_uid: profile.id,
+      email: profile.email,
+      full_name: profile.full_name,
+      role: profile.role,
+      role_title: profile.role_title || 'Team Member',
+      company_id: profile.company_id,
+      avatar_url: profile.avatar_url,
+      phone: profile.phone,
+      status: 'active'
+    };
+
+    this.currentUser = cloudUser;
+    await this.syncCloudState();
+    return cloudUser;
+  }
+
+  public async signOutFromSupabase(): Promise<void> {
+    if (this.supabase) {
+      await this.supabase.auth.signOut();
+    }
+  }
+
+  /** Shared state bridge for modules that still use localStorage internally. */
+  private getCloudStateSnapshot(): Record<string, string> {
+    const excluded = new Set([
+      STORAGE_KEYS.SUPABASE_CONFIG,
+      STORAGE_KEYS.CURRENT_USER_ROLE,
+      'buildpulse_auth_accounts_v1',
+      'buildpulse_auth_session_v1'
+    ]);
+    const state: Record<string, string> = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('buildpulse_') && !excluded.has(key)) {
+        const value = localStorage.getItem(key);
+        if (value !== null) state[key] = value;
+      }
+    }
+    return state;
+  }
+
+  private installCloudStateSync(): void {
+    if (this.storageSyncInstalled || typeof window === 'undefined') return;
+    this.storageSyncInstalled = true;
+    const storage = window.localStorage;
+    const originalSetItem = storage.setItem.bind(storage);
+    storage.setItem = (key: string, value: string) => {
+      originalSetItem(key, value);
+      if (!this.isRestoringCloudState && key.startsWith('buildpulse_')) {
+        this.queueCloudStateSync();
+      }
+    };
+  }
+
+  private queueCloudStateSync(): void {
+    if (!this.supabase || !this.config.isConnected || this.isRestoringCloudState) return;
+    if (this.cloudStateSyncTimer) clearTimeout(this.cloudStateSyncTimer);
+    this.cloudStateSyncTimer = setTimeout(() => {
+      void this.pushCloudState();
+    }, 500);
+  }
+
+  private async pushCloudState(): Promise<void> {
+    if (!this.supabase || !this.config.isConnected || !this.currentUser.company_id) return;
+    const { error } = await this.supabase.from('app_state').upsert({
+      company_id: this.currentUser.company_id,
+      state: this.getCloudStateSnapshot(),
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'company_id' });
+    if (error) console.error('Cloud state sync failed:', error.message);
+  }
+
+  public async syncCloudState(): Promise<void> {
+    if (!this.supabase || !this.config.isConnected || !this.currentUser.company_id) return;
+    this.installCloudStateSync();
+    const { data, error } = await this.supabase
+      .from('app_state')
+      .select('state')
+      .eq('company_id', this.currentUser.company_id)
+      .maybeSingle();
+    if (error) throw new Error(`Cloud state read failed: ${error.message}`);
+
+    if (data?.state && Object.keys(data.state).length > 0) {
+      this.isRestoringCloudState = true;
+      try {
+        Object.entries(data.state as Record<string, string>).forEach(([key, value]) => {
+          localStorage.setItem(key, value);
+        });
+      } finally {
+        this.isRestoringCloudState = false;
+      }
+    } else {
+      await this.pushCloudState();
+    }
   }
 
   // ==========================================
@@ -1633,6 +1773,7 @@ class DataService {
   // ==========================================
   public async getProjects(filter?: { status?: ProjectStatus | 'all'; search?: string }): Promise<Project[]> {
     let projects: Project[] = [];
+    let cloudQuerySucceeded = false;
 
     if (this.supabase && this.config.isConnected) {
       try {
@@ -1643,11 +1784,12 @@ class DataService {
         const { data, error } = await query;
         if (data && !error) {
           projects = data;
+          cloudQuerySucceeded = true;
         }
       } catch (e) {}
     }
 
-    if (projects.length === 0) {
+    if (projects.length === 0 && !cloudQuerySucceeded) {
       try {
         const stored = localStorage.getItem(STORAGE_KEYS.PROJECTS);
         projects = stored ? JSON.parse(stored) : [];
@@ -1717,7 +1859,7 @@ class DataService {
 
     const newProject: Project = {
       ...projectInput,
-      id: 'proj-' + Math.random().toString(36).substring(2, 9) + '-' + Date.now().toString(36),
+      id: generateUuid(),
       company_id: company.id,
       code: projectInput.code.trim().toUpperCase(),
       name: projectInput.name.trim(),
@@ -1733,12 +1875,18 @@ class DataService {
 
     if (this.supabase && this.config.isConnected) {
       try {
-        const { error } = await this.supabase.from('projects').insert([newProject]);
+        const cloudProject = {
+          ...newProject,
+          project_manager_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(newProject.project_manager_id)
+            ? newProject.project_manager_id
+            : null
+        };
+        const { error } = await this.supabase.from('projects').insert([cloudProject]);
         if (error) {
           throw new Error(error.message);
         }
       } catch (err: any) {
-        console.warn('Supabase cloud insert error, falling back to local storage', err);
+        throw new Error(`Cloud project save failed: ${err.message}`);
       }
     }
 
@@ -1846,13 +1994,25 @@ class DataService {
   // ==========================================
   public async getCementBrands(): Promise<CementBrand[]> {
     if (this.supabase && this.config.isConnected) {
-      try {
-        const { data, error } = await this.supabase
-          .from('cement_brands')
-          .select('*')
-          .order('display_order', { ascending: true });
-        if (data && !error && data.length > 0) return data;
-      } catch (e) {}
+      const { data, error } = await this.supabase
+        .from('cement_brands')
+        .select('*')
+        .order('display_order', { ascending: true });
+      if (error) throw new Error(`Cloud brand read failed: ${error.message}`);
+      if (data && data.length > 0) return data;
+
+      const company = await this.getCompany();
+      const cloudBrands: CementBrand[] = INITIAL_CEMENT_BRANDS.map(b => ({
+        id: generateUuid(),
+        company_id: company.id,
+        brand_name: b.name,
+        code: b.code,
+        is_active: true,
+        display_order: b.order
+      }));
+      const { error: seedError } = await this.supabase.from('cement_brands').insert(cloudBrands);
+      if (seedError) throw new Error(`Cloud brand setup failed: ${seedError.message}`);
+      return cloudBrands;
     }
 
     try {
@@ -1884,8 +2044,8 @@ class DataService {
     }
 
     const newBrand: CementBrand = {
-      id: 'brand-' + Math.random().toString(36).substring(2, 8),
-      company_id: 'comp-apex-01',
+      id: generateUuid(),
+      company_id: (await this.getCompany()).id,
       brand_name: trimmed,
       code: trimmed.substring(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, ''),
       is_active: true,
@@ -1893,9 +2053,8 @@ class DataService {
     };
 
     if (this.supabase && this.config.isConnected) {
-      try {
-        await this.supabase.from('cement_brands').insert([newBrand]);
-      } catch (e) {}
+      const { error } = await this.supabase.from('cement_brands').insert([newBrand]);
+      if (error) throw new Error(`Cloud brand save failed: ${error.message}`);
     }
 
     const updatedList = [...brands, newBrand];
@@ -1905,6 +2064,16 @@ class DataService {
   }
 
   public async getMaterialLocations(projectId: string): Promise<MaterialLocation[]> {
+    if (this.supabase && this.config.isConnected) {
+      const { data, error } = await this.supabase
+        .from('material_locations')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
+      if (error) throw new Error(`Cloud location read failed: ${error.message}`);
+      if (data) return data;
+    }
+
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS);
       const all: MaterialLocation[] = stored ? JSON.parse(stored) : [];
@@ -1919,13 +2088,18 @@ class DataService {
     const all: MaterialLocation[] = stored ? JSON.parse(stored) : [];
 
     const newLoc: MaterialLocation = {
-      id: 'loc-' + Math.random().toString(36).substring(2, 8),
-      company_id: 'comp-apex-01',
+      id: generateUuid(),
+      company_id: (await this.getCompany()).id,
       project_id: projectId,
       name: name.trim(),
       code: code ? code.trim() : 'LOC-' + (all.length + 1).toString().padStart(2, '0'),
       description: description?.trim()
     };
+
+    if (this.supabase && this.config.isConnected) {
+      const { error } = await this.supabase.from('material_locations').insert([newLoc]);
+      if (error) throw new Error(`Cloud location save failed: ${error.message}`);
+    }
 
     all.push(newLoc);
     localStorage.setItem(STORAGE_KEYS.LOCATIONS, JSON.stringify(all));
@@ -1943,6 +2117,7 @@ class DataService {
     endDate?: string;
   }): Promise<MaterialTransaction[]> {
     let transactions: MaterialTransaction[] = [];
+    let cloudQuerySucceeded = false;
 
     if (this.supabase && this.config.isConnected) {
       try {
@@ -1960,11 +2135,16 @@ class DataService {
           query = query.eq('transaction_type', filters.transactionType);
         }
         const { data, error } = await query;
-        if (data && !error) transactions = data;
-      } catch (e) {}
+        if (data && !error) {
+          transactions = data;
+          cloudQuerySucceeded = true;
+        }
+      } catch (e) {
+        throw e;
+      }
     }
 
-    if (transactions.length === 0) {
+    if (transactions.length === 0 && !cloudQuerySucceeded) {
       try {
         const stored = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
         const all: MaterialTransaction[] = stored ? JSON.parse(stored) : [];
@@ -2152,7 +2332,7 @@ class DataService {
     // 5. Build Transaction Record with Server-authoritative Audit fields
     const company = await this.getCompany();
     const newTx: MaterialTransaction = {
-      id: 'tx-' + Math.random().toString(36).substring(2, 9) + '-' + Date.now().toString(36),
+      id: generateUuid(),
       company_id: company.id,
       project_id: txInput.projectId,
       location_id: txInput.locationId,
@@ -2190,12 +2370,8 @@ class DataService {
     }
 
     if (this.supabase && this.config.isConnected) {
-      try {
-        const { error } = await this.supabase.from('material_transactions').insert([newTx]);
-        if (error) throw new Error(error.message);
-      } catch (err: any) {
-        console.warn('Supabase transaction insert failed, keeping in local storage', err);
-      }
+      const { error } = await this.supabase.from('material_transactions').insert([newTx]);
+      if (error) throw new Error(`Cloud transaction save failed: ${error.message}`);
     }
 
     // Save to persistent storage

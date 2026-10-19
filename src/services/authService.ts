@@ -1,5 +1,7 @@
 import { AuthAccount, UserSession, UserProfile, UserRole } from '../types';
 import { dataService } from './dataService';
+import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 
 const STORAGE_KEYS = {
   ACCOUNTS: 'buildpulse_auth_accounts_v1',
@@ -30,29 +32,42 @@ export class AuthCrypto {
       saltHex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
     );
 
-    const keyMaterial = await window.crypto.subtle.importKey(
-      'raw',
-      enc.encode(password),
-      'PBKDF2',
-      false,
-      ['deriveBits', 'deriveKey']
-    );
+    // Web Crypto's subtle API is unavailable on plain LAN HTTP URLs in many
+    // browsers. Use the same PBKDF2-HMAC-SHA256 parameters through noble as a
+    // development/LAN fallback, while retaining Web Crypto on HTTPS/localhost.
+    let hashBytes: Uint8Array;
+    if (window.crypto.subtle) {
+      const keyMaterial = await window.crypto.subtle.importKey(
+        'raw',
+        enc.encode(password),
+        'PBKDF2',
+        false,
+        ['deriveBits', 'deriveKey']
+      );
 
-    const derivedKey = await window.crypto.subtle.deriveKey(
-      {
-        name: 'PBKDF2',
-        salt: saltBytes,
-        iterations: 100000,
-        hash: 'SHA-256'
-      },
-      keyMaterial,
-      { name: 'HMAC', hash: 'SHA-256', length: 256 },
-      true,
-      ['sign']
-    );
+      const derivedKey = await window.crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: saltBytes,
+          iterations: 100000,
+          hash: 'SHA-256'
+        },
+        keyMaterial,
+        { name: 'HMAC', hash: 'SHA-256', length: 256 },
+        true,
+        ['sign']
+      );
 
-    const rawKey = await window.crypto.subtle.exportKey('raw', derivedKey);
-    const hashBytes = new Uint8Array(rawKey);
+      const rawKey = await window.crypto.subtle.exportKey('raw', derivedKey);
+      hashBytes = new Uint8Array(rawKey);
+    } else {
+      hashBytes = await pbkdf2Async(sha256, enc.encode(password), saltBytes, {
+        c: 100000,
+        dkLen: 32,
+        asyncTick: 10
+      });
+    }
+
     return Array.from(hashBytes).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
@@ -356,6 +371,13 @@ class AuthService {
       );
     }
 
+    // When cloud sync is configured, require a real Supabase Auth session so
+    // database RLS policies can identify this user across devices.
+    let cloudProfile: UserProfile | null = null;
+    if (dataService.isCloudConnected()) {
+      cloudProfile = await dataService.signInWithSupabase(account.email, password);
+    }
+
     // Login successful: reset attempts, update last login
     account.failed_attempts = 0;
     account.lockout_until = null;
@@ -366,13 +388,13 @@ class AuthService {
     const sessionDurationMs = rememberMe ? 24 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
     const session: UserSession = {
       token: AuthCrypto.generateSessionToken(),
-      auth_uid: account.auth_uid,
+      auth_uid: cloudProfile?.auth_uid || account.auth_uid,
       user_id: account.user_id,
       email: account.email,
-      full_name: account.full_name,
-      role: account.role,
-      role_title: account.role_title,
-      company_id: account.company_id,
+      full_name: cloudProfile?.full_name || account.full_name,
+      role: cloudProfile?.role || account.role,
+      role_title: cloudProfile?.role_title || account.role_title,
+      company_id: cloudProfile?.company_id || account.company_id,
       assigned_projects: account.assigned_projects || [],
       employee_id: account.employee_id,
       login_at: new Date().toISOString(),
@@ -403,6 +425,7 @@ class AuthService {
     }
     this.currentSession = null;
     localStorage.removeItem(STORAGE_KEYS.SESSION);
+    await dataService.signOutFromSupabase();
   }
 
   /**
