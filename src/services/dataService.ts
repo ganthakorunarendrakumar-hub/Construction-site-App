@@ -1062,6 +1062,11 @@ class DataService {
     }
   }
 
+  /** Persist the current local collection snapshot immediately. */
+  public async persistCloudState(): Promise<void> {
+    await this.pushCloudState();
+  }
+
   // ==========================================
   // AUTH & ROLES
   // ==========================================

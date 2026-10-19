@@ -1321,6 +1321,7 @@ class AttendanceService {
 
     localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, JSON.stringify(allRecords));
     this.recordAudit('save_attendance', `${groupId}_${date}`, { count: savedRecords.length, date });
+    await dataService.persistCloudState();
     return savedRecords;
   }
 
