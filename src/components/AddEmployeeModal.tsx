@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Upload, User, DollarSign, Clock, ShieldCheck, AlertTriangle } from 'lucide-react';
-import { Employee, AttendanceGroup, Project, SalaryType, EmployeeJobType } from '../types';
+import { Employee, AttendanceGroup, Project, SalaryType, EmployeeJobType, EmployeeDocuments, TransactionAttachment } from '../types';
 import { dataService } from '../services/dataService';
+import { getLocalDateString } from '../utils/dateUtils';
+import { AttachmentFileLink } from './AttachmentSections';
 
 interface AddEmployeeModalProps {
   isOpen: boolean;
@@ -10,6 +12,7 @@ interface AddEmployeeModalProps {
     employee_code?: string;
     full_name: string;
     photo_url?: string;
+    documents?: EmployeeDocuments;
     phone?: string;
     address?: string;
     job_type: EmployeeJobType | string;
@@ -27,6 +30,7 @@ interface AddEmployeeModalProps {
   groups: AttendanceGroup[];
   projects: Project[];
   defaultGroupId?: string;
+  onUploadFile: (file: File) => Promise<{ url: string; name: string; size: number; type?: string }>;
 }
 
 const JOB_TYPES: EmployeeJobType[] = [
@@ -49,7 +53,8 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   editingEmployee,
   groups,
   projects,
-  defaultGroupId
+  defaultGroupId,
+  onUploadFile
 }) => {
   const [employeeCode, setEmployeeCode] = useState('');
   const [fullName, setFullName] = useState('');
@@ -59,29 +64,47 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   const [jobType, setJobType] = useState<string>('Labourer');
   const [groupId, setGroupId] = useState('');
   const [projectId, setProjectId] = useState('');
-  const [joiningDate, setJoiningDate] = useState('2026-10-01');
+  const [joiningDate, setJoiningDate] = useState(getLocalDateString());
   const [salaryType, setSalaryType] = useState<SalaryType>('daily_wage');
-  const [salaryAmount, setSalaryAmount] = useState('800');
+  const [salaryAmount, setSalaryAmount] = useState('');
   const [standardHours, setStandardHours] = useState('8');
-  const [overtimeRate, setOvertimeRate] = useState('150');
+  const [overtimeRate, setOvertimeRate] = useState('');
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
   const [remarks, setRemarks] = useState('');
+  const [aadhaarPdf, setAadhaarPdf] = useState<TransactionAttachment | null>(null);
+  const [aadhaarFront, setAadhaarFront] = useState<TransactionAttachment | null>(null);
+  const [aadhaarBack, setAadhaarBack] = useState<TransactionAttachment | null>(null);
+  const [documentPreview, setDocumentPreview] = useState<{ file: TransactionAttachment; url: string } | null>(null);
+  const pendingPreviewUrls = useRef<Set<string>>(new Set());
+
+  const releasePreview = (attachment: TransactionAttachment | null) => {
+    const previewUrl = (attachment as (TransactionAttachment & { previewUrl?: string }) | null)?.previewUrl;
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      pendingPreviewUrls.current.delete(previewUrl);
+    }
+  };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
+    pendingPreviewUrls.current.forEach(url => URL.revokeObjectURL(url));
+    pendingPreviewUrls.current.clear();
     if (editingEmployee) {
       setEmployeeCode(editingEmployee.employee_code);
       setFullName(editingEmployee.full_name);
       setPhotoUrl(editingEmployee.photo_url || '');
+      setAadhaarPdf(editingEmployee.documents?.aadhaar_pdf || null);
+      setAadhaarFront(editingEmployee.documents?.aadhaar_front || null);
+      setAadhaarBack(editingEmployee.documents?.aadhaar_back || null);
       setPhone(editingEmployee.phone || '');
       setAddress(editingEmployee.address || '');
       setJobType(editingEmployee.job_type);
       setGroupId(editingEmployee.group_id || '');
       setProjectId(editingEmployee.project_id || '');
-      setJoiningDate(editingEmployee.joining_date || new Date().toISOString().split('T')[0]);
+      setJoiningDate(editingEmployee.joining_date || getLocalDateString());
       setSalaryType(editingEmployee.salary_type || 'daily_wage');
       setSalaryAmount(String(editingEmployee.salary_amount));
       setStandardHours(String(editingEmployee.standard_hours_per_day || 8));
@@ -100,32 +123,34 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       
       setFullName('');
       setPhotoUrl('');
+      setAadhaarPdf(null);
+      setAadhaarFront(null);
+      setAadhaarBack(null);
       setPhone('');
       setAddress('');
       setJobType('Labourer');
       setProjectId(targetGroup?.project_id || projects[0]?.id || '');
-      setJoiningDate(new Date().toISOString().split('T')[0]);
+      setJoiningDate(getLocalDateString());
       setSalaryType('daily_wage');
-      setSalaryAmount('750');
+      setSalaryAmount('');
       setStandardHours('8');
-      setOvertimeRate('140');
+      setOvertimeRate('');
       setStatus('active');
       setRemarks('');
     }
     setError(null);
-  }, [editingEmployee, isOpen, groups, defaultGroupId, projects]);
+  }, [editingEmployee?.id, isOpen]);
+
+  useEffect(() => () => {
+    pendingPreviewUrls.current.forEach(url => URL.revokeObjectURL(url));
+    pendingPreviewUrls.current.clear();
+  }, []);
 
   const handleGroupChange = (newGroupId: string) => {
     setGroupId(newGroupId);
     const targetGroup = groups.find(g => g.id === newGroupId);
     if (targetGroup?.project_id) {
       setProjectId(targetGroup.project_id);
-    }
-    if (!editingEmployee) {
-      const prefix = targetGroup
-        ? (targetGroup.name.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'EMP')
-        : 'IND';
-      setEmployeeCode(`EMP-${prefix}-${Math.floor(100 + Math.random() * 900)}`);
     }
   };
 
@@ -163,6 +188,64 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     }
   };
 
+  const handleAadhaarUpload = (slot: 'pdf' | 'front' | 'back', e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    const isImage = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || /\.(jpg|jpeg|png|webp)$/i.test(file.name);
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Aadhaar document is too large. Maximum allowed size is 5MB.');
+      return;
+    }
+    if ((slot === 'pdf' && !isPdf) || (slot !== 'pdf' && !isImage)) {
+      setError(slot === 'pdf' ? 'Please select an Aadhaar PDF.' : 'Please select an Aadhaar JPG, JPEG, PNG, or WEBP image.');
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    pendingPreviewUrls.current.add(previewUrl);
+    const attachment: TransactionAttachment & { pendingFile?: File; previewUrl?: string } = {
+      url: previewUrl,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      pendingFile: file,
+      previewUrl
+    };
+    if (slot === 'pdf') {
+      releasePreview(aadhaarPdf);
+      releasePreview(aadhaarFront);
+      releasePreview(aadhaarBack);
+      setAadhaarPdf(attachment);
+      setAadhaarFront(null);
+      setAadhaarBack(null);
+    } else {
+      releasePreview(aadhaarPdf);
+      releasePreview(slot === 'front' ? aadhaarFront : aadhaarBack);
+      setAadhaarPdf(null);
+      if (slot === 'front') setAadhaarFront(attachment);
+      else setAadhaarBack(attachment);
+    }
+    setError(null);
+  };
+
+  const removeAadhaar = (slot: 'pdf' | 'front' | 'back') => {
+    const current = slot === 'pdf' ? aadhaarPdf : slot === 'front' ? aadhaarFront : aadhaarBack;
+    releasePreview(current);
+    if (slot === 'pdf') setAadhaarPdf(null);
+    else if (slot === 'front') setAadhaarFront(null);
+    else setAadhaarBack(null);
+  };
+
+  const saveDocument = async (attachment: TransactionAttachment | null): Promise<TransactionAttachment | undefined> => {
+    if (!attachment) return undefined;
+    const pending = attachment as TransactionAttachment & { pendingFile?: File; previewUrl?: string };
+    if (!pending.pendingFile) return attachment;
+    const uploaded = await onUploadFile(pending.pendingFile);
+    return { ...uploaded, type: pending.pendingFile.type };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) {
@@ -174,14 +257,28 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       setError('Salary / wage amount must be a positive number.');
       return;
     }
+    if (!aadhaarPdf && ((aadhaarFront && !aadhaarBack) || (!aadhaarFront && aadhaarBack))) {
+      setError('Please upload both Aadhaar front and back images, or use one Aadhaar PDF.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
       setError(null);
+      const [savedPdf, savedFront, savedBack] = await Promise.all([
+        saveDocument(aadhaarPdf),
+        saveDocument(aadhaarFront),
+        saveDocument(aadhaarBack)
+      ]);
       await onSubmit({
         employee_code: employeeCode.trim(),
         full_name: fullName.trim(),
         photo_url: photoUrl.trim() || undefined,
+        documents: savedPdf || savedFront || savedBack ? {
+          aadhaar_pdf: savedPdf,
+          aadhaar_front: savedFront,
+          aadhaar_back: savedBack
+        } : undefined,
         phone: phone.trim() || undefined,
         address: address.trim() || undefined,
         job_type: jobType,
@@ -312,6 +409,43 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                   </select>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Aadhaar Document (optional, sensitive) */}
+          <div className="p-4 bg-[#F7F7F7] rounded-xl border border-[#E8E8E8] space-y-3">
+            <div>
+              <h4 className="text-xs font-bold text-[#111111] uppercase">Aadhaar Document (Optional)</h4>
+              <p className="text-[10px] text-[#666666] mt-0.5">Upload one PDF, or both front and back images. Maximum 5MB per file.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {([
+                ['pdf', 'Aadhaar PDF', aadhaarPdf, '.pdf,application/pdf'],
+                ['front', 'Front Image', aadhaarFront, '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp'],
+                ['back', 'Back Image', aadhaarBack, '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp']
+              ] as const).map(([slot, label, file, accept]) => (
+                <div key={slot} className="space-y-1.5">
+                  <div className="text-[11px] font-semibold text-[#111111]">{label}</div>
+                  {file ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-[#E8E8E8] bg-white p-2">
+                      <AttachmentFileLink
+                        file={file}
+                        label={file.name}
+                        compact={slot !== 'pdf'}
+                        onPreview={(previewFile, url) => setDocumentPreview({ file: previewFile, url })}
+                      />
+                      <button type="button" onClick={() => removeAadhaar(slot)} className="ml-auto text-[#666666] hover:text-red-600" title={`Remove ${label}`}>
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#CFCFCF] p-2 text-[11px] text-[#666666] hover:border-[#FFC400] hover:text-[#111111]">
+                      <Upload className="h-3.5 w-3.5" /> Upload
+                      <input type="file" accept={accept} className="hidden" onChange={e => handleAadhaarUpload(slot, e)} />
+                    </label>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -543,6 +677,17 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
             </button>
           </div>
         </form>
+
+        {documentPreview && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-label="Aadhaar document preview">
+            <button type="button" onClick={() => setDocumentPreview(null)} className="absolute right-5 top-5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#111111]">Close</button>
+            {documentPreview.file.type === 'application/pdf' || /\.pdf$/i.test(documentPreview.file.name) ? (
+              <iframe src={documentPreview.url} title={documentPreview.file.name} className="h-[85vh] w-[90vw] rounded-xl bg-white" />
+            ) : (
+              <img src={documentPreview.url} alt={documentPreview.file.name} className="max-h-[85vh] max-w-[90vw] rounded-xl object-contain" />
+            )}
+          </div>
+        )}
 
       </div>
     </div>

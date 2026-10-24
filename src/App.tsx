@@ -24,6 +24,7 @@ import { SandModule } from './components/SandModule';
 import { BricksModule } from './components/BricksModule';
 import { AggregateModule } from './components/AggregateModule';
 import { GenericEquipmentModule } from './components/GenericEquipmentModule';
+import { HireModule } from './components/HireModule';
 import { ReportsView } from './components/ReportsView';
 import { AttendanceView } from './components/AttendanceView';
 import { UserManagementView } from './components/UserManagementView';
@@ -46,6 +47,8 @@ type ViewMode =
   | 'bricks_module'
   | 'aggregate_module'
   | 'category_module'
+  | 'vehicle_hire'
+  | 'machinery_hire'
   | 'reports'
   | 'attendance'
   | 'user_management';
@@ -58,6 +61,7 @@ export default function App() {
 
   // Modals state
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isCloudSetupOpen, setIsCloudSetupOpen] = useState(false);
   const [isTestWorkflowOpen, setIsTestWorkflowOpen] = useState(false);
   const [testWorkflowLogs, setTestWorkflowLogs] = useState<string[]>([]);
@@ -163,23 +167,6 @@ export default function App() {
   // Derived lists
   const ongoingProjects = projects.filter(p => p.status !== 'completed');
   const completedProjects = projects.filter(p => p.status === 'completed');
-
-  // Total cement stock across all ongoing projects
-  const [totalCementStockAcrossAll, setTotalCementStockAcrossAll] = useState(72);
-
-  useEffect(() => {
-    async function calculateGlobalStock() {
-      let total = 0;
-      for (const p of ongoingProjects) {
-        const m = await dataService.calculateCementStock(p.id);
-        total += m.totalAvailableBags;
-      }
-      setTotalCementStockAcrossAll(total);
-    }
-    if (ongoingProjects.length > 0) {
-      calculateGlobalStock();
-    }
-  }, [projects, transactions]);
 
   // Navigation handlers
   const handleOpenProject = async (project: Project) => {
@@ -303,6 +290,14 @@ export default function App() {
 
   // Section 16 Automated End-to-End Verification Test Runner
   const runSection16Tests = async () => {
+    setTestWorkflowLogs([
+      `[${new Date().toLocaleTimeString()}] The demo data verification runner is disabled for production use.`
+    ]);
+    return;
+
+    /* Legacy test workflow intentionally disabled: it creates business-looking
+       projects and inventory transactions in application storage. */
+    /*
     setIsTestingWorkflow(true);
     setTestWorkflowLogs([]);
 
@@ -453,6 +448,15 @@ export default function App() {
     } finally {
       setIsTestingWorkflow(false);
     }
+    */
+  };
+
+  const handleUpdateProject = async (projectData: any) => {
+    if (!editingProject) throw new Error('No project selected for editing.');
+    const updated = await dataService.updateProject(editingProject.id, projectData);
+    await loadData();
+    setEditingProject(null);
+    return updated;
   };
 
   if (isAuthChecking) {
@@ -502,7 +506,6 @@ export default function App() {
                 ongoingProjects={ongoingProjects}
                 completedProjects={completedProjects}
                 currentUser={currentUser}
-                totalCementStockBags={totalCementStockAcrossAll}
                 onUpdateCompanyName={handleUpdateCompanyName}
                 onNavigateCreateProject={() => setIsCreateProjectOpen(true)}
                 onNavigateOngoing={() => setCurrentView('ongoing_projects')}
@@ -520,6 +523,7 @@ export default function App() {
                 projects={ongoingProjects}
                 currentUser={currentUser}
                 onOpenProject={handleOpenProject}
+                onEditProject={setEditingProject}
                 onNavigateCreate={() => setIsCreateProjectOpen(true)}
                 onMarkCompleted={handleMarkProjectCompleted}
                 onNavigateBack={() => setCurrentView('home')}
@@ -552,6 +556,8 @@ export default function App() {
                   setActiveCategoryId(catId);
                   setCurrentView('category_module');
                 }}
+                onOpenVehicleHire={() => setCurrentView('vehicle_hire')}
+                onOpenMachineryHire={() => setCurrentView('machinery_hire')}
                 onNavigateHome={() => setCurrentView('home')}
                 onNavigateProjects={() => setCurrentView(selectedProject.status === 'completed' ? 'completed_projects' : 'ongoing_projects')}
               />
@@ -636,6 +642,14 @@ export default function App() {
               />
             )}
 
+            {currentView === 'vehicle_hire' && selectedProject && (
+              <HireModule mode="vehicle" project={selectedProject} currentUser={currentUser} onNavigateBack={() => setCurrentView('project_workspace')} onNavigateHome={() => setCurrentView('home')} onUploadFile={handleUploadFile} />
+            )}
+
+            {currentView === 'machinery_hire' && selectedProject && (
+              <HireModule mode="machinery" project={selectedProject} currentUser={currentUser} onNavigateBack={() => setCurrentView('project_workspace')} onNavigateHome={() => setCurrentView('home')} onUploadFile={handleUploadFile} />
+            )}
+
             {/* VIEW 11: MATERIALS & STOCK REPORTS */}
             {currentView === 'reports' && (
               <ReportsView
@@ -669,7 +683,7 @@ export default function App() {
       </main>
 
       {/* Floating Section 16 Verification Runner Button */}
-      <aside aria-label="Testing Suite" className="fixed bottom-4 right-4 z-30">
+      <aside aria-label="Testing Suite" className="hidden">
         <button
           onClick={() => setIsTestWorkflowOpen(true)}
           className="px-3.5 py-2 bg-slate-900 text-amber-400 hover:bg-slate-800 rounded-full shadow-lg border border-slate-700 text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
@@ -747,6 +761,14 @@ export default function App() {
         onClose={() => setIsCreateProjectOpen(false)}
         onSubmit={handleCreateProject}
         currentUser={currentUser}
+      />
+
+      <CreateProjectModal
+        isOpen={Boolean(editingProject)}
+        onClose={() => setEditingProject(null)}
+        onSubmit={handleUpdateProject}
+        currentUser={currentUser}
+        project={editingProject}
       />
 
       {/* CLOUD DATABASE & SETUP MODAL */}

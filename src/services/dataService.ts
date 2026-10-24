@@ -19,7 +19,9 @@ import {
   ItemStockSummary,
   CategoryStockMetrics,
   ExtendedTransactionType,
-  StandardCategoryKey
+  StandardCategoryKey,
+  VehicleHireRecord,
+  MachineryHireRecord
 } from '../types';
 import {
   INITIAL_STEEL_BRANDS,
@@ -31,6 +33,7 @@ import {
   INITIAL_ITEMS_BY_CATEGORY,
   REGULAR_SITE_USE_DETAILED_ITEMS
 } from './materialCatalog';
+import { getLocalDateString } from '../utils/dateUtils';
 
 const generateUuid = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -181,6 +184,8 @@ const STORAGE_KEYS = {
   AGGREGATE_SIZES: 'buildpulse_aggregate_sizes_v2',
   CATEGORY_ITEMS: 'buildpulse_category_items_v2',
   GENERIC_TRANSACTIONS: 'buildpulse_generic_transactions_v2',
+  VEHICLE_HIRE: 'buildpulse_vehicle_hire_v1',
+  MACHINERY_HIRE: 'buildpulse_machinery_hire_v1',
 };
 
 export const INITIAL_REGULAR_SITE_USE_TRANSACTIONS: GenericMaterialTransaction[] = [
@@ -1109,6 +1114,15 @@ class DataService {
   // SEEDING DEFAULT DATA FOR IMMEDIATE TESTING
   // ==========================================
   private seedDefaultDataIfEmpty() {
+    // Business/demo records are intentionally not seeded in the application.
+    // Required catalog defaults remain available through their respective
+    // getters, while projects, locations, and ledgers start empty for a new
+    // local installation. Existing stored data is left untouched.
+    return;
+
+    /* Legacy demo seed data retained below for historical reference only.
+       It is unreachable and must not be re-enabled in production. */
+    /*
     try {
       if (!localStorage.getItem(STORAGE_KEYS.COMPANY)) {
         const defaultCompany: Company = {
@@ -1720,6 +1734,7 @@ class DataService {
     } catch (e) {
       console.error('Error during data seeding', e);
     }
+    */
   }
 
   // ==========================================
@@ -1847,8 +1862,16 @@ class DataService {
     if (!projectInput.expected_completion_date) {
       throw new Error('Expected completion date is required.');
     }
-    if (new Date(projectInput.expected_completion_date) < new Date(projectInput.start_date)) {
+    if (projectInput.expected_completion_date < projectInput.start_date) {
       throw new Error('Expected completion date cannot be earlier than start date.');
+    }
+    const today = getLocalDateString();
+    const effectiveStatus = projectInput.status || 'in_progress';
+    if (effectiveStatus === 'in_progress' && projectInput.start_date > today) {
+      throw new Error("An ongoing project's start date cannot be in the future.");
+    }
+    if (effectiveStatus === 'planning' && projectInput.start_date < today) {
+      throw new Error("A planning project's start date cannot be in the past.");
     }
 
     const company = await this.getCompany();
@@ -1871,7 +1894,7 @@ class DataService {
       client_name: projectInput.client_name.trim(),
       address: projectInput.address.trim(),
       location: projectInput.location.trim(),
-      status: projectInput.status || 'in_progress',
+      status: effectiveStatus,
       created_by: this.currentUser.id,
       created_by_name: this.currentUser.full_name,
       created_at: new Date().toISOString(),
@@ -1906,6 +1929,108 @@ class DataService {
     return newProject;
   }
 
+  public async updateProject(
+    projectId: string,
+    projectInput: Omit<Project, 'id' | 'company_id' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at' | 'completed_at' | 'completed_by' | 'actual_completion_date' | 'reopened_at' | 'reopened_by'>
+  ): Promise<Project> {
+    if (this.currentUser.role !== 'admin' && this.currentUser.role !== 'project_manager') {
+      throw new Error('Access Denied: Only Company Administrators and Project Managers can edit projects.');
+    }
+
+    if (!projectInput.name || !projectInput.name.trim()) {
+      throw new Error('Project name is required.');
+    }
+    if (!projectInput.code || !projectInput.code.trim()) {
+      throw new Error('Unique project code is required.');
+    }
+    if (!projectInput.client_name || !projectInput.client_name.trim()) {
+      throw new Error('Client or Customer name is required.');
+    }
+    if (!projectInput.location || !projectInput.location.trim()) {
+      throw new Error('Location (City, State) is required.');
+    }
+    if (!projectInput.start_date) {
+      throw new Error('Start date is required.');
+    }
+    if (!projectInput.expected_completion_date) {
+      throw new Error('Expected completion date is required.');
+    }
+    if (projectInput.expected_completion_date < projectInput.start_date) {
+      throw new Error('Expected completion date cannot be earlier than start date.');
+    }
+    const today = getLocalDateString();
+    const effectiveStatus = projectInput.status || 'in_progress';
+    if (effectiveStatus === 'in_progress' && projectInput.start_date > today) {
+      throw new Error("An ongoing project's start date cannot be in the future.");
+    }
+    if (effectiveStatus === 'planning' && projectInput.start_date < today) {
+      throw new Error("A planning project's start date cannot be in the past.");
+    }
+
+    const projects = await this.getProjects();
+    const projectIndex = projects.findIndex(p => p.id === projectId);
+    if (projectIndex === -1) throw new Error('Project not found.');
+
+    const isDuplicateCode = projects.some(
+      p => p.id !== projectId && p.code.trim().toUpperCase() === projectInput.code.trim().toUpperCase()
+    );
+    if (isDuplicateCode) {
+      throw new Error(`Project code "${projectInput.code.trim().toUpperCase()}" already exists. Please enter a unique code.`);
+    }
+
+    const existing = projects[projectIndex];
+    const updated: Project = {
+      ...existing,
+      ...projectInput,
+      status: effectiveStatus,
+      id: existing.id,
+      company_id: existing.company_id,
+      created_by: existing.created_by,
+      created_by_name: existing.created_by_name,
+      created_at: existing.created_at,
+      code: projectInput.code.trim().toUpperCase(),
+      name: projectInput.name.trim(),
+      client_name: projectInput.client_name.trim(),
+      address: projectInput.address.trim(),
+      location: projectInput.location.trim(),
+      description: projectInput.description.trim(),
+      project_manager_name: projectInput.project_manager_name.trim(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (this.supabase && this.config.isConnected) {
+      try {
+        const cloudProject = {
+          name: updated.name,
+          code: updated.code,
+          client_name: updated.client_name,
+          address: updated.address,
+          location: updated.location,
+          description: updated.description,
+          start_date: updated.start_date,
+          expected_completion_date: updated.expected_completion_date,
+          project_manager_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(updated.project_manager_id)
+            ? updated.project_manager_id
+            : null,
+          status: updated.status,
+          updated_at: updated.updated_at
+        };
+        const { error } = await this.supabase.from('projects').update(cloudProject).eq('id', projectId);
+        if (error) throw new Error(error.message);
+      } catch (err: any) {
+        throw new Error(`Cloud project update failed: ${err.message}`);
+      }
+    }
+
+    projects[projectIndex] = updated;
+    localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+    this.recordAuditLog('update_project', 'projects', updated.id, {
+      name: updated.name,
+      code: updated.code
+    });
+    return updated;
+  }
+
   public async markProjectCompleted(projectId: string): Promise<Project> {
     if (this.currentUser.role !== 'admin' && this.currentUser.role !== 'project_manager') {
       throw new Error('Access Denied: Only Administrators and Project Managers can mark a project as completed.');
@@ -1923,7 +2048,7 @@ class DataService {
     const updated: Project = {
       ...project,
       status: 'completed',
-      actual_completion_date: new Date().toISOString().split('T')[0],
+      actual_completion_date: getLocalDateString(),
       completed_at: new Date().toISOString(),
       completed_by: this.currentUser.id,
       updated_at: new Date().toISOString()
@@ -2285,6 +2410,7 @@ class DataService {
     attachmentUrl?: string;
     attachmentName?: string;
     attachmentSize?: number;
+    attachments?: import('../types').TransactionAttachments;
   }): Promise<MaterialTransaction> {
     // 1. RBAC Permissions Verification
     const role = this.currentUser.role;
@@ -2358,6 +2484,7 @@ class DataService {
       attachment_url: txInput.attachmentUrl,
       attachment_name: txInput.attachmentName,
       attachment_size: txInput.attachmentSize,
+      attachments: txInput.attachments,
       // Authenticated user snapshot (cannot be spoofed)
       created_by: this.currentUser.id,
       created_by_name: this.currentUser.full_name,
@@ -2375,7 +2502,11 @@ class DataService {
     }
 
     if (this.supabase && this.config.isConnected) {
-      const { error } = await this.supabase.from('material_transactions').insert([newTx]);
+      // Keep the structured attachment bundle in local persistence until the
+      // remote schema has an attachments column; legacy attachment columns
+      // continue to be sent to Supabase unchanged.
+      const { attachments: _attachments, ...cloudTransaction } = newTx;
+      const { error } = await this.supabase.from('material_transactions').insert([cloudTransaction]);
       if (error) throw new Error(`Cloud transaction save failed: ${error.message}`);
     }
 
@@ -2430,7 +2561,7 @@ class DataService {
       category: 'cement',
       brand_id: orig.brand_id,
       brand_name: orig.brand_name,
-      transaction_date: new Date().toISOString().split('T')[0],
+          transaction_date: getLocalDateString(),
       transaction_type: invertedType,
       quantity_bags: orig.quantity_bags,
       received_qty: invertedType === 'receipt' ? orig.quantity_bags : 0,
@@ -2471,20 +2602,14 @@ class DataService {
       throw new Error(`File is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum allowed attachment size is 10MB.`);
     }
 
-    const allowedMime = [
-      'image/jpeg',
-      'image/png',
-      'image/webp',
-      'application/pdf',
-      'image/heic'
-    ];
-    if (!allowedMime.includes(file.type) && !file.name.match(/\.(jpg|jpeg|png|webp|pdf|heic)$/i)) {
-      throw new Error('Unsupported file format. Please attach JPEG, PNG, WEBP, or PDF invoices/challans.');
+    const allowedMime = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowedMime.includes(file.type) && !file.name.match(/\.(jpg|jpeg|png|pdf)$/i)) {
+      throw new Error('Unsupported file format. Please attach PDF, JPG, JPEG, or PNG files.');
     }
 
     const fileExt = file.name.split('.').pop() || 'bin';
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const storagePath = `comp-apex-01/${projectId}/cement_${Date.now()}_${sanitizedName}`;
+    const storagePath = `comp-apex-01/${projectId}/documents_${Date.now()}_${sanitizedName}`;
 
     // If Supabase Storage is connected, upload to 'construction-docs' bucket
     if (this.supabase && this.config.isConnected) {
@@ -2525,6 +2650,77 @@ class DataService {
       reader.onerror = () => reject(new Error('Failed to read file for storage'));
       reader.readAsDataURL(file);
     });
+  }
+
+  /**
+   * Uploads a sensitive employee document without exposing a public URL.
+   * The returned storage path is resolved through createSignedUrl when it is
+   * opened. The local fallback remains a data URL because localStorage is the
+   * supported offline persistence mechanism for this application.
+   */
+  public async uploadPrivateAttachment(file: File, projectId: string): Promise<{ url: string; name: string; size: number; type?: string }> {
+    const maxSizeBytes = 5 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      throw new Error('Aadhaar document is too large. Maximum allowed size is 5MB.');
+    }
+    const allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowedMime.includes(file.type) && !file.name.match(/\.(jpg|jpeg|png|webp|pdf)$/i)) {
+      throw new Error('Unsupported Aadhaar format. Please attach PDF, JPG, JPEG, PNG, or WEBP.');
+    }
+
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const storagePath = `comp-apex-01/${projectId}/private_employee_documents_${Date.now()}_${sanitizedName}`;
+    if (this.supabase && this.config.isConnected) {
+      try {
+        const { data, error } = await this.supabase.storage
+          .from('construction-docs')
+          .upload(storagePath, file, { cacheControl: '3600', upsert: false });
+        if (!error && data) {
+          return { url: storagePath, name: file.name, size: file.size, type: file.type };
+        }
+        if (error) throw error;
+      } catch (err) {
+        console.warn('Private document upload failed, using client data URL', err);
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ url: reader.result as string, name: file.name, size: file.size, type: file.type });
+      reader.onerror = () => reject(new Error('Failed to read Aadhaar document for storage'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /** Resolve a saved attachment reference before it is used by a viewer. */
+  public async resolveAttachmentUrl(reference: string): Promise<string> {
+    const value = reference.trim();
+    if (!value) throw new Error('Attachment reference is empty.');
+    const isSupabaseStorageReference = value.includes('/storage/v1/object/');
+    if (value.startsWith('data:') || value.startsWith('blob:') || value.startsWith('/') || (/^https?:\/\//i.test(value) && !isSupabaseStorageReference)) {
+      return value;
+    }
+
+    if (this.supabase && this.config.isConnected) {
+      let path = value;
+      const storageMarker = '/storage/v1/object/';
+      const markerIndex = value.indexOf(storageMarker);
+      if (markerIndex >= 0) {
+        const afterMarker = value.slice(markerIndex + storageMarker.length);
+        const parts = afterMarker.split('/');
+        if (parts.length >= 3) path = parts.slice(2).join('/').split('?')[0];
+      } else if (path.startsWith('construction-docs/')) {
+        path = path.slice('construction-docs/'.length);
+      }
+
+      const { data, error } = await this.supabase.storage
+        .from('construction-docs')
+        .createSignedUrl(path, 3600);
+      if (!error && data?.signedUrl) return data.signedUrl;
+      throw new Error(error?.message || 'The saved attachment could not be opened.');
+    }
+
+    throw new Error('The saved attachment reference is not a complete local or public URL.');
   }
 
   // ==========================================
@@ -3093,6 +3289,7 @@ class DataService {
     attachmentUrl?: string;
     attachmentName?: string;
     attachmentSize?: number;
+    attachments?: import('../types').TransactionAttachments;
     equipment_condition?: 'good' | 'fair' | 'damaged' | 'maintenance';
     issued_to?: string;
     idempotency_key?: string;
@@ -3211,6 +3408,7 @@ class DataService {
       attachment_url: txInput.attachmentUrl,
       attachment_name: txInput.attachmentName,
       attachment_size: txInput.attachmentSize,
+      attachments: txInput.attachments,
       idempotency_key: txInput.idempotency_key,
       created_by: this.currentUser.id,
       created_by_name: this.currentUser.full_name,
@@ -3275,7 +3473,7 @@ class DataService {
       brand_name: orig.brand_name,
       diameter_or_size: orig.diameter_or_size,
       unit: orig.unit,
-      transaction_date: new Date().toISOString().split('T')[0],
+      transaction_date: getLocalDateString(),
       transaction_type: invertedType,
       quantity: orig.quantity,
       received_qty: invertedType === 'receipt' ? orig.quantity : 0,
@@ -3332,6 +3530,75 @@ class DataService {
     }
 
     return lines.join('\n');
+  }
+
+  // ==========================================
+  // VEHICLE & MACHINERY HIRE
+  // ==========================================
+  private canManageHire(): boolean {
+    return ['admin', 'project_manager', 'site_supervisor'].includes(this.currentUser.role);
+  }
+
+  public async getVehicleHireRecords(projectId: string): Promise<VehicleHireRecord[]> {
+    const stored = localStorage.getItem(STORAGE_KEYS.VEHICLE_HIRE);
+    return (stored ? JSON.parse(stored) : [])
+      .filter((record: VehicleHireRecord) => record.project_id === projectId)
+      .sort((a: VehicleHireRecord, b: VehicleHireRecord) => b.hire_date.localeCompare(a.hire_date) || b.created_at.localeCompare(a.created_at));
+  }
+
+  public async saveVehicleHireRecord(input: Omit<VehicleHireRecord, 'id' | 'company_id' | 'project_name' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at'> & { id?: string }): Promise<VehicleHireRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to manage vehicle hire.');
+    const project = await this.getProjectById(input.project_id);
+    if (!project) throw new Error('Project not found.');
+    const stored = localStorage.getItem(STORAGE_KEYS.VEHICLE_HIRE);
+    const all: VehicleHireRecord[] = stored ? JSON.parse(stored) : [];
+    const now = new Date().toISOString();
+    const existingIndex = input.id ? all.findIndex(record => record.id === input.id) : -1;
+    const record: VehicleHireRecord = {
+      ...input,
+      id: existingIndex >= 0 ? all[existingIndex].id : `vh-${generateUuid()}`,
+      company_id: existingIndex >= 0 ? all[existingIndex].company_id : project.company_id,
+      project_name: project.name,
+      created_by: existingIndex >= 0 ? all[existingIndex].created_by : this.currentUser.id,
+      created_by_name: existingIndex >= 0 ? all[existingIndex].created_by_name : this.currentUser.full_name,
+      created_at: existingIndex >= 0 ? all[existingIndex].created_at : now,
+      updated_at: now
+    };
+    if (existingIndex >= 0) all[existingIndex] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE, JSON.stringify(all));
+    this.recordAuditLog(existingIndex >= 0 ? 'update_vehicle_hire' : 'create_vehicle_hire', 'vehicle_hire', record.id, { project_id: record.project_id });
+    return record;
+  }
+
+  public async getMachineryHireRecords(projectId: string): Promise<MachineryHireRecord[]> {
+    const stored = localStorage.getItem(STORAGE_KEYS.MACHINERY_HIRE);
+    return (stored ? JSON.parse(stored) : [])
+      .filter((record: MachineryHireRecord) => record.project_id === projectId)
+      .sort((a: MachineryHireRecord, b: MachineryHireRecord) => b.received_date.localeCompare(a.received_date) || b.created_at.localeCompare(a.created_at));
+  }
+
+  public async saveMachineryHireRecord(input: Omit<MachineryHireRecord, 'id' | 'company_id' | 'project_name' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at'> & { id?: string }): Promise<MachineryHireRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to manage machinery hire.');
+    const project = await this.getProjectById(input.project_id);
+    if (!project) throw new Error('Project not found.');
+    const stored = localStorage.getItem(STORAGE_KEYS.MACHINERY_HIRE);
+    const all: MachineryHireRecord[] = stored ? JSON.parse(stored) : [];
+    const now = new Date().toISOString();
+    const existingIndex = input.id ? all.findIndex(record => record.id === input.id) : -1;
+    const record: MachineryHireRecord = {
+      ...input,
+      id: existingIndex >= 0 ? all[existingIndex].id : `mh-${generateUuid()}`,
+      company_id: existingIndex >= 0 ? all[existingIndex].company_id : project.company_id,
+      project_name: project.name,
+      created_by: existingIndex >= 0 ? all[existingIndex].created_by : this.currentUser.id,
+      created_by_name: existingIndex >= 0 ? all[existingIndex].created_by_name : this.currentUser.full_name,
+      created_at: existingIndex >= 0 ? all[existingIndex].created_at : now,
+      updated_at: now
+    };
+    if (existingIndex >= 0) all[existingIndex] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.MACHINERY_HIRE, JSON.stringify(all));
+    this.recordAuditLog(existingIndex >= 0 ? 'update_machinery_hire' : 'create_machinery_hire', 'machinery_hire', record.id, { project_id: record.project_id });
+    return record;
   }
 
   // ==========================================

@@ -123,6 +123,19 @@ export interface MaterialLocation {
 
 export type TransactionType = 'receipt' | 'usage' | 'damage' | 'return' | 'opening_stock';
 
+export interface TransactionAttachment {
+  url: string;
+  name: string;
+  size: number;
+  type?: string;
+}
+
+export interface TransactionAttachments {
+  invoice?: TransactionAttachment;
+  dc?: TransactionAttachment;
+  images: TransactionAttachment[];
+}
+
 export interface MaterialTransaction {
   id: string;
   company_id: string;
@@ -146,6 +159,7 @@ export interface MaterialTransaction {
   attachment_url?: string;
   attachment_name?: string;
   attachment_size?: number;
+  attachments?: TransactionAttachments;
   created_by: string;
   created_by_name: string;
   created_by_role: UserRole;
@@ -269,6 +283,7 @@ export interface GenericMaterialTransaction {
   attachment_url?: string;
   attachment_name?: string;
   attachment_size?: number;
+  attachments?: TransactionAttachments;
   idempotency_key?: string;
   created_by: string;
   created_by_name: string;
@@ -354,12 +369,67 @@ export interface AttendanceGroup {
   created_by?: string;
 }
 
+export interface VehicleHireRecord {
+  id: string;
+  company_id: string;
+  project_id: string;
+  project_name: string;
+  vehicle_category: string;
+  vehicle_type: string;
+  vehicle_identifier: string;
+  vendor: string;
+  operator?: string;
+  hire_date: string;
+  start_time: string;
+  stop_time: string;
+  idle_minutes: number;
+  idle_reason?: string;
+  fuel_type: 'petrol' | 'diesel';
+  fuel_litres?: number;
+  working_hours: number;
+  remarks?: string;
+  attachments?: TransactionAttachments;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MachineryHireRecord {
+  id: string;
+  company_id: string;
+  project_id: string;
+  project_name: string;
+  machinery_category: string;
+  machinery_type: string;
+  equipment_identifier: string;
+  vendor: string;
+  location: string;
+  quantity: number;
+  received_date: string;
+  returned_date?: string;
+  rent_per_day: number;
+  remarks?: string;
+  attachments?: TransactionAttachments;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmployeeDocuments {
+  aadhaar_pdf?: TransactionAttachment;
+  aadhaar_front?: TransactionAttachment;
+  aadhaar_back?: TransactionAttachment;
+}
+
 export interface Employee {
   id: string;
   company_id: string;
   employee_code: string;
   full_name: string;
   photo_url?: string;
+  documents?: EmployeeDocuments;
   phone?: string;
   address?: string;
   job_type: EmployeeJobType | string;
@@ -420,6 +490,7 @@ export interface SalaryPaymentRecord {
   payment_type: 'salary' | 'advance' | 'bonus' | 'deduction';
   reference_no?: string;
   remarks?: string;
+  attachments?: TransactionAttachments;
   recorded_by: string;
   recorded_by_name: string;
   created_at: string;

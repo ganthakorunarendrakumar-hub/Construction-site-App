@@ -10,6 +10,7 @@ import {
   EmployeeJobType,
   Project
 } from '../types';
+import { getLocalDateString } from '../utils/dateUtils';
 
 const STORAGE_KEYS = {
   GROUPS: 'buildpulse_attendance_groups_v1',
@@ -676,30 +677,16 @@ export const INITIAL_PAYMENTS: SalaryPaymentRecord[] = [
 class AttendanceService {
   private ensureInitialized() {
     if (!localStorage.getItem(STORAGE_KEYS.GROUPS)) {
-      localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(INITIAL_GROUPS));
+      localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.EMPLOYEES)) {
-      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(INITIAL_EMPLOYEES));
-    } else {
-      try {
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
-        let updated = false;
-        for (const emp of INITIAL_EMPLOYEES) {
-          if (!stored.some((e: any) => e.id === emp.id)) {
-            stored.push(emp);
-            updated = true;
-          }
-        }
-        if (updated) {
-          localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(stored));
-        }
-      } catch {}
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.ATTENDANCE_RECORDS)) {
-      localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, JSON.stringify(INITIAL_ATTENDANCE_RECORDS));
+      localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.PAYMENTS)) {
-      localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(INITIAL_PAYMENTS));
+      localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify([]));
     }
   }
 
@@ -884,6 +871,7 @@ class AttendanceService {
     employee_code?: string;
     full_name: string;
     photo_url?: string;
+    documents?: import('../types').EmployeeDocuments;
     phone?: string;
     address?: string;
     job_type: EmployeeJobType | string;
@@ -951,6 +939,7 @@ class AttendanceService {
       employee_code: empCode,
       full_name: trimmedName,
       photo_url: input.photo_url,
+      documents: input.documents,
       phone: input.phone?.trim(),
       address: input.address?.trim(),
       job_type: input.job_type || 'Labourer',
@@ -958,7 +947,7 @@ class AttendanceService {
       group_name: targetGroup ? targetGroup.name : undefined,
       project_id: projId,
       project_name: projectName,
-      joining_date: input.joining_date || new Date().toISOString().split('T')[0],
+      joining_date: input.joining_date || getLocalDateString(),
       salary_type: input.salary_type || 'daily_wage',
       salary_amount: wage,
       standard_hours_per_day: stdHours,
@@ -980,6 +969,7 @@ class AttendanceService {
     employee_code?: string;
     full_name: string;
     photo_url?: string;
+    documents?: import('../types').EmployeeDocuments;
     phone?: string;
     address?: string;
     job_type: EmployeeJobType | string;
@@ -1038,6 +1028,7 @@ class AttendanceService {
       employee_code: empCode,
       full_name: trimmedName,
       photo_url: input.photo_url !== undefined ? input.photo_url : employees[idx].photo_url,
+      documents: input.documents !== undefined ? input.documents : employees[idx].documents,
       phone: input.phone !== undefined ? input.phone.trim() : employees[idx].phone,
       address: input.address !== undefined ? input.address.trim() : employees[idx].address,
       job_type: input.job_type || employees[idx].job_type,
@@ -1374,6 +1365,7 @@ class AttendanceService {
     payment_type?: 'salary' | 'advance' | 'bonus' | 'deduction';
     reference_no?: string;
     remarks?: string;
+    attachments?: import('../types').TransactionAttachments;
   }): Promise<SalaryPaymentRecord> {
     const currentUser = dataService.getCurrentUser();
     if (currentUser.role !== 'admin' && currentUser.role !== 'project_manager') {
@@ -1395,12 +1387,13 @@ class AttendanceService {
       employee_id: employee.id,
       employee_name: employee.full_name,
       employee_code: employee.employee_code,
-      payment_date: input.payment_date || new Date().toISOString().split('T')[0],
+      payment_date: input.payment_date || getLocalDateString(),
       amount: amt,
       payment_method: input.payment_method,
       payment_type: input.payment_type || 'salary',
       reference_no: input.reference_no?.trim(),
       remarks: input.remarks?.trim(),
+      attachments: input.attachments,
       recorded_by: currentUser.id,
       recorded_by_name: currentUser.full_name,
       created_at: new Date().toISOString()

@@ -25,6 +25,9 @@ import {
   MaterialTransaction,
   ProjectStockMetrics
 } from '../types';
+import { getLocalDateString } from '../utils/dateUtils';
+import { AttachmentSections, emptyTransactionAttachments, hasTransactionAttachments } from './AttachmentSections';
+import { TransactionAttachments } from '../types';
 
 interface CementTransactionModalProps {
   isOpen: boolean;
@@ -51,6 +54,7 @@ interface CementTransactionModalProps {
     attachmentUrl?: string;
     attachmentName?: string;
     attachmentSize?: number;
+    attachments?: TransactionAttachments;
   }) => Promise<MaterialTransaction>;
   onUploadFile: (file: File) => Promise<{ url: string; name: string; size: number }>;
 }
@@ -71,8 +75,8 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
   const [selectedBrandId, setSelectedBrandId] = useState<string>(preselectedBrandId || brands[0]?.id || '');
   const [customBrandName, setCustomBrandName] = useState('');
   const [locationId, setLocationId] = useState(locations[0]?.id || 'main-site');
-  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
-  const [quantityBags, setQuantityBags] = useState<string>('50');
+  const [transactionDate, setTransactionDate] = useState(getLocalDateString());
+  const [quantityBags, setQuantityBags] = useState<string>('');
   
   // Commercial & Audit Metadata
   const [supplierName, setSupplierName] = useState('');
@@ -81,15 +85,11 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
   const [remarks, setRemarks] = useState('');
 
   // Attachment state
-  const [attachment, setAttachment] = useState<{ url: string; name: string; size: number } | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<TransactionAttachments>(emptyTransactionAttachments());
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successSaved, setSuccessSaved] = useState<MaterialTransaction | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
@@ -108,22 +108,6 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
     if (transactionType === 'receipt' || transactionType === 'opening_stock') return canPerformReceipt;
     if (transactionType === 'usage' || transactionType === 'damage') return canPerformUsageOrDamage;
     return true;
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsUploading(true);
-      setUploadError(null);
-      const uploaded = await onUploadFile(file);
-      setAttachment(uploaded);
-    } catch (err: any) {
-      setUploadError(err.message || 'File upload failed');
-    } finally {
-      setIsUploading(false);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,6 +152,7 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
 
     const selectedLoc = locations.find(l => l.id === locationId);
     const locName = selectedLoc ? selectedLoc.name : 'Main Site Cement Yard';
+    if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
 
     try {
       setIsSubmitting(true);
@@ -184,9 +169,10 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
         invoiceNumber: invoiceNumber.trim(),
         challanNumber: challanNumber.trim(),
         remarks: remarks.trim(),
-        attachmentUrl: attachment?.url,
-        attachmentName: attachment?.name,
-        attachmentSize: attachment?.size
+        attachmentUrl: attachments.invoice?.url || attachments.dc?.url,
+        attachmentName: attachments.invoice?.name || attachments.dc?.name,
+        attachmentSize: attachments.invoice?.size || attachments.dc?.size,
+        attachments
       });
 
       setSuccessSaved(saved);
@@ -504,54 +490,7 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                 />
               </div>
 
-              {/* Supporting Document Upload */}
-              <div>
-                <label className="block text-[11px] font-medium text-[#666666] mb-1">
-                  Attach Delivery Challan / Invoice / Photo
-                </label>
-
-                {attachment ? (
-                  <div className="flex items-center justify-between p-2.5 bg-white border border-[#E8E8E8] rounded-xl text-xs">
-                    <div className="flex items-center gap-2 truncate">
-                      <FileCheck className="w-4 h-4 text-[#111111] shrink-0" />
-                      <span className="font-semibold text-[#111111] truncate">{attachment.name}</span>
-                      <span className="text-[10px] text-[#666666] font-mono">
-                        ({(attachment.size / 1024).toFixed(0)} KB)
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAttachment(null)}
-                      className="text-[#666666] hover:text-[#111111] p-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="px-3 py-1.5 bg-white border border-[#E8E8E8] hover:bg-[#F7F7F7] text-[#111111] text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
-                    >
-                      <Upload className="w-3.5 h-3.5 text-[#666666]" />
-                      {isUploading ? 'Uploading...' : 'Upload File / Photo (Max 10MB)'}
-                    </button>
-                    <span className="text-[11px] text-[#666666]">
-                      PDF challans, JPG/PNG site photos
-                    </span>
-                  </div>
-                )}
-                {uploadError && <p className="text-[11px] text-[#111111] mt-1">{uploadError}</p>}
-              </div>
+              <AttachmentSections value={attachments} onChange={setAttachments} onUploadFile={onUploadFile} />
 
             </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Users,
   Plus,
@@ -47,6 +47,8 @@ import { dataService } from '../services/dataService';
 import { CreateGroupModal } from './CreateGroupModal';
 import { AddEmployeeModal } from './AddEmployeeModal';
 import { RecordPaymentModal } from './RecordPaymentModal';
+import { AttachmentFileLink, AttachmentLinks } from './AttachmentSections';
+import { getLocalDateString, getLocalDateStringOffset, getLocalMonthStartString, getLocalYearStartString } from '../utils/dateUtils';
 
 interface AttendanceViewProps {
   currentUser: UserProfile;
@@ -91,7 +93,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const [groupStatusFilter, setGroupStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   // Mark Attendance State
-  const [attendanceDate, setAttendanceDate] = useState<string>('2026-10-17');
+  const [attendanceDate, setAttendanceDate] = useState<string>(getLocalDateString());
   const [dailyForm, setDailyForm] = useState<
     Record<
       string,
@@ -106,11 +108,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       }
     >
   >({});
+  const attendanceFormContextRef = useRef<string | null>(null);
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const [attendanceSaveMessage, setAttendanceSaveMessage] = useState<string | null>(null);
 
   // History State
-  const [historyDate, setHistoryDate] = useState<string>('2026-10-16');
+  const [historyDate, setHistoryDate] = useState<string>(getLocalDateStringOffset(-1));
 
   // Salary & Payments State
   const [salarySummaries, setSalarySummaries] = useState<EmployeeSalarySummary[]>([]);
@@ -118,9 +121,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
   // Reports State
   const [reportMode, setReportMode] = useState<'date_range' | 'up_to_date'>('date_range');
-  const [reportFromDate, setReportFromDate] = useState<string>('2026-10-01');
-  const [reportToDate, setReportToDate] = useState<string>('2026-10-17');
-  const [reportUpToDate, setReportUpToDate] = useState<string>('2026-10-17');
+  const [reportFromDate, setReportFromDate] = useState<string>(getLocalMonthStartString());
+  const [reportToDate, setReportToDate] = useState<string>(getLocalDateString());
+  const [reportUpToDate, setReportUpToDate] = useState<string>(getLocalDateString());
   const [reportGroupScope, setReportGroupScope] = useState<string>('all');
   const [reportEmployeeFilter, setReportEmployeeFilter] = useState<string>('all');
   const [reportSummaries, setReportSummaries] = useState<EmployeeSalarySummary[]>([]);
@@ -194,7 +197,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
   // Load daily attendance register when activeGroup or attendanceDate changes
   useEffect(() => {
-    if (!selectedGroupId) return;
+    if (!selectedGroupId || isLoading) return;
 
     const currentRecords = attendanceRecords.filter(
       r => r.group_id === selectedGroupId && r.date === attendanceDate
@@ -238,20 +241,23 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       }
     });
 
-    setDailyForm(initialMap);
+    const contextKey = `${selectedGroupId}:${attendanceDate}`;
+    const contextChanged = attendanceFormContextRef.current !== contextKey;
+    attendanceFormContextRef.current = contextKey;
+    setDailyForm(previous => contextChanged ? initialMap : { ...initialMap, ...previous });
     setAttendanceSaveMessage(null);
-  }, [selectedGroupId, attendanceDate, groupEmployees, attendanceRecords]);
+  }, [selectedGroupId, attendanceDate, groupEmployees, attendanceRecords, isLoading]);
 
   // Load Salary summaries when group or period changes
   useEffect(() => {
     if (!selectedGroupId) return;
     async function loadSalary() {
-      let fromDate = '2026-10-01';
-      let toDate = '2026-10-17';
+      let fromDate = getLocalMonthStartString();
+      let toDate = getLocalDateString();
       if (salaryPeriod === 'last_30_days') {
-        fromDate = '2026-09-17';
+        fromDate = getLocalDateStringOffset(-29);
       } else if (salaryPeriod === 'all') {
-        fromDate = '2026-01-01';
+        fromDate = getLocalYearStartString();
       }
       const sums = await attendanceService.computeSalarySummaries({
         groupId: selectedGroupId || undefined,
@@ -693,7 +699,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               filteredGroups.map(group => {
                 const count = employees.filter(e => e.group_id === group.id && e.status === 'active').length;
                 const todayPresent = attendanceRecords.filter(
-                  r => r.group_id === group.id && r.date === '2026-10-17' && r.status === 'Present'
+                  r => r.group_id === group.id && r.date === attendanceDate && r.status === 'Present'
                 ).length;
 
                 return (
@@ -716,6 +722,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                           </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                        {group.photo_url && (
+                          <div className="absolute bottom-2.5 left-2.5 rounded-lg bg-white/90 px-2 py-1">
+                            <AttachmentFileLink file={{ url: group.photo_url, name: `${group.name} photo`, size: 0, type: 'image/*' }} label="Download photo" />
+                          </div>
+                        )}
 
                         {/* Status Badge */}
                         <div className="absolute top-2.5 right-2.5">
@@ -924,6 +935,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                               <p className="font-bold text-[#111111]">{emp.full_name}</p>
                               <p className="text-[11px] font-mono text-[#666666]">{emp.employee_code}</p>
                               {emp.phone && <p className="text-[10px] text-[#888888]">{emp.phone}</p>}
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                {emp.photo_url && <AttachmentFileLink file={{ url: emp.photo_url, name: `${emp.employee_code}-photo`, size: 0, type: 'image/*' }} label="Photo" />}
+                                {emp.documents?.aadhaar_pdf && <AttachmentFileLink file={emp.documents.aadhaar_pdf} label="Aadhaar PDF" />}
+                                {emp.documents?.aadhaar_front && <AttachmentFileLink file={emp.documents.aadhaar_front} label="Aadhaar front" />}
+                                {emp.documents?.aadhaar_back && <AttachmentFileLink file={emp.documents.aadhaar_back} label="Aadhaar back" />}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -1163,7 +1180,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       />
                       <button
                         type="button"
-                        onClick={() => setAttendanceDate('2026-10-17')}
+                        onClick={() => setAttendanceDate(getLocalDateString())}
                         className="px-2.5 py-1 text-[11px] font-medium bg-[#F7F7F7] hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
                       >
                         Today
@@ -1498,6 +1515,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <p className="text-xs text-[#666666] font-medium">
                           {emp.job_type}
                         </p>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {emp.photo_url && <AttachmentFileLink file={{ url: emp.photo_url, name: `${emp.employee_code}-photo`, size: 0, type: 'image/*' }} label="Photo" />}
+                          {emp.documents?.aadhaar_pdf && <AttachmentFileLink file={emp.documents.aadhaar_pdf} label="Aadhaar PDF" />}
+                          {emp.documents?.aadhaar_front && <AttachmentFileLink file={emp.documents.aadhaar_front} label="Aadhaar front" />}
+                          {emp.documents?.aadhaar_back && <AttachmentFileLink file={emp.documents.aadhaar_back} label="Aadhaar back" />}
+                        </div>
                       </div>
                     </div>
 
@@ -1563,14 +1586,14 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   <div className="pt-4 flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setHistoryDate('2026-10-16')}
+                      onClick={() => setHistoryDate(getLocalDateStringOffset(-1))}
                       className="px-2.5 py-1 text-xs font-medium bg-[#F7F7F7] hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
                     >
                       Oct 16
                     </button>
                     <button
                       type="button"
-                      onClick={() => setHistoryDate('2026-10-15')}
+                      onClick={() => setHistoryDate(getLocalDateStringOffset(-2))}
                       className="px-2.5 py-1 text-xs font-medium bg-[#F7F7F7] hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
                     >
                       Oct 15
@@ -1784,6 +1807,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                             <span className="text-xs text-[#666666] block">
                               Method: {p.payment_method} {p.reference_no && `• Ref: ${p.reference_no}`} {p.remarks && `• "${p.remarks}"`}
                             </span>
+                            <AttachmentLinks attachments={p.attachments} />
                           </div>
                           <div className="text-right">
                             <span className="font-mono font-bold text-sm text-[#111111]">₹{p.amount.toLocaleString()}</span>
@@ -1897,8 +1921,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            setReportFromDate('2026-10-01');
-                            setReportToDate('2026-10-17');
+                            setReportFromDate(getLocalMonthStartString());
+                            setReportToDate(getLocalDateString());
                           }}
                           className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
                         >
@@ -1907,8 +1931,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            setReportFromDate('2026-10-10');
-                            setReportToDate('2026-10-17');
+                            setReportFromDate(getLocalDateStringOffset(-6));
+                            setReportToDate(getLocalDateString());
                           }}
                           className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
                         >
@@ -1933,14 +1957,14 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       <div className="sm:col-span-3 flex items-center gap-1.5 pt-1">
                         <button
                           type="button"
-                          onClick={() => setReportUpToDate('2026-10-17')}
+                          onClick={() => setReportUpToDate(getLocalDateString())}
                           className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
                         >
                           Today (Oct 17)
                         </button>
                         <button
                           type="button"
-                          onClick={() => setReportUpToDate('2026-10-15')}
+                          onClick={() => setReportUpToDate(getLocalDateStringOffset(-2))}
                           className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
                         >
                           Oct 15
@@ -2102,6 +2126,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         groups={groups}
         projects={projects}
         defaultGroupId={addEmployeeDefaultGroupId !== undefined ? addEmployeeDefaultGroupId : (selectedGroupId || undefined)}
+        onUploadFile={(file) => dataService.uploadPrivateAttachment(file, selectedGroupId || 'attendance')}
       />
 
       {/* RECORD PAYMENT MODAL */}
@@ -2116,6 +2141,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         employees={selectedGroupId ? groupEmployees : employees}
         selectedEmployee={paymentTargetEmployee}
         suggestedAmount={paymentSuggestedAmount}
+        onUploadFile={(file) => dataService.uploadAttachment(file, selectedGroupId || 'attendance')}
       />
 
     </div>

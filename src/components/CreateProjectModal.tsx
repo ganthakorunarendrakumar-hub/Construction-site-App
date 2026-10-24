@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   PlusCircle,
@@ -12,8 +12,9 @@ import {
   Hash,
   ShieldAlert
 } from 'lucide-react';
-import { Project, ProjectStatus, UserProfile } from '../types';
-import { PRESET_USERS } from '../services/dataService';
+import { AuthAccount, Project, ProjectStatus, UserProfile } from '../types';
+import { authService } from '../services/authService';
+import { getLocalDateString, getLocalDateStringOffset } from '../utils/dateUtils';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -32,13 +33,15 @@ interface CreateProjectModalProps {
     status: ProjectStatus;
   }) => Promise<Project>;
   currentUser: UserProfile;
+  project?: Project | null;
 }
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  currentUser
+  currentUser,
+  project = null
 }) => {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
@@ -46,16 +49,66 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [address, setAddress] = useState('');
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(getLocalDateString());
   const [expectedCompletionDate, setExpectedCompletionDate] = useState(
-    new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    getLocalDateStringOffset(180)
   );
-  const [pmId, setPmId] = useState(PRESET_USERS.project_manager.id);
+  const [projectManagers, setProjectManagers] = useState<AuthAccount[]>([]);
+  const [pmId, setPmId] = useState('');
   const [status, setStatus] = useState<ProjectStatus>('in_progress');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successCreated, setSuccessCreated] = useState<Project | null>(null);
+
+  const isEditMode = Boolean(project);
+  const hasCustomProjectManager = Boolean(
+    project && !projectManagers.some(user =>
+      user.auth_uid === project.project_manager_id || user.user_id === project.project_manager_id
+    )
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let active = true;
+    authService.getProjectManagerCandidates()
+      .then(accounts => {
+        if (active) setProjectManagers(accounts);
+      })
+      .catch(() => {
+        if (active) setProjectManagers([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !project || projectManagers.length === 0) return;
+    const matchingManager = projectManagers.find(user =>
+      user.auth_uid === project.project_manager_id || user.user_id === project.project_manager_id
+    );
+    if (matchingManager) setPmId(matchingManager.auth_uid);
+  }, [isOpen, project?.id, project?.project_manager_id, projectManagers]);
+
+  useEffect(() => {
+    if (isOpen && project) {
+      setName(project.name);
+      setCode(project.code);
+      setClientName(project.client_name);
+      setAddress(project.address);
+      setLocation(project.location);
+      setDescription(project.description);
+      setStartDate(project.start_date);
+      setExpectedCompletionDate(project.expected_completion_date);
+      setPmId(project.project_manager_id);
+      setStatus(project.status === 'completed' ? 'in_progress' : project.status);
+      setErrorMessage(null);
+      setSuccessCreated(null);
+    }
+  }, [isOpen, project]);
 
   if (!isOpen) return null;
 
@@ -94,12 +147,31 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       setErrorMessage('Expected completion date is required.');
       return;
     }
-    if (new Date(expectedCompletionDate) < new Date(startDate)) {
+    const today = getLocalDateString();
+    if (expectedCompletionDate < startDate) {
       setErrorMessage('Expected completion date cannot be earlier than start date.');
       return;
     }
+    if (status === 'in_progress' && startDate > today) {
+      setErrorMessage("An ongoing project's start date cannot be in the future.");
+      return;
+    }
+    if (status === 'planning' && startDate < today) {
+      setErrorMessage("A planning project's start date cannot be in the past.");
+      return;
+    }
 
-    const selectedPm = Object.values(PRESET_USERS).find(u => u.id === pmId) || PRESET_USERS.project_manager;
+    const selectedPm = projectManagers.find(user =>
+      user.auth_uid === pmId || user.user_id === pmId
+    );
+    const preservingLegacyAssignment = Boolean(
+      isEditMode && project && pmId === project.project_manager_id && !selectedPm
+    );
+
+    if (!selectedPm && !preservingLegacyAssignment) {
+      setErrorMessage('Please select an active eligible project manager.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -112,12 +184,17 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         description: description.trim(),
         start_date: startDate,
         expected_completion_date: expectedCompletionDate,
-        project_manager_id: selectedPm.id,
-        project_manager_name: selectedPm.full_name,
+        project_manager_id: selectedPm?.auth_uid || project!.project_manager_id,
+        project_manager_name: selectedPm?.full_name || project!.project_manager_name,
         status
       });
 
-      setSuccessCreated(created);
+      if (isEditMode) {
+        window.alert('Project updated successfully.');
+        resetAndClose();
+      } else {
+        setSuccessCreated(created);
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to save project. Please verify inputs.');
     } finally {
@@ -132,6 +209,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     setAddress('');
     setLocation('');
     setDescription('');
+    setStartDate(getLocalDateString());
+    setExpectedCompletionDate(getLocalDateStringOffset(180));
+    setPmId('');
+    setStatus('in_progress');
     setErrorMessage(null);
     setSuccessCreated(null);
     onClose();
@@ -148,8 +229,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               <Building2 className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Create Project</h3>
-              <p className="text-xs text-[#AAAAAA]">Add a new construction site to your portfolio</p>
+              <h3 className="text-base font-bold text-white">{isEditMode ? 'Edit Project' : 'Create Project'}</h3>
+              <p className="text-xs text-[#AAAAAA]">{isEditMode ? 'Update the existing construction site details' : 'Add a new construction site to your portfolio'}</p>
             </div>
           </div>
           <button
@@ -284,17 +365,22 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   <select
                     value={pmId}
                     onChange={(e) => setPmId(e.target.value)}
+                    required={!isEditMode}
                     className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] transition-colors"
                   >
-                    <option value={PRESET_USERS.project_manager.id}>
-                      {PRESET_USERS.project_manager.full_name} (Senior PM)
+                    <option value="" disabled>
+                      {projectManagers.length > 0 ? 'Select a project manager' : 'No eligible active managers found'}
                     </option>
-                    <option value={PRESET_USERS.admin.id}>
-                      {PRESET_USERS.admin.full_name} (Director / Admin)
-                    </option>
-                    <option value={PRESET_USERS.site_engineer.id}>
-                      {PRESET_USERS.site_engineer.full_name} (Site In-Charge)
-                    </option>
+                    {hasCustomProjectManager && project && (
+                      <option value={project.project_manager_id}>
+                        {project.project_manager_name} (Current Manager)
+                      </option>
+                    )}
+                    {projectManagers.map(manager => (
+                      <option key={manager.auth_uid} value={manager.auth_uid}>
+                        {manager.full_name} ({manager.role_title})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -388,7 +474,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                 className="px-5 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] text-xs font-bold rounded-xl shadow-xs flex items-center gap-2 transition-all disabled:opacity-50"
               >
                 <PlusCircle className="w-4 h-4 text-[#111111]" />
-                {isSubmitting ? 'Saving...' : 'Create Project'}
+                  {isSubmitting ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Project'}
               </button>
             </div>
           </form>

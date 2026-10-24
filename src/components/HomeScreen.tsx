@@ -22,7 +22,6 @@ interface HomeScreenProps {
   ongoingProjects: Project[];
   completedProjects: Project[];
   currentUser: UserProfile;
-  totalCementStockBags: number;
   onUpdateCompanyName: (newName: string) => Promise<void>;
   onNavigateCreateProject: () => void;
   onNavigateOngoing: () => void;
@@ -38,7 +37,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   ongoingProjects,
   completedProjects,
   currentUser,
-  totalCementStockBags,
   onUpdateCompanyName,
   onNavigateCreateProject,
   onNavigateOngoing,
@@ -135,21 +133,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
           </div>
 
-          {/* Quick Metrics (Connected to real data) */}
-          <div className="flex items-center gap-5 sm:gap-8 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-[#E8E8E8] md:pl-8 shrink-0">
-            <div>
-              <p className="text-xs font-medium text-[#666666]">Live Cement Stock</p>
-              <p className="text-2xl sm:text-[26px] font-bold text-[#111111] font-mono mt-0.5">
-                {totalCementStockBags.toLocaleString()} <span className="text-xs font-normal text-[#666666]">bags</span>
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[#666666]">Active Sites</p>
-              <p className="text-2xl sm:text-[26px] font-bold text-[#111111] font-mono mt-0.5">
-                {ongoingProjects.length}
-              </p>
-            </div>
-          </div>
         </div>
       </section>
 

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Calendar, CreditCard, AlertTriangle, User } from 'lucide-react';
 import { Employee } from '../types';
+import { getLocalDateString } from '../utils/dateUtils';
+import { AttachmentSections, emptyTransactionAttachments, hasTransactionAttachments } from './AttachmentSections';
+import { TransactionAttachments } from '../types';
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -14,7 +17,9 @@ interface RecordPaymentModalProps {
     payment_type: 'salary' | 'advance' | 'bonus' | 'deduction';
     reference_no?: string;
     remarks?: string;
+    attachments?: TransactionAttachments;
   }) => Promise<void>;
+  onUploadFile: (file: File) => Promise<{ url: string; name: string; size: number }>;
   groupId: string;
   employees: Employee[];
   selectedEmployee?: Employee | null;
@@ -29,14 +34,16 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   employees,
   selectedEmployee,
   suggestedAmount
+  , onUploadFile
 }) => {
   const [employeeId, setEmployeeId] = useState('');
   const [amount, setAmount] = useState('');
-  const [paymentDate, setPaymentDate] = useState('2026-10-17');
+  const [paymentDate, setPaymentDate] = useState(getLocalDateString());
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Bank Transfer' | 'UPI' | 'Cheque'>('Cash');
   const [paymentType, setPaymentType] = useState<'salary' | 'advance' | 'bonus' | 'deduction'>('salary');
   const [referenceNo, setReferenceNo] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [attachments, setAttachments] = useState<TransactionAttachments>(emptyTransactionAttachments());
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,13 +59,14 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     } else {
       setAmount('');
     }
-    setPaymentDate(new Date().toISOString().split('T')[0]);
+    setPaymentDate(getLocalDateString());
     setPaymentMethod('Cash');
     setPaymentType('salary');
     setReferenceNo('');
     setRemarks('');
+    setAttachments(emptyTransactionAttachments());
     setError(null);
-  }, [isOpen, selectedEmployee, employees, suggestedAmount]);
+  }, [isOpen, selectedEmployee?.id, suggestedAmount]);
 
   if (!isOpen) return null;
 
@@ -79,6 +87,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       setError('Please select a payment date.');
       return;
     }
+    if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
 
     try {
       setIsSubmitting(true);
@@ -92,6 +101,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         payment_type: paymentType,
         reference_no: referenceNo.trim() || undefined,
         remarks: remarks.trim() || undefined
+        , attachments
       });
       onClose();
     } catch (err: any) {
@@ -254,6 +264,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </div>
 
           {/* Actions */}
+          <AttachmentSections value={attachments} onChange={setAttachments} onUploadFile={onUploadFile} />
           <div className="pt-3 border-t border-[#E8E8E8] flex items-center justify-end gap-2">
             <button
               type="button"

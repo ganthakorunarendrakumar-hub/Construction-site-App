@@ -12,7 +12,7 @@ import {
   Briefcase,
   AlertCircle
 } from 'lucide-react';
-import { UserProfile, Employee, AttendanceRecord, SalaryPaymentRecord } from '../types';
+import { UserProfile, Employee, DailyAttendanceRecord, SalaryPaymentRecord } from '../types';
 import { attendanceService } from '../services/attendanceService';
 
 interface WorkerPortalViewProps {
@@ -21,7 +21,7 @@ interface WorkerPortalViewProps {
 
 export const WorkerPortalView: React.FC<WorkerPortalViewProps> = ({ currentUser }) => {
   const [employee, setEmployee] = useState<Employee | null>(null);
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [records, setRecords] = useState<DailyAttendanceRecord[]>([]);
   const [payments, setPayments] = useState<SalaryPaymentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 

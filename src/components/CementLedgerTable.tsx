@@ -15,6 +15,7 @@ import {
   TransactionType,
   UserProfile
 } from '../types';
+import { AttachmentLinks } from './AttachmentSections';
 
 interface CementLedgerTableProps {
   transactions: MaterialTransaction[];
@@ -320,19 +321,7 @@ export const CementLedgerTable: React.FC<CementLedgerTableProps> = ({
                     </td>
 
                     <td className="py-3 px-4 text-center whitespace-nowrap">
-                      {tx.attachment_url ? (
-                        <a
-                          href={tx.attachment_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#111111] hover:underline"
-                        >
-                          <Paperclip className="w-3.5 h-3.5" />
-                          View
-                        </a>
-                      ) : (
-                        <span className="text-[#888888]">—</span>
-                      )}
+                      <AttachmentLinks attachments={tx.attachments} legacyUrl={tx.attachment_url} legacyName={tx.attachment_name} />
                     </td>
 
                     <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -443,20 +432,9 @@ export const CementLedgerTable: React.FC<CementLedgerTableProps> = ({
                 </div>
               )}
 
-              {selectedTx.attachment_url && (
+              {(selectedTx.attachment_url || selectedTx.attachments) && (
                 <div className="p-3 bg-[#F7F7F7] border border-[#E8E8E8] rounded-xl flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Paperclip className="w-4 h-4 text-[#111111]" />
-                    <span className="font-semibold text-[#111111] truncate max-w-xs">{selectedTx.attachment_name || 'Document'}</span>
-                  </div>
-                  <a
-                    href={selectedTx.attachment_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-3 py-1 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-semibold text-xs rounded-lg transition-colors shadow-xs"
-                  >
-                    View Document
-                  </a>
+                  <AttachmentLinks attachments={selectedTx.attachments} legacyUrl={selectedTx.attachment_url} legacyName={selectedTx.attachment_name} />
                 </div>
               )}
 

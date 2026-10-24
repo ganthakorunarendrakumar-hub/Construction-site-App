@@ -30,6 +30,7 @@ import {
   MaterialCumulativeSummary,
   UnifiedTransaction
 } from '../services/reportService';
+import { getLocalDateString, getLocalDateStringOffset, getLocalMonthStartString, getLocalYearStartString } from '../utils/dateUtils';
 
 interface ReportsViewProps {
   initialProjectId?: string;
@@ -48,11 +49,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const [reportMode, setReportMode] = useState<'date_range' | 'up_to_date'>('date_range');
 
   // Option 1 inputs: From Date & To Date
-  const [fromDate, setFromDate] = useState<string>('2026-10-01');
-  const [toDate, setToDate] = useState<string>('2026-10-17');
+  const [fromDate, setFromDate] = useState<string>(getLocalMonthStartString());
+  const [toDate, setToDate] = useState<string>(getLocalDateString());
 
   // Option 2 input: ONLY Report Up To Date (Never ask for fromDate in this option)
-  const [upToDate, setUpToDate] = useState<string>('2026-10-17');
+  const [upToDate, setUpToDate] = useState<string>(getLocalDateString());
 
   // Common filters
   const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId);
@@ -65,6 +66,16 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const [categories, setCategories] = useState<MaterialCategoryDef[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  // Category definitions are the single source for this filter. Keep the
+  // first definition for a stable id or label so legacy saved catalog entries
+  // cannot create duplicate dropdown choices without touching transactions.
+  const reportCategories = categories.filter((category, index, all) => {
+    const normalizedName = category.name.trim().toLowerCase();
+    return all.findIndex(candidate =>
+      candidate.id === category.id || candidate.name.trim().toLowerCase() === normalizedName
+    ) === index;
+  });
 
   // Results state
   const [dateRangeReport, setDateRangeReport] = useState<DateRangeReportResult | null>(null);
@@ -364,31 +375,31 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <span className="text-[11px] font-semibold text-[#666666] mr-1">Quick:</span>
                 <button
                   type="button"
-                  onClick={() => setQuickRange('2026-10-01', '2026-10-17')}
+                  onClick={() => setQuickRange(getLocalMonthStartString(), getLocalDateString())}
                   className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC] transition-colors"
                 >
-                  October 2026
+                  This Month
                 </button>
                 <button
                   type="button"
-                  onClick={() => setQuickRange('2026-10-10', '2026-10-17')}
+                  onClick={() => setQuickRange(getLocalDateStringOffset(-6), getLocalDateString())}
                   className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC] transition-colors"
                 >
                   Last 7 Days
                 </button>
                 <button
                   type="button"
-                  onClick={() => setQuickRange('2026-10-03', '2026-10-14')}
+                  onClick={() => setQuickRange(getLocalDateStringOffset(-13), getLocalDateStringOffset(-2))}
                   className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC] transition-colors"
                 >
-                  Audit Week (Oct 3 - Oct 14)
+                  Previous 12-Day Audit Window
                 </button>
                 <button
                   type="button"
-                  onClick={() => setQuickRange('2026-01-01', '2026-10-17')}
+                  onClick={() => setQuickRange(getLocalYearStartString(), getLocalDateString())}
                   className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC] transition-colors"
                 >
-                  All Year 2026
+                  Year to Date
                 </button>
               </div>
             </div>
@@ -422,31 +433,31 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <span className="text-[11px] font-semibold text-[#666666] mr-1">Quick Cut-off:</span>
                 <button
                   type="button"
-                  onClick={() => setQuickCutoff('2026-10-17')}
+                  onClick={() => setQuickCutoff(getLocalDateString())}
                   className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC] transition-colors"
                 >
-                  Today (Oct 17, 2026)
+                  Today
                 </button>
                 <button
                   type="button"
-                  onClick={() => setQuickCutoff('2026-10-14')}
+                  onClick={() => setQuickCutoff(getLocalDateStringOffset(-3))}
                   className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC] transition-colors"
                 >
-                  Oct 14, 2026
+                  3 Days Ago
                 </button>
                 <button
                   type="button"
-                  onClick={() => setQuickCutoff('2026-10-12')}
+                  onClick={() => setQuickCutoff(getLocalDateStringOffset(-5))}
                   className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC] transition-colors"
                 >
-                  Oct 12, 2026
+                  5 Days Ago
                 </button>
                 <button
                   type="button"
-                  onClick={() => setQuickCutoff('2026-10-10')}
+                  onClick={() => setQuickCutoff(getLocalDateStringOffset(-7))}
                   className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC] transition-colors"
                 >
-                  Oct 10, 2026
+                  7 Days Ago
                 </button>
               </div>
             </div>
@@ -493,8 +504,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               className="w-full px-3 py-2 bg-white text-xs text-[#111111] font-semibold rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
             >
               <option value="all">All Categories</option>
-              <option value="cement">Cement</option>
-              {categories.map((c) => (
+              {reportCategories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>

@@ -54,6 +54,9 @@ import {
   MaterialCategoryDef
 } from '../types';
 import { dataService } from '../services/dataService';
+import { getLocalDateString } from '../utils/dateUtils';
+import { AttachmentLinks, AttachmentSections, emptyTransactionAttachments, hasTransactionAttachments } from './AttachmentSections';
+import { TransactionAttachments } from '../types';
 
 interface GenericEquipmentModuleProps {
   categoryId: string;
@@ -95,9 +98,9 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItemName, setSelectedItemName] = useState('');
   const [txLocationId, setTxLocationId] = useState(locations[0]?.id || 'main-site');
-  const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
+  const [txDate, setTxDate] = useState(getLocalDateString());
   const [txType, setTxType] = useState<ExtendedTransactionType>('receipt');
-  const [txQty, setTxQty] = useState('10');
+  const [txQty, setTxQty] = useState('');
   const [txUnit, setTxUnit] = useState('Nos');
   const [txCondition, setTxCondition] = useState<'good' | 'fair' | 'damaged' | 'maintenance'>('good');
   const [issuedToCrew, setIssuedToCrew] = useState('');
@@ -106,6 +109,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
   const [challanNumber, setChallanNumber] = useState('');
   const [remarks, setRemarks] = useState('');
   const [attachment, setAttachment] = useState<{ url: string; name: string; size: number } | null>(null);
+  const [attachments, setAttachments] = useState<TransactionAttachments>(emptyTransactionAttachments());
   const [isUploading, setIsUploading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -289,6 +293,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
       }
     }
 
+    if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
+
     try {
       setIsSubmitting(true);
       const loc = locations.find(l => l.id === txLocationId);
@@ -314,7 +320,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
         remarks: remarks.trim() || undefined,
         attachmentUrl: attachment?.url,
         attachmentName: attachment?.name,
-        attachmentSize: attachment?.size
+        attachmentSize: attachment?.size,
+        attachments
       });
 
       setSuccessSaved(saved);
@@ -917,12 +924,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                           <span className="text-[10px] text-[#666666] font-mono">{new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          {tx.attachment_url ? (
-                            <a href={tx.attachment_url} target="_blank" rel="noreferrer" className="text-[#111111] hover:underline inline-flex items-center gap-1 font-semibold text-[11px]">
-                              <Paperclip className="w-3.5 h-3.5" />
-                              View
-                            </a>
-                          ) : '—'}
+                          <AttachmentLinks attachments={tx.attachments} legacyUrl={tx.attachment_url} legacyName={tx.attachment_name} />
                         </td>
                         {isAdmin && (
                           <td className="py-3 px-4 text-right">
@@ -1224,17 +1226,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-[#111111] uppercase mb-1.5">Attach Delivery Challan / Photo</label>
-                  {attachment ? (
-                    <div className="flex items-center justify-between p-2.5 bg-[#F7F7F7] border border-[#E8E8E8] rounded-xl">
-                      <span className="font-semibold text-[#111111] truncate">{attachment.name}</span>
-                      <button type="button" onClick={() => setAttachment(null)} className="text-[#666666] hover:text-[#111111] font-bold">Remove</button>
-                    </div>
-                  ) : (
-                    <input type="file" onChange={handleFileUpload} className="w-full text-xs text-[#666666]" />
-                  )}
-                </div>
+                <AttachmentSections value={attachments} onChange={setAttachments} onUploadFile={onUploadFile} />
 
                 <div className="pt-3 border-t border-[#E8E8E8] flex items-center justify-end gap-2">
                   <button

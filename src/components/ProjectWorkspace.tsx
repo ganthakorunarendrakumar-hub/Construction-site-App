@@ -51,6 +51,8 @@ interface ProjectWorkspaceProps {
   onOpenBricksModule: () => void;
   onOpenAggregateModule: () => void;
   onOpenCategoryModule: (categoryId: string) => void;
+  onOpenVehicleHire: () => void;
+  onOpenMachineryHire: () => void;
   onNavigateHome: () => void;
   onNavigateProjects: () => void;
 }
@@ -65,6 +67,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   onOpenBricksModule,
   onOpenAggregateModule,
   onOpenCategoryModule,
+  onOpenVehicleHire,
+  onOpenMachineryHire,
   onNavigateHome,
   onNavigateProjects
 }) => {
@@ -584,6 +588,21 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2">
+            <HireCard
+              title="Vehicle Hire"
+              description="Manage hired vehicles, operators, working hours, fuel, and supporting documents."
+              icon={<Truck className="w-5 h-5 text-[#111111]" />}
+              onOpen={onOpenVehicleHire}
+            />
+            <HireCard
+              title="Machinery Hire"
+              description="Manage rented machinery, drilling tools, cutting tools, rental costs, and returns."
+              icon={<Wrench className="w-5 h-5 text-[#111111]" />}
+              onOpen={onOpenMachineryHire}
+            />
+          </div>
+
         </div>
       ) : activeTab === 'reports' ? (
         /* LIVE REPORTS & INVENTORY AUDITS */
@@ -712,3 +731,36 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     </div>
   );
 };
+
+const HireCard: React.FC<{
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  onOpen: () => void;
+}> = ({ title, description, icon, onOpen }) => (
+  <div
+    onClick={onOpen}
+    className="group flex cursor-pointer flex-col justify-between rounded-2xl border border-[#E8E8E8] bg-white p-5 shadow-xs transition-all hover:border-[#FFC400] hover:shadow-xs"
+  >
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F7F7F7] transition-colors group-hover:bg-[#FFC400]">
+          {icon}
+        </div>
+        <ChevronRight className="h-4 w-4 text-[#888888]" />
+      </div>
+      <h3 className="text-[17px] font-semibold text-[#111111]">{title}</h3>
+      <p className="mt-1 text-xs text-[#666666]">{description}</p>
+    </div>
+    <button
+      type="button"
+      onClick={event => {
+        event.stopPropagation();
+        onOpen();
+      }}
+      className="mt-5 flex w-full items-center justify-center rounded-xl bg-[#FFC400] px-3 py-1.5 text-center text-xs font-semibold text-[#111111] transition-colors hover:bg-[#F0B800]"
+    >
+      Open Module &rarr;
+    </button>
+  </div>
+);

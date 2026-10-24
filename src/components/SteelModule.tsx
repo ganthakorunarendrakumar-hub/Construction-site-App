@@ -26,6 +26,9 @@ import {
   ExtendedTransactionType
 } from '../types';
 import { dataService } from '../services/dataService';
+import { getLocalDateString } from '../utils/dateUtils';
+import { AttachmentLinks, AttachmentSections, emptyTransactionAttachments, hasTransactionAttachments } from './AttachmentSections';
+import { TransactionAttachments } from '../types';
 
 interface SteelModuleProps {
   project: Project;
@@ -63,15 +66,16 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
   const [txDiameter, setTxDiameter] = useState('12 mm');
   const [customDiameter, setCustomDiameter] = useState('');
   const [txLocationId, setTxLocationId] = useState(locations[0]?.id || 'main-site');
-  const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
+  const [txDate, setTxDate] = useState(getLocalDateString());
   const [txType, setTxType] = useState<ExtendedTransactionType>('receipt');
-  const [txQty, setTxQty] = useState('1000');
+  const [txQty, setTxQty] = useState('');
   const [txUnit, setTxUnit] = useState<'kg' | 'tonnes'>('kg');
   const [supplierName, setSupplierName] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [challanNumber, setChallanNumber] = useState('');
   const [remarks, setRemarks] = useState('');
   const [attachment, setAttachment] = useState<{ url: string; name: string; size: number } | null>(null);
+  const [attachments, setAttachments] = useState<TransactionAttachments>(emptyTransactionAttachments());
   const [isUploading, setIsUploading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -148,6 +152,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
     const qtyInKg = txUnit === 'tonnes' ? qty * 1000 : qty;
     const loc = locations.find(l => l.id === txLocationId);
+    if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
 
     try {
       setIsSubmitting(true);
@@ -169,7 +174,8 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
         remarks: remarks ? `${remarks} (Entered as ${qty} ${txUnit})` : `Entered as ${qty} ${txUnit}`,
         attachmentUrl: attachment?.url,
         attachmentName: attachment?.name,
-        attachmentSize: attachment?.size
+        attachmentSize: attachment?.size,
+        attachments
       });
 
       setSuccessSaved(saved);
@@ -607,12 +613,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                       </td>
                       <td className="py-3 px-4 text-[#111111]">{tx.created_by_name}</td>
                       <td className="py-3 px-4 text-center">
-                        {tx.attachment_url ? (
-                          <a href={tx.attachment_url} target="_blank" rel="noreferrer" className="text-[#111111] hover:underline inline-flex items-center gap-1 font-semibold text-[11px]">
-                            <Paperclip className="w-3.5 h-3.5" />
-                            File
-                          </a>
-                        ) : '—'}
+                        <AttachmentLinks attachments={tx.attachments} legacyUrl={tx.attachment_url} legacyName={tx.attachment_name} />
                       </td>
                       {isAdmin && (
                         <td className="py-3 px-4 text-right">
@@ -682,7 +683,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                 {/* Type */}
                 <div>
                   <label className="block font-semibold text-[#111111] uppercase mb-1">Transaction Type</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setTxType('receipt')}
@@ -821,18 +822,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                   />
                 </div>
 
-                {/* File Attachment */}
-                <div>
-                  <label className="block font-semibold text-[#111111] uppercase mb-1">Attach Mill Test Certificate / Invoice</label>
-                  {attachment ? (
-                    <div className="flex items-center justify-between p-2.5 bg-[#F7F7F7] border border-[#E8E8E8] rounded-xl">
-                      <span className="font-semibold text-[#111111] truncate">{attachment.name}</span>
-                      <button type="button" onClick={() => setAttachment(null)} className="text-[#666666] hover:text-[#111111]">Remove</button>
-                    </div>
-                  ) : (
-                    <input type="file" onChange={handleFileUpload} className="w-full text-xs" />
-                  )}
-                </div>
+                <AttachmentSections value={attachments} onChange={setAttachments} onUploadFile={onUploadFile} />
 
                 <div className="pt-3 border-t border-[#E8E8E8] flex justify-end gap-2">
                   <button

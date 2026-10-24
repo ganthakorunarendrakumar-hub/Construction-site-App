@@ -10,15 +10,18 @@ import {
   CheckCircle,
   Plus,
   ArrowRight,
-  CheckCheck
+  CheckCheck,
+  Edit2
 } from 'lucide-react';
 import { Project, UserProfile } from '../types';
+import { parseLocalDateOnly } from '../utils/dateUtils';
 
 interface OngoingProjectsViewProps {
   projects: Project[];
   currentUser: UserProfile;
   onOpenProject: (project: Project) => void;
   onNavigateCreate: () => void;
+  onEditProject: (project: Project) => void;
   onMarkCompleted: (projectId: string) => Promise<void>;
   onNavigateBack: () => void;
 }
@@ -28,6 +31,7 @@ export const OngoingProjectsView: React.FC<OngoingProjectsViewProps> = ({
   currentUser,
   onOpenProject,
   onNavigateCreate,
+  onEditProject,
   onMarkCompleted,
   onNavigateBack
 }) => {
@@ -68,9 +72,9 @@ export const OngoingProjectsView: React.FC<OngoingProjectsViewProps> = ({
       } else if (sortBy === 'code') {
         cmp = a.code.localeCompare(b.code);
       } else if (sortBy === 'start_date') {
-        cmp = new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+        cmp = parseLocalDateOnly(a.start_date).getTime() - parseLocalDateOnly(b.start_date).getTime();
       } else if (sortBy === 'completion_date') {
-        cmp = new Date(a.expected_completion_date).getTime() - new Date(b.expected_completion_date).getTime();
+        cmp = parseLocalDateOnly(a.expected_completion_date).getTime() - parseLocalDateOnly(b.expected_completion_date).getTime();
       }
       return sortOrder === 'asc' ? cmp : -cmp;
     });
@@ -223,7 +227,7 @@ export const OngoingProjectsView: React.FC<OngoingProjectsViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {filteredProjects.map((p) => {
             const isTargetNear =
-              new Date(p.expected_completion_date).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
+              parseLocalDateOnly(p.expected_completion_date).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
 
             return (
               <div
@@ -286,14 +290,26 @@ export const OngoingProjectsView: React.FC<OngoingProjectsViewProps> = ({
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
 
-                  {canComplete && (
-                    <button
-                      onClick={() => setConfirmCompleteId(p.id)}
-                      className="text-[11px] font-medium text-[#666666] hover:text-[#111111] hover:underline transition-colors"
-                    >
-                      Mark Completed
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {canCreate && (
+                      <button
+                        onClick={() => onEditProject(p)}
+                        className="text-[11px] font-medium text-[#666666] hover:text-[#111111] hover:underline transition-colors flex items-center gap-1"
+                        title={`Edit ${p.name}`}
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        Edit
+                      </button>
+                    )}
+                    {canComplete && (
+                      <button
+                        onClick={() => setConfirmCompleteId(p.id)}
+                        className="text-[11px] font-medium text-[#666666] hover:text-[#111111] hover:underline transition-colors"
+                      >
+                        Mark Completed
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );

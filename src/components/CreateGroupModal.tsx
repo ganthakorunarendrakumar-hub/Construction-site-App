@@ -57,7 +57,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       setStatus('active');
     }
     setError(null);
-  }, [editingGroup, isOpen, projects]);
+  }, [editingGroup?.id, isOpen]);
 
   if (!isOpen) return null;
 

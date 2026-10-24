@@ -10,7 +10,9 @@ import {
   FileCode2,
   RefreshCw,
   FileSpreadsheet,
-  Users
+  Users,
+  Menu,
+  X
 } from 'lucide-react';
 import { UserProfile, UserRole, SupabaseConfig } from '../types';
 import { PRESET_USERS } from '../services/dataService';
@@ -44,11 +46,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  const navigateMobile = (callback?: () => void) => {
+    callback?.();
+    setShowMobileMenu(false);
+  };
 
   return (
     <header className="sticky top-0 z-40 bg-[#111111] text-white border-b border-[#222222] shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
+        <div className="flex items-center justify-between h-16 gap-4 max-[639px]:gap-2">
           
           {/* Brand Wordmark & Home Link */}
           <button
@@ -59,11 +67,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               <HardHat className="w-5 h-5 text-[#111111]" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 max-[639px]:gap-1">
                 <span className="font-bold text-lg tracking-tight text-white font-['Inter',sans-serif]">
                   BUILDPULSE
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#222222] text-[#FFC400] border border-[#333333]">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#222222] text-[#FFC400] border border-[#333333] max-[639px]:hidden">
                   ERP
                 </span>
               </div>
@@ -74,7 +82,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {/* Center/Right Toolbar */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="hidden xl:flex items-center gap-2 sm:gap-3 shrink-0">
 
             {/* Attendance & Worker Groups Navigation Button */}
             {onNavigateAttendance && (
@@ -254,7 +262,52 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
           </div>
+
+          {/* Compact mobile toolbar and navigation drawer */}
+          <div className="flex xl:hidden items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowMobileMenu(value => !value)}
+              className="min-h-11 min-w-11 flex items-center justify-center rounded-xl bg-[#1c1c1c] border border-[#333333] text-[#FFC400]"
+              aria-label={showMobileMenu ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={showMobileMenu}
+            >
+              {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMobileMenu(true)}
+              className="min-h-11 min-w-11 rounded-full bg-[#FFC400] text-[#111111] flex items-center justify-center font-bold text-xs"
+              aria-label="Open account menu"
+            >
+              {currentUser.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+            </button>
+          </div>
         </div>
+
+        {showMobileMenu && (
+          <div className="xl:hidden border-t border-[#333333] py-3 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              {onNavigateAttendance && <button type="button" onClick={() => navigateMobile(onNavigateAttendance)} className="min-h-11 rounded-xl bg-[#1c1c1c] border border-[#333333] px-3 text-left text-xs font-semibold"><Users className="inline w-4 h-4 mr-2 text-[#FFC400]" />Attendance</button>}
+              {onNavigateReports && <button type="button" onClick={() => navigateMobile(onNavigateReports)} className="min-h-11 rounded-xl bg-[#1c1c1c] border border-[#333333] px-3 text-left text-xs font-semibold"><FileSpreadsheet className="inline w-4 h-4 mr-2 text-[#FFC400]" />Reports</button>}
+              {currentUser.role === 'admin' && onNavigateUserManagement && <button type="button" onClick={() => navigateMobile(onNavigateUserManagement)} className="min-h-11 rounded-xl bg-[#1c1c1c] border border-[#333333] px-3 text-left text-xs font-semibold"><ShieldCheck className="inline w-4 h-4 mr-2 text-[#FFC400]" />User Accounts</button>}
+              <button type="button" onClick={() => { setShowMobileMenu(false); onOpenCloudSetup(); }} className="min-h-11 rounded-xl bg-[#1c1c1c] border border-[#333333] px-3 text-left text-xs font-semibold"><Database className="inline w-4 h-4 mr-2 text-[#FFC400]" />{supabaseConfig.isConnected ? 'Cloud DB Active' : 'Cloud DB Setup'}</button>
+              <button type="button" disabled={isRefreshing} onClick={() => { setShowMobileMenu(false); onRefreshData(); }} className="min-h-11 rounded-xl bg-[#1c1c1c] border border-[#333333] px-3 text-left text-xs font-semibold disabled:opacity-50"><RefreshCw className={`inline w-4 h-4 mr-2 text-[#FFC400] ${isRefreshing ? 'animate-spin' : ''}`} />Refresh data</button>
+            </div>
+            <div className="rounded-xl border border-[#333333] bg-[#1c1c1c] p-3">
+              <p className="text-xs font-semibold text-white">{currentUser.full_name}</p>
+              <p className="text-[11px] text-[#888888]">{currentUser.role_title}</p>
+              <div className="mt-2 grid grid-cols-1 gap-1">
+                {(Object.keys(PRESET_USERS) as UserRole[]).map(roleKey => (
+                  <button key={roleKey} type="button" onClick={() => { onSwitchRole(roleKey); setShowMobileMenu(false); }} className={`min-h-10 rounded-lg px-2 text-left text-xs ${currentUser.role === roleKey ? 'bg-[#FFC400]/20 text-[#FFC400]' : 'text-[#CCCCCC] hover:bg-[#222222]'}`}>
+                    {PRESET_USERS[roleKey].role_title}
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={() => { setShowMobileMenu(false); onLogout(); }} className="mt-2 min-h-10 w-full rounded-lg px-2 text-left text-xs font-semibold text-rose-400 hover:bg-rose-950/30">Sign Out</button>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );

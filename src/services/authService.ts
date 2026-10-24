@@ -120,6 +120,13 @@ export const ROLE_TITLES: Record<UserRole, string> = {
   management_viewer: 'Management Auditor / Viewer'
 };
 
+export const PROJECT_MANAGER_ROLES: UserRole[] = [
+  'admin',
+  'project_manager',
+  'site_supervisor',
+  'site_engineer'
+];
+
 // ==========================================
 // AUTHENTICATION & USER MANAGEMENT SERVICE
 // ==========================================
@@ -603,6 +610,14 @@ class AuthService {
       throw new Error('Access Denied: Only Company Administrators can access User Management.');
     }
     return [...this.accounts];
+  }
+
+  /** Returns active accounts eligible to be assigned to construction projects. */
+  public async getProjectManagerCandidates(): Promise<AuthAccount[]> {
+    await this.ensureInitialized();
+    return this.accounts.filter(account =>
+      account.status === 'active' && PROJECT_MANAGER_ROLES.includes(account.role)
+    );
   }
 
   /**

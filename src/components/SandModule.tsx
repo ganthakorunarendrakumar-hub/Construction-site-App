@@ -26,6 +26,9 @@ import {
   ExtendedTransactionType
 } from '../types';
 import { dataService } from '../services/dataService';
+import { getLocalDateString } from '../utils/dateUtils';
+import { AttachmentLinks, AttachmentSections, emptyTransactionAttachments, hasTransactionAttachments } from './AttachmentSections';
+import { TransactionAttachments } from '../types';
 
 interface SandModuleProps {
   project: Project;
@@ -59,15 +62,16 @@ export const SandModule: React.FC<SandModuleProps> = ({
   const [txSandType, setTxSandType] = useState('River Sand');
   const [customTypeInput, setCustomTypeInput] = useState('');
   const [txLocationId, setTxLocationId] = useState(locations[0]?.id || 'main-site');
-  const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
+  const [txDate, setTxDate] = useState(getLocalDateString());
   const [txType, setTxType] = useState<ExtendedTransactionType>('receipt');
-  const [txQty, setTxQty] = useState('500');
+  const [txQty, setTxQty] = useState('');
   const [inputUnit, setInputUnit] = useState<'cft' | 'm3' | 'brass' | 'tonnes'>('cft');
   const [supplierName, setSupplierName] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [challanNumber, setChallanNumber] = useState('');
   const [remarks, setRemarks] = useState('');
   const [attachment, setAttachment] = useState<{ url: string; name: string; size: number } | null>(null);
+  const [attachments, setAttachments] = useState<TransactionAttachments>(emptyTransactionAttachments());
   const [isUploading, setIsUploading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -153,6 +157,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
 
     const qtyCft = toCanonicalCft(qty, inputUnit);
     const loc = locations.find(l => l.id === txLocationId);
+    if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
 
     try {
       setIsSubmitting(true);
@@ -172,7 +177,8 @@ export const SandModule: React.FC<SandModuleProps> = ({
         remarks: remarks ? `${remarks} (Logged as ${qty} ${inputUnit})` : `Logged as ${qty} ${inputUnit}`,
         attachmentUrl: attachment?.url,
         attachmentName: attachment?.name,
-        attachmentSize: attachment?.size
+        attachmentSize: attachment?.size,
+        attachments
       });
 
       setSuccessSaved(saved);
@@ -555,12 +561,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
                       <td className="py-3 px-4 font-mono text-[#666666]">{tx.invoice_number || tx.challan_number || '—'}</td>
                       <td className="py-3 px-4 text-[#111111]">{tx.created_by_name}</td>
                       <td className="py-3 px-4 text-center">
-                        {tx.attachment_url ? (
-                          <a href={tx.attachment_url} target="_blank" rel="noreferrer" className="text-[#111111] hover:underline inline-flex items-center gap-1 font-semibold text-[11px]">
-                            <Paperclip className="w-3.5 h-3.5" />
-                            File
-                          </a>
-                        ) : '—'}
+                        <AttachmentLinks attachments={tx.attachments} legacyUrl={tx.attachment_url} legacyName={tx.attachment_name} />
                       </td>
                       {isAdmin && (
                         <td className="py-3 px-4 text-right">
@@ -628,7 +629,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
 
                 <div>
                   <label className="block font-semibold text-[#111111] uppercase mb-1">Transaction Type</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setTxType('receipt')}
@@ -759,17 +760,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-[#111111] uppercase mb-1">Attach Weight Slip / Challan Document</label>
-                  {attachment ? (
-                    <div className="flex items-center justify-between p-2.5 bg-[#F7F7F7] border border-[#E8E8E8] rounded-xl">
-                      <span className="font-semibold text-[#111111] truncate">{attachment.name}</span>
-                      <button type="button" onClick={() => setAttachment(null)} className="text-[#666666] hover:text-[#111111]">Remove</button>
-                    </div>
-                  ) : (
-                    <input type="file" onChange={handleFileUpload} className="w-full text-xs" />
-                  )}
-                </div>
+                <AttachmentSections value={attachments} onChange={setAttachments} onUploadFile={onUploadFile} />
 
                 <div className="pt-3 border-t border-[#E8E8E8] flex justify-end gap-2">
                   <button
