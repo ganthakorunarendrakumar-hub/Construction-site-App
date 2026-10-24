@@ -72,23 +72,23 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-[#E8E8E8] overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-bp-navy-deep/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-bp-border overflow-hidden">
         
         {/* Modal Header */}
-        <div className="bg-[#111111] text-white px-6 py-4 flex items-center justify-between border-b border-[#222222]">
+        <div className="bg-bp-navy text-white px-6 py-4 flex items-center justify-between border-b border-bp-navy-border">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#FFC400] text-[#111111] flex items-center justify-center font-bold">
-              <KeyRound className="w-4 h-4 text-[#111111]" />
+            <div className="w-8 h-8 rounded-xl bg-bp-cyan text-bp-text flex items-center justify-center font-bold">
+              <KeyRound className="w-4 h-4 text-bp-text" />
             </div>
             <div>
               <h3 className="font-bold text-sm text-white">Reset Account Password</h3>
-              <p className="text-[11px] text-[#888888]">CHEN INFRA ERP Secure Recovery</p>
+              <p className="text-[11px] text-bp-muted">CHEN INFRA ERP Secure Recovery</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-[#888888] hover:text-white p-1 rounded-lg hover:bg-[#222222] transition-colors"
+            className="text-bp-muted hover:text-white p-1 rounded-lg hover:bg-bp-navy-light transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -106,23 +106,23 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
 
           {step === 'request' ? (
             <form onSubmit={handleRequestCode} className="space-y-4">
-              <p className="text-xs text-[#666666]">
-                Enter your registered <strong>Email Address</strong> or unique <strong>User ID</strong> (e.g., <code className="bg-[#F7F7F7] px-1.5 py-0.5 rounded border border-[#E8E8E8] font-mono text-[#111111]">CHEN-ADM-01</code>). A secure 6-digit verification code will be generated.
+              <p className="text-xs text-bp-muted">
+                Enter your registered <strong>Email Address</strong> or unique <strong>User ID</strong> (e.g., <code className="bg-bp-background px-1.5 py-0.5 rounded border border-bp-border font-mono text-bp-text">CHEN-ADM-01</code>). A secure 6-digit verification code will be generated.
               </p>
 
               <div>
-                <label className="block text-xs font-semibold text-[#111111] mb-1.5">
+                <label className="block text-xs font-semibold text-bp-text mb-1.5">
                   Email Address or User ID
                 </label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-[#888888] absolute left-3 top-3" />
+                  <User className="w-4 h-4 text-bp-muted absolute left-3 top-3" />
                   <input
                     type="text"
                     required
                     placeholder="admin@cheninfra.com or CHEN-ADM-01"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    className="w-full pl-9 pr-3.5 py-2.5 text-xs text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                    className="w-full pl-9 pr-3.5 py-2.5 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
               </div>
@@ -131,14 +131,14 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 text-xs font-semibold text-[#666666] hover:bg-[#F7F7F7] rounded-xl transition-colors"
+                  className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading || !identifier.trim()}
-                  className="px-4 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
+                  className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
                 >
                   {isLoading ? (
                     <>
@@ -167,8 +167,8 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                 </p>
                 {generatedCode && (
                   <div className="mt-1 flex items-center justify-between p-2 bg-white rounded-lg border border-amber-300">
-                    <span className="text-[11px] text-[#666666] font-medium">Your 6-Digit Code:</span>
-                    <span className="font-mono text-base font-bold text-[#111111] tracking-widest bg-amber-100 px-2 py-0.5 rounded">
+                    <span className="text-[11px] text-bp-muted font-medium">Your 6-Digit Code:</span>
+                    <span className="font-mono text-base font-bold text-bp-text tracking-widest bg-amber-100 px-2 py-0.5 rounded">
                       {generatedCode}
                     </span>
                   </div>
@@ -176,7 +176,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#111111] mb-1">
+                <label className="block text-xs font-semibold text-bp-text mb-1">
                   Enter 6-Digit Verification Code
                 </label>
                 <input
@@ -186,12 +186,12 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                   placeholder="e.g. 123456"
                   value={resetCode}
                   onChange={(e) => setResetCode(e.target.value.replace(/[^0-9]/g, ''))}
-                  className="w-full px-3 py-2 text-center text-base tracking-widest font-mono font-bold text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                  className="w-full px-3 py-2 text-center text-base tracking-widest font-mono font-bold text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#111111] mb-1">
+                <label className="block text-xs font-semibold text-bp-text mb-1">
                   New Password (min. 8 characters, letters & digits)
                 </label>
                 <input
@@ -200,12 +200,12 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                   placeholder="Enter new strong password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 text-xs text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                  className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#111111] mb-1">
+                <label className="block text-xs font-semibold text-bp-text mb-1">
                   Confirm New Password
                 </label>
                 <input
@@ -214,7 +214,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                   placeholder="Re-enter new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-3 py-2 text-xs text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                  className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                 />
               </div>
 
@@ -222,14 +222,14 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep('request')}
-                  className="text-xs font-semibold text-[#666666] hover:text-[#111111]"
+                  className="text-xs font-semibold text-bp-muted hover:text-bp-text"
                 >
                   &larr; Back
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading || !resetCode.trim() || newPassword.length < 8}
-                  className="px-4 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
+                  className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
                 >
                   {isLoading ? (
                     <>

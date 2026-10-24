@@ -11,6 +11,8 @@ import {
   RefreshCw,
   FileSpreadsheet,
   Users,
+  Building2,
+  Home,
   Menu,
   X
 } from 'lucide-react';
@@ -19,9 +21,11 @@ import { PRESET_USERS } from '../services/dataService';
 
 interface NavbarProps {
   currentUser: UserProfile;
+  activeView: string;
   onSwitchRole: (role: UserRole) => void;
   onOpenCloudSetup: () => void;
   onNavigateHome: () => void;
+  onNavigateProjects?: () => void;
   onNavigateReports?: () => void;
   onNavigateAttendance?: () => void;
   onNavigateUserManagement?: () => void;
@@ -33,9 +37,11 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
+  activeView,
   onSwitchRole,
   onOpenCloudSetup,
   onNavigateHome,
+  onNavigateProjects,
   onNavigateReports,
   onNavigateAttendance,
   onNavigateUserManagement,
@@ -53,8 +59,27 @@ export const Navbar: React.FC<NavbarProps> = ({
     setShowMobileMenu(false);
   };
 
+  const isActive = (section: 'home' | 'projects' | 'attendance' | 'reports' | 'user_management') => {
+    if (section === 'home') return activeView === 'home';
+    if (section === 'projects') {
+      return [
+        'ongoing_projects', 'completed_projects', 'project_workspace', 'cement_module',
+        'steel_module', 'sand_module', 'bricks_module', 'aggregate_module',
+        'category_module', 'vehicle_hire', 'machinery_hire'
+      ].includes(activeView);
+    }
+    return activeView === section;
+  };
+
+  const navButtonClass = (section: 'home' | 'projects' | 'attendance' | 'reports' | 'user_management') =>
+    `flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg border transition-colors focus-visible:ring-2 focus-visible:ring-bp-cyan ${
+      isActive(section)
+        ? 'bg-white/15 text-white border-white/20'
+        : 'bg-transparent text-slate-200 border-transparent hover:bg-white/10 hover:text-white'
+    }`;
+
   return (
-    <header className="sticky top-0 z-40 bg-[#111111] text-white border-b border-[#222222] shadow-xs">
+    <header className="sticky top-0 z-40 bg-bp-navy text-white border-b border-bp-navy-border shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4 max-[639px]:gap-2">
           
@@ -63,19 +88,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={onNavigateHome}
             className="flex items-center gap-3 group text-left transition-opacity hover:opacity-95 shrink-0"
           >
-            <div className="w-9 h-9 rounded-xl bg-[#FFC400] text-[#111111] flex items-center justify-center font-bold shadow-xs transition-transform group-hover:scale-105">
-              <HardHat className="w-5 h-5 text-[#111111]" />
+            <div className="w-9 h-9 rounded-xl bg-bp-cyan text-bp-text flex items-center justify-center font-bold shadow-xs transition-transform group-hover:scale-105">
+              <HardHat className="w-5 h-5 text-bp-text" />
             </div>
             <div>
             <div className="flex items-center gap-2 max-[639px]:gap-1">
                 <span className="font-bold text-lg tracking-tight text-white font-['Inter',sans-serif]">
                   BUILDPULSE
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#222222] text-[#FFC400] border border-[#333333] max-[639px]:hidden">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-bp-navy-light text-bp-cyan border border-bp-navy-border max-[639px]:hidden">
                   ERP
                 </span>
               </div>
-              <p className="text-[11px] text-[#888888] hidden sm:block font-normal">
+              <p className="text-[11px] text-bp-border-strong hidden sm:block font-normal">
                 Construction Management
               </p>
             </div>
@@ -84,14 +109,37 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Center/Right Toolbar */}
           <div className="hidden xl:flex items-center gap-2 sm:gap-3 shrink-0">
 
+            <button
+              type="button"
+              onClick={onNavigateHome}
+              className={navButtonClass('home')}
+              aria-current={isActive('home') ? 'page' : undefined}
+            >
+              <Home className="w-3.5 h-3.5 text-bp-cyan" />
+              <span>Home</span>
+            </button>
+
+            {onNavigateProjects && (
+              <button
+                type="button"
+                onClick={onNavigateProjects}
+                className={navButtonClass('projects')}
+                aria-current={isActive('projects') ? 'page' : undefined}
+              >
+                <Building2 className="w-3.5 h-3.5 text-bp-cyan" />
+                <span>Projects</span>
+              </button>
+            )}
+
             {/* Attendance & Worker Groups Navigation Button */}
             {onNavigateAttendance && (
               <button
                 onClick={onNavigateAttendance}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-[#1c1c1c] text-white border border-[#333333] hover:border-[#FFC400] transition-colors"
+                className={navButtonClass('attendance')}
+                aria-current={isActive('attendance') ? 'page' : undefined}
                 title="Manage Worker Groups, Daily Attendance & Wages"
               >
-                <Users className="w-3.5 h-3.5 text-[#FFC400]" />
+                <Users className="w-3.5 h-3.5 text-bp-cyan" />
                 <span className="hidden sm:inline">Attendance</span>
               </button>
             )}
@@ -100,10 +148,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             {onNavigateReports && (
               <button
                 onClick={onNavigateReports}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-[#1c1c1c] text-white border border-[#333333] hover:border-[#FFC400] transition-colors"
+                className={navButtonClass('reports')}
+                aria-current={isActive('reports') ? 'page' : undefined}
                 title="View Date Range & Cumulative Inventory Reports"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-[#FFC400]" />
+                <FileSpreadsheet className="w-3.5 h-3.5 text-bp-cyan" />
                 <span className="hidden sm:inline">Reports</span>
               </button>
             )}
@@ -112,10 +161,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             {currentUser.role === 'admin' && onNavigateUserManagement && (
               <button
                 onClick={onNavigateUserManagement}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-[#1c1c1c] text-white border border-[#333333] hover:border-[#FFC400] transition-colors"
+                className={navButtonClass('user_management')}
+                aria-current={isActive('user_management') ? 'page' : undefined}
                 title="Administrator Console: Manage User Accounts and Site Permissions"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-[#FFC400]" />
+                <ShieldCheck className="w-3.5 h-3.5 text-bp-cyan" />
                 <span className="hidden md:inline">User Accounts</span>
               </button>
             )}
@@ -125,12 +175,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={onOpenCloudSetup}
               className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-xl border transition-colors ${
                 supabaseConfig.isConnected
-                  ? 'bg-[#1c1c1c] text-white border-[#333333] hover:border-[#FFC400]'
-                  : 'bg-[#1c1c1c] text-[#CCCCCC] border-[#333333] hover:border-[#FFC400]'
+                  ? 'bg-bp-navy-light text-white border-bp-navy-border hover:border-bp-cyan'
+                  : 'bg-bp-navy-light text-bp-border-strong border-bp-navy-border hover:border-bp-cyan'
               }`}
               title="Click to view Supabase Cloud Database settings and SQL schema"
             >
-              <Database className="w-3.5 h-3.5 text-[#FFC400]" />
+              <Database className="w-3.5 h-3.5 text-bp-cyan" />
               <span className="hidden md:inline">
                 {supabaseConfig.isConnected ? 'Cloud DB Active' : 'Cloud DB Setup'}
               </span>
@@ -139,7 +189,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
               <span
                 className={`w-2 h-2 rounded-full ${
-                  supabaseConfig.isConnected ? 'bg-[#FFC400]' : 'bg-[#666666]'
+                  supabaseConfig.isConnected ? 'bg-bp-cyan' : 'bg-[#64748B]'
                 }`}
               />
             </button>
@@ -148,31 +198,31 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onRefreshData}
               disabled={isRefreshing}
-              className="p-2 text-[#CCCCCC] hover:text-[#FFC400] rounded-xl hover:bg-[#1f1f1f] transition-colors"
+              className="p-2 text-bp-border-strong hover:text-bp-cyan rounded-xl hover:bg-bp-navy-light transition-colors"
               title="Sync latest inventory and projects"
             >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#FFC400]' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-bp-cyan' : ''}`} />
             </button>
 
             {/* RBAC Role Switcher */}
             <div className="relative">
               <button
                 onClick={() => setShowRoleMenu(!showRoleMenu)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#1c1c1c] hover:bg-[#222222] text-white text-xs font-medium border border-[#333333] transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-bp-navy-light hover:bg-bp-navy-light text-white text-xs font-medium border border-bp-navy-border transition-colors"
                 title="Switch simulated staff account to test permissions"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-[#FFC400]" />
-                <span className="hidden sm:inline text-[#888888]">Role:</span>
-                <span className="font-semibold text-[#FFC400]">{currentUser.role_title}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-[#888888]" />
+                <ShieldCheck className="w-3.5 h-3.5 text-bp-cyan" />
+                <span className="hidden sm:inline text-bp-border-strong">Role:</span>
+                <span className="font-semibold text-bp-cyan">{currentUser.role_title}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-bp-border-strong" />
               </button>
 
               {showRoleMenu && (
                 <div
-                  className="absolute right-0 mt-2 w-64 rounded-2xl bg-white text-[#111111] shadow-xl border border-[#E8E8E8] py-2 z-50 animate-in fade-in slide-in-from-top-1"
+                  className="absolute right-0 mt-2 w-64 rounded-2xl bg-white text-bp-text shadow-xl border border-bp-border py-2 z-50 animate-in fade-in slide-in-from-top-1"
                   onClick={() => setShowRoleMenu(false)}
                 >
-                  <div className="px-3.5 py-1.5 border-b border-[#E8E8E8] text-[11px] font-semibold text-[#666666] uppercase tracking-wider">
+                  <div className="px-3.5 py-1.5 border-b border-bp-border text-[11px] font-semibold text-bp-muted uppercase tracking-wider">
                     Simulate Staff Role
                   </div>
                   {(Object.keys(PRESET_USERS) as UserRole[]).map((roleKey) => {
@@ -182,15 +232,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <button
                         key={roleKey}
                         onClick={() => onSwitchRole(roleKey)}
-                        className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-[#F7F7F7] transition-colors ${
-                          isSelected ? 'bg-[#FFC400]/15 text-[#111111] font-semibold' : 'text-[#111111]'
+                        className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-bp-background transition-colors ${
+                          isSelected ? 'bg-bp-cyan/15 text-bp-text font-semibold' : 'text-bp-text'
                         }`}
                       >
                         <div>
-                          <div className="font-semibold text-[#111111]">{u.role_title}</div>
-                          <div className="text-[11px] text-[#666666]">{u.full_name}</div>
+                          <div className="font-semibold text-bp-text">{u.role_title}</div>
+                          <div className="text-[11px] text-bp-muted">{u.full_name}</div>
                         </div>
-                        {isSelected && <CheckCircle2 className="w-4 h-4 text-[#111111] shrink-0" />}
+                        {isSelected && <CheckCircle2 className="w-4 h-4 text-bp-text shrink-0" />}
                       </button>
                     );
                   })}
@@ -202,9 +252,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-[#FFC400] transition-all"
+                className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-bp-cyan transition-all"
               >
-                <div className="w-8 h-8 rounded-full bg-[#FFC400] text-[#111111] flex items-center justify-center font-bold text-xs shadow-xs">
+                <div className="w-8 h-8 rounded-full bg-bp-cyan text-bp-text flex items-center justify-center font-bold text-xs shadow-xs">
                   {currentUser.full_name
                     .split(' ')
                     .map((n) => n[0])
@@ -215,20 +265,20 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {showUserMenu && (
                 <div
-                  className="absolute right-0 mt-2 w-60 rounded-2xl bg-white text-[#111111] shadow-xl border border-[#E8E8E8] py-2 z-50 animate-in fade-in"
+                  className="absolute right-0 mt-2 w-60 rounded-2xl bg-white text-bp-text shadow-xl border border-bp-border py-2 z-50 animate-in fade-in"
                   onClick={() => setShowUserMenu(false)}
                 >
-                  <div className="px-4 py-2.5 border-b border-[#E8E8E8]">
+                  <div className="px-4 py-2.5 border-b border-bp-border">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-[#111111]">{currentUser.full_name}</p>
+                      <p className="text-sm font-semibold text-bp-text">{currentUser.full_name}</p>
                       {currentUser.user_id && (
-                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#F7F7F7] border border-[#CCCCCC] text-[#111111]">
+                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-bp-background border border-bp-border-strong text-bp-text">
                           {currentUser.user_id}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-[#666666]">{currentUser.email}</p>
-                    <span className="inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#FFC400]/20 text-[#111111] border border-[#FFC400]/50">
+                    <p className="text-xs text-bp-muted">{currentUser.email}</p>
+                    <span className="inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-bp-cyan/20 text-bp-text border border-bp-cyan/50">
                       {currentUser.role_title}
                     </span>
                   </div>
@@ -236,17 +286,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {currentUser.role === 'admin' && onNavigateUserManagement && (
                       <button
                         onClick={onNavigateUserManagement}
-                        className="w-full text-left px-4 py-2 text-xs text-[#111111] hover:bg-[#F7F7F7] flex items-center gap-2"
+                        className="w-full text-left px-4 py-2 text-xs text-bp-text hover:bg-bp-background flex items-center gap-2"
                       >
-                        <ShieldCheck className="w-4 h-4 text-[#FFC400]" />
+                        <ShieldCheck className="w-4 h-4 text-bp-cyan" />
                         <span>User Accounts & Security</span>
                       </button>
                     )}
                     <button
                       onClick={onOpenCloudSetup}
-                      className="w-full text-left px-4 py-2 text-xs text-[#111111] hover:bg-[#F7F7F7] flex items-center gap-2"
+                      className="w-full text-left px-4 py-2 text-xs text-bp-text hover:bg-bp-background flex items-center gap-2"
                     >
-                      <FileCode2 className="w-4 h-4 text-[#666666]" />
+                      <FileCode2 className="w-4 h-4 text-bp-muted" />
                       Cloud Database & SQL Schema
                     </button>
                     <button
@@ -268,7 +318,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={() => setShowMobileMenu(value => !value)}
-              className="min-h-11 min-w-11 flex items-center justify-center rounded-xl bg-[#1c1c1c] border border-[#333333] text-[#FFC400]"
+              className="min-h-11 min-w-11 flex items-center justify-center rounded-xl bg-bp-navy-light border border-bp-navy-border text-bp-cyan"
               aria-label={showMobileMenu ? 'Close navigation menu' : 'Open navigation menu'}
               aria-expanded={showMobileMenu}
             >
@@ -277,7 +327,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={() => setShowMobileMenu(true)}
-              className="min-h-11 min-w-11 rounded-full bg-[#FFC400] text-[#111111] flex items-center justify-center font-bold text-xs"
+              className="min-h-11 min-w-11 rounded-full bg-bp-cyan text-bp-text flex items-center justify-center font-bold text-xs"
               aria-label="Open account menu"
             >
               {currentUser.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
@@ -286,20 +336,28 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {showMobileMenu && (
-          <div className="xl:hidden border-t border-[#333333] py-3 space-y-2">
+          <div className="xl:hidden border-t border-bp-navy-border py-3 space-y-2">
             <div className="grid grid-cols-2 gap-2">
-              {onNavigateAttendance && <button type="button" onClick={() => navigateMobile(onNavigateAttendance)} className="min-h-11 rounded-xl bg-[#1c1c1c] border border-[#333333] px-3 text-left text-xs font-semibold"><Users className="inline w-4 h-4 mr-2 text-[#FFC400]" />Attendance</button>}
-              {onNavigateReports && <button type="button" onClick={() => navigateMobile(onNavigateReports)} className="min-h-11 rounded-xl bg-[#1c1c1c] border border-[#333333] px-3 text-left text-xs font-semibold"><FileSpreadsheet className="inline w-4 h-4 mr-2 text-[#FFC400]" />Reports</button>}
-              {currentUser.role === 'admin' && onNavigateUserManagement && <button type="button" onClick={() => navigateMobile(onNavigateUserManagement)} className="min-h-11 rounded-xl bg-[#1c1c1c] border border-[#333333] px-3 text-left text-xs font-semibold"><ShieldCheck className="inline w-4 h-4 mr-2 text-[#FFC400]" />User Accounts</button>}
-              <button type="button" onClick={() => { setShowMobileMenu(false); onOpenCloudSetup(); }} className="min-h-11 rounded-xl bg-[#1c1c1c] border border-[#333333] px-3 text-left text-xs font-semibold"><Database className="inline w-4 h-4 mr-2 text-[#FFC400]" />{supabaseConfig.isConnected ? 'Cloud DB Active' : 'Cloud DB Setup'}</button>
-              <button type="button" disabled={isRefreshing} onClick={() => { setShowMobileMenu(false); onRefreshData(); }} className="min-h-11 rounded-xl bg-[#1c1c1c] border border-[#333333] px-3 text-left text-xs font-semibold disabled:opacity-50"><RefreshCw className={`inline w-4 h-4 mr-2 text-[#FFC400] ${isRefreshing ? 'animate-spin' : ''}`} />Refresh data</button>
+              <button type="button" onClick={() => navigateMobile(onNavigateHome)} className={`${navButtonClass('home')} min-h-11 justify-start`} aria-current={isActive('home') ? 'page' : undefined}>
+                <Home className="w-4 h-4 text-bp-cyan" />Home
+              </button>
+              {onNavigateProjects && <button type="button" onClick={() => navigateMobile(onNavigateProjects)} className={`${navButtonClass('projects')} min-h-11 justify-start`} aria-current={isActive('projects') ? 'page' : undefined}>
+                <Building2 className="w-4 h-4 text-bp-cyan" />Projects
+              </button>}
             </div>
-            <div className="rounded-xl border border-[#333333] bg-[#1c1c1c] p-3">
+            <div className="grid grid-cols-2 gap-2">
+              {onNavigateAttendance && <button type="button" onClick={() => navigateMobile(onNavigateAttendance)} className={`${navButtonClass('attendance')} min-h-11 justify-start`} aria-current={isActive('attendance') ? 'page' : undefined}><Users className="w-4 h-4 text-bp-cyan" />Attendance</button>}
+              {onNavigateReports && <button type="button" onClick={() => navigateMobile(onNavigateReports)} className={`${navButtonClass('reports')} min-h-11 justify-start`} aria-current={isActive('reports') ? 'page' : undefined}><FileSpreadsheet className="w-4 h-4 text-bp-cyan" />Reports</button>}
+              {currentUser.role === 'admin' && onNavigateUserManagement && <button type="button" onClick={() => navigateMobile(onNavigateUserManagement)} className={`${navButtonClass('user_management')} min-h-11 justify-start`} aria-current={isActive('user_management') ? 'page' : undefined}><ShieldCheck className="w-4 h-4 text-bp-cyan" />User Accounts</button>}
+              <button type="button" onClick={() => { setShowMobileMenu(false); onOpenCloudSetup(); }} className="min-h-11 rounded-xl bg-bp-navy-light border border-bp-navy-border px-3 text-left text-xs font-semibold"><Database className="inline w-4 h-4 mr-2 text-bp-cyan" />{supabaseConfig.isConnected ? 'Cloud DB Active' : 'Cloud DB Setup'}</button>
+              <button type="button" disabled={isRefreshing} onClick={() => { setShowMobileMenu(false); onRefreshData(); }} className="min-h-11 rounded-xl bg-bp-navy-light border border-bp-navy-border px-3 text-left text-xs font-semibold disabled:opacity-50"><RefreshCw className={`inline w-4 h-4 mr-2 text-bp-cyan ${isRefreshing ? 'animate-spin' : ''}`} />Refresh data</button>
+            </div>
+            <div className="rounded-xl border border-bp-navy-border bg-bp-navy-light p-3">
               <p className="text-xs font-semibold text-white">{currentUser.full_name}</p>
-              <p className="text-[11px] text-[#888888]">{currentUser.role_title}</p>
+              <p className="text-[11px] text-bp-border-strong">{currentUser.role_title}</p>
               <div className="mt-2 grid grid-cols-1 gap-1">
                 {(Object.keys(PRESET_USERS) as UserRole[]).map(roleKey => (
-                  <button key={roleKey} type="button" onClick={() => { onSwitchRole(roleKey); setShowMobileMenu(false); }} className={`min-h-10 rounded-lg px-2 text-left text-xs ${currentUser.role === roleKey ? 'bg-[#FFC400]/20 text-[#FFC400]' : 'text-[#CCCCCC] hover:bg-[#222222]'}`}>
+                  <button key={roleKey} type="button" onClick={() => { onSwitchRole(roleKey); setShowMobileMenu(false); }} className={`min-h-10 rounded-lg px-2 text-left text-xs ${currentUser.role === roleKey ? 'bg-bp-cyan/20 text-bp-cyan' : 'text-bp-border-strong hover:bg-bp-navy-light'}`}>
                     {PRESET_USERS[roleKey].role_title}
                   </button>
                 ))}

@@ -439,26 +439,26 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
 
   const getCategoryIcon = (iconName?: string) => {
     switch (iconName) {
-      case 'ShieldAlert': return <ShieldAlert className="w-5 h-5 text-[#111111]" />;
-      case 'Wrench': return <Wrench className="w-5 h-5 text-[#111111]" />;
-      case 'Ruler': return <Ruler className="w-5 h-5 text-[#111111]" />;
-      case 'Hammer': return <Hammer className="w-5 h-5 text-[#111111]" />;
-      case 'Crosshair': return <Crosshair className="w-5 h-5 text-[#111111]" />;
-      case 'Grid': return <Grid className="w-5 h-5 text-[#111111]" />;
-      case 'Zap': return <Zap className="w-5 h-5 text-[#111111]" />;
-      case 'Cpu': return <Cpu className="w-5 h-5 text-[#111111]" />;
-      case 'Droplet': return <Droplet className="w-5 h-5 text-[#111111]" />;
-      case 'Flame': return <Flame className="w-5 h-5 text-[#111111]" />;
-      case 'Paintbrush': return <Paintbrush className="w-5 h-5 text-[#111111]" />;
-      case 'PackageCheck': return <PackageCheck className="w-5 h-5 text-[#111111]" />;
-      case 'Boxes': return <Boxes className="w-5 h-5 text-[#111111]" />;
-      case 'DoorOpen': return <DoorOpen className="w-5 h-5 text-[#111111]" />;
-      case 'Umbrella': return <Umbrella className="w-5 h-5 text-[#111111]" />;
-      case 'Sparkles': return <Sparkles className="w-5 h-5 text-[#111111]" />;
-      case 'Compass': return <Compass className="w-5 h-5 text-[#111111]" />;
-      case 'Truck': return <Truck className="w-5 h-5 text-[#111111]" />;
-      case 'ClipboardList': return <ClipboardList className="w-5 h-5 text-[#111111]" />;
-      default: return <Package className="w-5 h-5 text-[#111111]" />;
+      case 'ShieldAlert': return <ShieldAlert className="w-5 h-5 text-bp-text" />;
+      case 'Wrench': return <Wrench className="w-5 h-5 text-bp-text" />;
+      case 'Ruler': return <Ruler className="w-5 h-5 text-bp-text" />;
+      case 'Hammer': return <Hammer className="w-5 h-5 text-bp-text" />;
+      case 'Crosshair': return <Crosshair className="w-5 h-5 text-bp-text" />;
+      case 'Grid': return <Grid className="w-5 h-5 text-bp-text" />;
+      case 'Zap': return <Zap className="w-5 h-5 text-bp-text" />;
+      case 'Cpu': return <Cpu className="w-5 h-5 text-bp-text" />;
+      case 'Droplet': return <Droplet className="w-5 h-5 text-bp-text" />;
+      case 'Flame': return <Flame className="w-5 h-5 text-bp-text" />;
+      case 'Paintbrush': return <Paintbrush className="w-5 h-5 text-bp-text" />;
+      case 'PackageCheck': return <PackageCheck className="w-5 h-5 text-bp-text" />;
+      case 'Boxes': return <Boxes className="w-5 h-5 text-bp-text" />;
+      case 'DoorOpen': return <DoorOpen className="w-5 h-5 text-bp-text" />;
+      case 'Umbrella': return <Umbrella className="w-5 h-5 text-bp-text" />;
+      case 'Sparkles': return <Sparkles className="w-5 h-5 text-bp-text" />;
+      case 'Compass': return <Compass className="w-5 h-5 text-bp-text" />;
+      case 'Truck': return <Truck className="w-5 h-5 text-bp-text" />;
+      case 'ClipboardList': return <ClipboardList className="w-5 h-5 text-bp-text" />;
+      default: return <Package className="w-5 h-5 text-bp-text" />;
     }
   };
 
@@ -466,30 +466,30 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
     <div className="space-y-6 animate-in fade-in duration-150">
       
       {/* Breadcrumbs */}
-      <nav className="flex items-center gap-2 text-xs text-[#666666]">
-        <button onClick={onNavigateHome} className="hover:text-[#111111] transition-colors">
+      <nav className="flex items-center gap-2 text-xs text-bp-muted">
+        <button onClick={onNavigateHome} className="hover:text-bp-text transition-colors">
           Company Home
         </button>
-        <ChevronRight className="w-3.5 h-3.5 text-[#888888]" />
-        <button onClick={onNavigateBack} className="hover:text-[#111111] transition-colors truncate max-w-xs">
+        <ChevronRight className="w-3.5 h-3.5 text-bp-muted" />
+        <button onClick={onNavigateBack} className="hover:text-bp-text transition-colors truncate max-w-xs">
           {project.name}
         </button>
-        <ChevronRight className="w-3.5 h-3.5 text-[#888888]" />
-        <span className="font-semibold text-[#111111]">{categoryDef?.name || categoryId}</span>
+        <ChevronRight className="w-3.5 h-3.5 text-bp-muted" />
+        <span className="font-semibold text-bp-text">{categoryDef?.name || categoryId}</span>
       </nav>
 
       {/* Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#E8E8E8] pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-bp-border pb-4">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-[#FFC400] flex items-center justify-center shrink-0 shadow-xs">
+          <div className="w-11 h-11 rounded-2xl bg-bp-cyan flex items-center justify-center shrink-0 shadow-xs">
             {getCategoryIcon(categoryDef?.iconName)}
           </div>
           <div>
-            <h1 className="text-2xl sm:text-[28px] font-bold text-[#111111] tracking-tight">
+            <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight">
               {categoryDef?.name}
             </h1>
-            <p className="text-xs text-[#666666] mt-0.5">
-              Site: <strong className="text-[#111111] font-semibold">{project.name}</strong> &bull; {isReusable ? 'Reusable Equipment & Tool Logistics' : 'Consumables & Material Inventory'}
+            <p className="text-xs text-bp-muted mt-0.5">
+              Site: <strong className="text-bp-text font-semibold">{project.name}</strong> &bull; {isReusable ? 'Reusable Equipment & Tool Logistics' : 'Consumables & Material Inventory'}
             </p>
           </div>
         </div>
@@ -506,7 +506,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
               a.download = `${categoryId}_Stock_Report_${project.code}.csv`;
               a.click();
             }}
-            className="px-3.5 py-2 bg-white border border-[#E8E8E8] hover:bg-[#F7F7F7] text-[#111111] text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
+            className="px-3.5 py-2 bg-white border border-bp-border hover:bg-bp-background text-bp-text text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
           >
             <Download className="w-3.5 h-3.5" />
             Export CSV
@@ -515,7 +515,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
           {(isAdmin || isPM) && (
             <button
               onClick={() => setIsAddItemOpen(true)}
-              className="px-3.5 py-2 bg-white hover:bg-[#F7F7F7] text-[#111111] text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors border border-[#E8E8E8] shadow-xs"
+              className="px-3.5 py-2 bg-white hover:bg-bp-background text-bp-text text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors border border-bp-border shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" />
               Add Material Item
@@ -529,9 +529,9 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 setFormError(null);
                 setIsModalOpen(true);
               }}
-              className="px-4 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+              className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
             >
-              <PlusCircle className="w-4 h-4 text-[#111111]" />
+              <PlusCircle className="w-4 h-4 text-bp-text" />
               Record Stock Movement
             </button>
           )}
@@ -540,73 +540,73 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
 
       {/* KPI Overview Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-[#111111] text-white p-5 rounded-2xl border border-[#222222] shadow-xs">
-          <p className="text-xs font-medium text-[#AAAAAA]">
+        <div className="bg-bp-navy text-white p-5 rounded-2xl border border-bp-navy-border shadow-xs">
+          <p className="text-xs font-medium text-bp-border-strong">
             {isReusable ? 'Available in Yard' : 'Live Available Stock'}
           </p>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-[28px] font-bold text-[#FFC400] font-mono tabular-nums">
+            <span className="text-2xl sm:text-[28px] font-bold text-bp-cyan font-mono tabular-nums">
               {stockMetrics?.totalAvailableAggregate.toLocaleString() ?? 0}
             </span>
-            <span className="text-xs text-[#AAAAAA]">{categoryDef?.default_unit || 'Units'}</span>
+            <span className="text-xs text-bp-border-strong">{categoryDef?.default_unit || 'Units'}</span>
           </div>
-          <p className="text-[11px] text-[#888888] mt-2 font-mono">
+          <p className="text-[11px] text-bp-muted mt-2 font-mono">
             {stockMetrics?.totalItemsCount ?? 0} catalogued materials
           </p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-[#E8E8E8] shadow-xs">
-          <div className="flex items-center justify-between text-xs font-medium text-[#666666]">
+        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Total Delivered</span>
-            <TrendingUp className="w-4 h-4 text-[#111111]" />
+            <TrendingUp className="w-4 h-4 text-bp-text" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-[28px] font-bold text-[#111111] font-mono tabular-nums">
+            <span className="text-2xl sm:text-[28px] font-bold text-bp-text font-mono tabular-nums">
               {stockMetrics?.items.reduce((s, i) => s + i.total_received, 0).toLocaleString() ?? 0}
             </span>
-            <span className="text-xs text-[#666666]">{categoryDef?.default_unit || 'Units'}</span>
+            <span className="text-xs text-bp-muted">{categoryDef?.default_unit || 'Units'}</span>
           </div>
-          <p className="text-[11px] text-[#666666] mt-2">Delivered to site</p>
+          <p className="text-[11px] text-bp-muted mt-2">Delivered to site</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-[#E8E8E8] shadow-xs">
-          <div className="flex items-center justify-between text-xs font-medium text-[#666666]">
+        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>{isReusable ? 'Currently Issued on Site' : 'Total Consumed / Used'}</span>
-            <TrendingDown className="w-4 h-4 text-[#111111]" />
+            <TrendingDown className="w-4 h-4 text-bp-text" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-[28px] font-bold text-[#111111] font-mono tabular-nums">
+            <span className="text-2xl sm:text-[28px] font-bold text-bp-text font-mono tabular-nums">
               {isReusable
                 ? (stockMetrics?.items.reduce((s, i) => s + (i.in_use_stock || 0), 0).toLocaleString() ?? 0)
                 : (stockMetrics?.items.reduce((s, i) => s + i.total_used, 0).toLocaleString() ?? 0)}
             </span>
-            <span className="text-xs text-[#666666]">{categoryDef?.default_unit || 'Units'}</span>
+            <span className="text-xs text-bp-muted">{categoryDef?.default_unit || 'Units'}</span>
           </div>
-          <p className="text-[11px] text-[#666666] mt-2">{isReusable ? 'Checked out to work zones' : 'Used on site'}</p>
+          <p className="text-[11px] text-bp-muted mt-2">{isReusable ? 'Checked out to work zones' : 'Used on site'}</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-[#E8E8E8] shadow-xs">
-          <div className="flex items-center justify-between text-xs font-medium text-[#666666]">
+        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>{isReusable ? 'Under Repair' : 'Damaged / Scrap'}</span>
-            <AlertOctagon className="w-4 h-4 text-[#111111]" />
+            <AlertOctagon className="w-4 h-4 text-bp-text" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-[28px] font-bold text-[#111111] font-mono tabular-nums">
+            <span className="text-2xl sm:text-[28px] font-bold text-bp-text font-mono tabular-nums">
               {stockMetrics?.items.reduce((s, i) => s + i.total_damaged, 0).toLocaleString() ?? 0}
             </span>
-            <span className="text-xs text-[#666666]">{categoryDef?.default_unit || 'Units'}</span>
+            <span className="text-xs text-bp-muted">{categoryDef?.default_unit || 'Units'}</span>
           </div>
-          <p className="text-[11px] text-[#666666] mt-2">Deducted from available stock</p>
+          <p className="text-[11px] text-bp-muted mt-2">Deducted from available stock</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center justify-between border-b border-[#E8E8E8]">
+      <div className="flex items-center justify-between border-b border-bp-border">
         <div className="flex items-center gap-4">
           <button
             onClick={() => setActiveTab('inventory')}
             className={`pb-3 text-xs font-semibold border-b-2 flex items-center gap-2 transition-all ${
-              activeTab === 'inventory' ? 'border-[#FFC400] text-[#111111]' : 'border-transparent text-[#666666] hover:text-[#111111]'
+              activeTab === 'inventory' ? 'border-bp-cyan text-bp-text' : 'border-transparent text-bp-muted hover:text-bp-text'
             }`}
           >
             <Layers className="w-4 h-4" />
@@ -615,7 +615,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
           <button
             onClick={() => setActiveTab('ledger')}
             className={`pb-3 text-xs font-semibold border-b-2 flex items-center gap-2 transition-all ${
-              activeTab === 'ledger' ? 'border-[#FFC400] text-[#111111]' : 'border-transparent text-[#666666] hover:text-[#111111]'
+              activeTab === 'ledger' ? 'border-bp-cyan text-bp-text' : 'border-transparent text-bp-muted hover:text-bp-text'
             }`}
           >
             Transaction History ({transactions.length})
@@ -627,8 +627,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
             onClick={() => setLowStockOnly(!lowStockOnly)}
             className={`px-3 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors border ${
               lowStockOnly
-                ? 'bg-[#111111] text-white border-[#111111]'
-                : 'bg-white text-[#666666] border-[#E8E8E8] hover:text-[#111111]'
+                ? 'bg-bp-navy text-white border-bp-navy'
+                : 'bg-white text-bp-muted border-bp-border hover:text-bp-text'
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
@@ -647,8 +647,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 onClick={() => setSelectedSubcategory('all')}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                   selectedSubcategory === 'all'
-                    ? 'bg-[#111111] text-[#FFC400] shadow-xs'
-                    : 'bg-white text-[#666666] border border-[#E8E8E8] hover:text-[#111111]'
+                    ? 'bg-bp-navy text-bp-cyan shadow-xs'
+                    : 'bg-white text-bp-muted border border-bp-border hover:text-bp-text'
                 }`}
               >
                 All Materials ({stockMetrics?.items.length ?? items.length})
@@ -661,8 +661,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                     onClick={() => setSelectedSubcategory(sub)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                       selectedSubcategory === sub
-                        ? 'bg-[#FFC400] text-[#111111] shadow-xs font-bold'
-                        : 'bg-white text-[#666666] border border-[#E8E8E8] hover:text-[#111111]'
+                        ? 'bg-bp-cyan text-bp-text shadow-xs font-bold'
+                        : 'bg-white text-bp-muted border border-bp-border hover:text-bp-text'
                     }`}
                   >
                     {sub} ({count})
@@ -672,90 +672,90 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
             </div>
           )}
 
-          <div className="bg-white p-4 rounded-2xl border border-[#E8E8E8] flex gap-3 items-center shadow-xs">
+          <div className="bg-white p-4 rounded-2xl border border-bp-border flex gap-3 items-center shadow-xs">
             <div className="relative flex-1">
-              <Search className="w-4 h-4 text-[#666666] absolute left-3.5 top-3" />
+              <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-3" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={`Search ${categoryDef?.name.toLowerCase()} materials and equipment...`}
-                className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400]"
+                className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
               />
             </div>
-            <span className="text-xs text-[#666666] shrink-0 font-medium">
+            <span className="text-xs text-bp-muted shrink-0 font-medium">
               Showing {filteredItems.length} items
             </span>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-xs">
+          <div className="bg-white rounded-2xl border border-bp-border overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-[#F7F7F7] border-b border-[#E8E8E8] text-[11px] font-semibold text-[#666666] uppercase tracking-wider">
+                  <tr className="bg-bp-background border-b border-bp-border text-[11px] font-semibold text-bp-muted uppercase tracking-wider">
                     <th className="py-3 px-4">Material / Item</th>
                     <th className="py-3 px-4">Subcategory</th>
                     <th className="py-3 px-4">Unit</th>
                     <th className="py-3 px-4 text-right">Delivered (In)</th>
                     <th className="py-3 px-4 text-right">In Use / Consumed</th>
                     <th className="py-3 px-4 text-right">Damaged / Maint.</th>
-                    <th className="py-3 px-4 text-right bg-[#FFC400]/10 font-bold text-[#111111]">
+                    <th className="py-3 px-4 text-right bg-bp-cyan/10 font-bold text-bp-text">
                       Available Stock
                     </th>
                     <th className="py-3 px-4 text-center">Status</th>
                     <th className="py-3 px-4 text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E8E8E8]">
+                <tbody className="divide-y divide-[#E2E8F0]">
                   {filteredItems.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-[#666666]">
+                      <td colSpan={9} className="py-12 text-center text-bp-muted">
                         No materials found matching your search.
                       </td>
                     </tr>
                   ) : (
                     filteredItems.map((item) => (
-                      <tr key={item.key} className="hover:bg-[#F7F7F7] transition-colors">
+                      <tr key={item.key} className="hover:bg-bp-background transition-colors">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-[#111111]">{item.item_name}</span>
+                            <span className="font-semibold text-bp-text">{item.item_name}</span>
                             <span className={`text-[9px] px-1.5 py-0.2 rounded border font-medium ${
                               item.is_reusable
-                                ? 'bg-[#F7F7F7] text-[#111111] border-[#E8E8E8]'
-                                : 'bg-white text-[#666666] border-[#E8E8E8]'
+                                ? 'bg-bp-background text-bp-text border-bp-border'
+                                : 'bg-white text-bp-muted border-bp-border'
                             }`}>
                               {item.is_reusable ? 'Reusable Tool' : 'Consumable'}
                             </span>
                           </div>
                           {item.brand_name && (
-                            <span className="text-[11px] text-[#666666] font-normal block">Brand: {item.brand_name}</span>
+                            <span className="text-[11px] text-bp-muted font-normal block">Brand: {item.brand_name}</span>
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-[#F7F7F7] text-[#666666] border border-[#E8E8E8] font-medium whitespace-nowrap">
+                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-bp-background text-bp-muted border border-bp-border font-medium whitespace-nowrap">
                             {item.subcategory || 'General'}
                           </span>
                         </td>
-                        <td className="py-3 px-4 font-mono text-[#666666]">{item.unit}</td>
-                        <td className="py-3 px-4 text-right font-mono font-semibold text-[#111111]">
+                        <td className="py-3 px-4 font-mono text-bp-muted">{item.unit}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-bp-text">
                           {item.total_received.toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-semibold text-[#111111]">
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-bp-text">
                           {item.is_reusable ? (item.in_use_stock || 0).toLocaleString() : item.total_used.toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-semibold text-[#666666]">
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-bp-muted">
                           {item.total_damaged.toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-sm tabular-nums text-[#111111] bg-[#FFC400]/10">
+                        <td className="py-3 px-4 text-right font-mono font-bold text-sm tabular-nums text-bp-text bg-bp-cyan/10">
                           {item.available_stock.toLocaleString()}
                         </td>
                         <td className="py-3 px-4 text-center">
                           {item.is_low_stock ? (
-                            <span className="px-2 py-0.5 rounded-md bg-[#111111] text-[#FFC400] font-semibold text-[10px]">
+                            <span className="px-2 py-0.5 rounded-md bg-bp-navy text-bp-cyan font-semibold text-[10px]">
                               Low Stock (&le;{item.min_stock_alert})
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-md bg-[#F7F7F7] text-[#111111] border border-[#E8E8E8] font-medium text-[10px]">
+                            <span className="px-2 py-0.5 rounded-md bg-bp-background text-bp-text border border-bp-border font-medium text-[10px]">
                               Adequate
                             </span>
                           )}
@@ -770,7 +770,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                                   setTxType(item.is_reusable ? 'issue' : 'usage');
                                   setIsModalOpen(true);
                                 }}
-                                className="px-2.5 py-1 text-[11px] font-semibold text-[#111111] bg-[#FFC400] hover:bg-[#F0B800] rounded-lg transition-colors shadow-xs"
+                                className="px-2.5 py-1 text-[11px] font-semibold text-bp-text bg-bp-cyan hover:bg-bp-blue rounded-lg transition-colors shadow-xs"
                                 title="Record movement for this item"
                               >
                                 + Movement
@@ -779,7 +779,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                             {canEditItem && (
                               <button
                                 onClick={() => handleOpenEditItem(item)}
-                                className="p-1 text-[#666666] hover:text-[#111111] hover:bg-[#F7F7F7] rounded-lg transition-colors"
+                                className="p-1 text-bp-muted hover:text-bp-text hover:bg-bp-background rounded-lg transition-colors"
                                 title="Edit Material Details"
                               >
                                 <Edit className="w-3.5 h-3.5" />
@@ -801,22 +801,22 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
       {activeTab === 'ledger' && (
         <div className="space-y-4">
           {/* Ledger Filters Strip */}
-          <div className="bg-white p-4 rounded-2xl border border-[#E8E8E8] flex flex-wrap gap-3 items-center justify-between text-xs shadow-xs">
+          <div className="bg-white p-4 rounded-2xl border border-bp-border flex flex-wrap gap-3 items-center justify-between text-xs shadow-xs">
             <div className="relative flex-1 min-w-[200px]">
-              <Search className="w-4 h-4 text-[#666666] absolute left-3.5 top-3" />
+              <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-3" />
               <input
                 type="text"
                 value={ledgerSearch}
                 onChange={(e) => setLedgerSearch(e.target.value)}
                 placeholder="Search ledger by item, supplier, invoice, challan..."
-                className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400]"
+                className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={ledgerTypeFilter}
                 onChange={(e) => setLedgerTypeFilter(e.target.value)}
-                className="text-xs py-2 px-3 rounded-xl border border-[#E8E8E8] bg-white text-[#111111] focus:outline-none focus:border-[#FFC400]"
+                className="text-xs py-2 px-3 rounded-xl border border-bp-border bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
               >
                 <option value="all">All Movement Types</option>
                 <option value="receipt">Receipt (Delivery In)</option>
@@ -825,20 +825,20 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <option value="damage">Damage / Scrap</option>
               </select>
 
-              <div className="flex items-center gap-1.5 text-[#666666]">
+              <div className="flex items-center gap-1.5 text-bp-muted">
                 <span>From:</span>
                 <input
                   type="date"
                   value={ledgerStartDate}
                   onChange={(e) => setLedgerStartDate(e.target.value)}
-                  className="text-xs py-1.5 px-2 rounded-xl border border-[#E8E8E8] bg-white text-[#111111]"
+                  className="text-xs py-1.5 px-2 rounded-xl border border-bp-border bg-white text-bp-text"
                 />
                 <span>To:</span>
                 <input
                   type="date"
                   value={ledgerEndDate}
                   onChange={(e) => setLedgerEndDate(e.target.value)}
-                  className="text-xs py-1.5 px-2 rounded-xl border border-[#E8E8E8] bg-white text-[#111111]"
+                  className="text-xs py-1.5 px-2 rounded-xl border border-bp-border bg-white text-bp-text"
                 />
               </div>
 
@@ -850,7 +850,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                     setLedgerStartDate('');
                     setLedgerEndDate('');
                   }}
-                  className="text-[11px] text-[#111111] font-semibold hover:underline"
+                  className="text-[11px] text-bp-text font-semibold hover:underline"
                 >
                   Clear Filters
                 </button>
@@ -858,70 +858,70 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-xs">
+          <div className="bg-white rounded-2xl border border-bp-border overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-[#F7F7F7] border-b border-[#E8E8E8] text-[11px] font-semibold text-[#666666] uppercase tracking-wider">
+                  <tr className="bg-bp-background border-b border-bp-border text-[11px] font-semibold text-bp-muted uppercase tracking-wider">
                     <th className="py-3 px-4">Date</th>
                     <th className="py-3 px-4">Item</th>
                     <th className="py-3 px-4">Movement</th>
                     <th className="py-3 px-4 text-right">Quantity</th>
-                    <th className="py-3 px-4 text-right bg-[#FFC400]/10 font-bold text-[#111111]">Running Stock</th>
+                    <th className="py-3 px-4 text-right bg-bp-cyan/10 font-bold text-bp-text">Running Stock</th>
                     <th className="py-3 px-4">{isReusable ? 'Issued To / Supplier' : 'Supplier / Challan'}</th>
                     <th className="py-3 px-4">Recorded By</th>
                     <th className="py-3 px-4 text-center">Attachment</th>
                     {isAdmin && <th className="py-3 px-4 text-right">Action</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E8E8E8]">
+                <tbody className="divide-y divide-[#E2E8F0]">
                   {filteredTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-[#666666]">
+                      <td colSpan={9} className="py-12 text-center text-bp-muted">
                         No transactions recorded matching the active filters.
                       </td>
                     </tr>
                   ) : (
                     filteredTransactions.map((tx) => (
-                      <tr key={tx.id} className={`hover:bg-[#F7F7F7] transition-colors ${tx.is_reversal ? 'line-through opacity-60' : ''}`}>
-                        <td className="py-3 px-4 font-mono text-[#666666]">{tx.transaction_date}</td>
+                      <tr key={tx.id} className={`hover:bg-bp-background transition-colors ${tx.is_reversal ? 'line-through opacity-60' : ''}`}>
+                        <td className="py-3 px-4 font-mono text-bp-muted">{tx.transaction_date}</td>
                         <td className="py-3 px-4">
-                          <span className="font-semibold text-[#111111] block">{tx.item_name}</span>
-                          {tx.remarks && <span className="text-[11px] text-[#666666] italic block">{tx.remarks}</span>}
+                          <span className="font-semibold text-bp-text block">{tx.item_name}</span>
+                          {tx.remarks && <span className="text-[11px] text-bp-muted italic block">{tx.remarks}</span>}
                         </td>
                         <td className="py-3 px-4">
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase ${
                             tx.transaction_type === 'receipt'
-                              ? 'bg-[#FFC400]/20 text-[#111111] border border-[#FFC400]/40'
-                              : 'bg-[#F7F7F7] text-[#111111] border border-[#E8E8E8]'
+                              ? 'bg-bp-cyan/20 text-bp-text border border-bp-cyan/40'
+                              : 'bg-bp-background text-bp-text border border-bp-border'
                           }`}>
                             {tx.transaction_type}
                           </span>
                           {tx.equipment_condition && (
-                            <span className="block text-[10px] text-[#666666] mt-0.5 capitalize">Cond: {tx.equipment_condition}</span>
+                            <span className="block text-[10px] text-bp-muted mt-0.5 capitalize">Cond: {tx.equipment_condition}</span>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-semibold text-[#111111]">
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-bp-text">
                           {tx.quantity.toLocaleString()} {tx.unit}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-[#111111] bg-[#FFC400]/10">
+                        <td className="py-3 px-4 text-right font-mono font-bold text-bp-text bg-bp-cyan/10">
                           {tx.running_balance !== undefined ? `${tx.running_balance.toLocaleString()} ${tx.unit}` : '—'}
                         </td>
-                        <td className="py-3 px-4 text-[#111111]">
+                        <td className="py-3 px-4 text-bp-text">
                           <div className="space-y-0.5">
                             {tx.issued_to && <span className="block font-medium">Crew: {tx.issued_to}</span>}
-                            {tx.supplier_name && <span className="block text-[#666666]">{tx.supplier_name}</span>}
+                            {tx.supplier_name && <span className="block text-bp-muted">{tx.supplier_name}</span>}
                             {(tx.invoice_number || tx.challan_number) && (
-                              <span className="block font-mono text-[10px] text-[#666666]">
+                              <span className="block font-mono text-[10px] text-bp-muted">
                                 {tx.invoice_number ? `Inv: ${tx.invoice_number} ` : ''}
                                 {tx.challan_number ? `DC: ${tx.challan_number}` : ''}
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-[#111111]">
+                        <td className="py-3 px-4 text-bp-text">
                           <span className="block font-medium">{tx.created_by_name}</span>
-                          <span className="text-[10px] text-[#666666] font-mono">{new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="text-[10px] text-bp-muted font-mono">{new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </td>
                         <td className="py-3 px-4 text-center">
                           <AttachmentLinks attachments={tx.attachments} legacyUrl={tx.attachment_url} legacyName={tx.attachment_name} />
@@ -934,7 +934,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                                   setReversalTarget(tx);
                                   setReversalReason('');
                                 }}
-                                className="text-[11px] text-[#111111] hover:underline font-semibold"
+                                className="text-[11px] text-bp-text hover:underline font-semibold"
                               >
                                 Reverse
                               </button>
@@ -953,25 +953,25 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
 
       {/* RECORD MOVEMENT MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-[#111111]/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-[#E8E8E8] max-w-lg w-full p-6 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-[#E8E8E8]">
-              <h3 className="text-base font-bold text-[#111111] flex items-center gap-2">
-                <PlusCircle className="w-4 h-4 text-[#FFC400]" />
+        <div className="fixed inset-0 z-50 bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-bp-border max-w-lg w-full p-6 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-bp-border">
+              <h3 className="text-base font-bold text-bp-text flex items-center gap-2">
+                <PlusCircle className="w-4 h-4 text-bp-cyan" />
                 Record Movement — {categoryDef?.name}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-[#666666] hover:text-[#111111]">
+              <button onClick={() => setIsModalOpen(false)} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {successSaved ? (
               <div className="py-6 text-center space-y-3">
-                <div className="w-14 h-14 bg-[#FFC400] text-[#111111] rounded-2xl flex items-center justify-center mx-auto shadow-xs">
+                <div className="w-14 h-14 bg-bp-cyan text-bp-text rounded-2xl flex items-center justify-center mx-auto shadow-xs">
                   <CheckCircle2 className="w-8 h-8" />
                 </div>
-                <h4 className="font-bold text-lg text-[#111111]">Transaction Confirmed!</h4>
-                <p className="text-xs text-[#666666]">
+                <h4 className="font-bold text-lg text-bp-text">Transaction Confirmed!</h4>
+                <p className="text-xs text-bp-muted">
                   Recorded {successSaved.quantity} {successSaved.unit} of {successSaved.item_name}.
                 </p>
                 <button
@@ -979,7 +979,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                     setIsModalOpen(false);
                     setSuccessSaved(null);
                   }}
-                  className="px-5 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs transition-colors"
+                  className="px-5 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs transition-colors"
                 >
                   Done & View Ledger
                 </button>
@@ -987,22 +987,22 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
             ) : (
               <form onSubmit={handleRecordSubmit} className="space-y-4 text-xs mt-4">
                 {formError && (
-                  <div className="p-3 bg-[#F7F7F7] border border-[#E8E8E8] text-[#111111] rounded-xl flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-[#111111] shrink-0" />
+                  <div className="p-3 bg-bp-background border border-bp-border text-bp-text rounded-xl flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-bp-text shrink-0" />
                     <span>{formError}</span>
                   </div>
                 )}
 
                 <div>
-                  <label className="block font-semibold text-[#111111] uppercase mb-1.5">Movement Type</label>
+                  <label className="block font-semibold text-bp-text uppercase mb-1.5">Movement Type</label>
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                     <button
                       type="button"
                       onClick={() => setTxType('receipt')}
                       className={`py-2 px-1 rounded-xl font-bold border transition-all text-center text-xs ${
                         txType === 'receipt'
-                          ? 'bg-[#FFC400] border-[#FFC400] text-[#111111] shadow-xs'
-                          : 'border-[#E8E8E8] text-[#666666] hover:bg-[#F7F7F7] hover:text-[#111111]'
+                          ? 'bg-bp-cyan border-bp-cyan text-bp-text shadow-xs'
+                          : 'border-bp-border text-bp-muted hover:bg-bp-background hover:text-bp-text'
                       }`}
                     >
                       Receive (In)
@@ -1015,8 +1015,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                       }}
                       className={`py-2 px-1 rounded-xl font-bold border transition-all text-center text-xs ${
                         (txType === 'usage' || txType === 'issue')
-                          ? 'bg-[#FFC400] border-[#FFC400] text-[#111111] shadow-xs'
-                          : 'border-[#E8E8E8] text-[#666666] hover:bg-[#F7F7F7] hover:text-[#111111]'
+                          ? 'bg-bp-cyan border-bp-cyan text-bp-text shadow-xs'
+                          : 'border-bp-border text-bp-muted hover:bg-bp-background hover:text-bp-text'
                       }`}
                     >
                       {(items.find(i => i.name === selectedItemName)?.is_reusable ?? isReusable) ? 'Issue / Out' : 'Usage / Out'}
@@ -1026,8 +1026,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                       onClick={() => setTxType('return')}
                       className={`py-2 px-1 rounded-xl font-bold border transition-all text-center text-xs ${
                         txType === 'return'
-                          ? 'bg-[#FFC400] border-[#FFC400] text-[#111111] shadow-xs'
-                          : 'border-[#E8E8E8] text-[#666666] hover:bg-[#F7F7F7] hover:text-[#111111]'
+                          ? 'bg-bp-cyan border-bp-cyan text-bp-text shadow-xs'
+                          : 'border-bp-border text-bp-muted hover:bg-bp-background hover:text-bp-text'
                       }`}
                     >
                       Return
@@ -1037,8 +1037,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                       onClick={() => setTxType('damage')}
                       className={`py-2 px-1 rounded-xl font-bold border transition-all text-center text-xs ${
                         txType === 'damage'
-                          ? 'bg-[#111111] border-[#111111] text-white shadow-xs'
-                          : 'border-[#E8E8E8] text-[#666666] hover:bg-[#F7F7F7] hover:text-[#111111]'
+                          ? 'bg-bp-navy border-bp-navy text-white shadow-xs'
+                          : 'border-bp-border text-bp-muted hover:bg-bp-background hover:text-bp-text'
                       }`}
                     >
                       Damaged
@@ -1048,8 +1048,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                       onClick={() => setTxType('adjustment')}
                       className={`py-2 px-1 rounded-xl font-bold border transition-all text-center text-xs ${
                         txType === 'adjustment'
-                          ? 'bg-[#111111] border-[#111111] text-white shadow-xs'
-                          : 'border-[#E8E8E8] text-[#666666] hover:bg-[#F7F7F7] hover:text-[#111111]'
+                          ? 'bg-bp-navy border-bp-navy text-white shadow-xs'
+                          : 'border-bp-border text-bp-muted hover:bg-bp-background hover:text-bp-text'
                       }`}
                     >
                       Adjust
@@ -1059,8 +1059,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                       onClick={() => setTxType('opening_stock')}
                       className={`py-2 px-1 rounded-xl font-bold border transition-all text-center text-xs ${
                         txType === 'opening_stock'
-                          ? 'bg-[#111111] border-[#111111] text-white shadow-xs'
-                          : 'border-[#E8E8E8] text-[#666666] hover:bg-[#F7F7F7] hover:text-[#111111]'
+                          ? 'bg-bp-navy border-bp-navy text-white shadow-xs'
+                          : 'border-bp-border text-bp-muted hover:bg-bp-background hover:text-bp-text'
                       }`}
                     >
                       Opening
@@ -1070,7 +1070,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <label className="block font-semibold text-[#111111] uppercase mb-1.5">Material / Equipment Item *</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1.5">Material / Equipment Item *</label>
                     <select
                       value={selectedItemName}
                       onChange={(e) => {
@@ -1082,7 +1082,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                           setTxType(match.is_reusable ? 'issue' : 'usage');
                         }
                       }}
-                      className="w-full py-2.5 px-3.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] font-medium focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                      className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text font-medium focus:bg-white focus:outline-none focus:border-bp-cyan"
                       required
                     >
                       {subcategories.length > 0 ? (
@@ -1106,7 +1106,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1.5">Quantity *</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1.5">Quantity *</label>
                     <input
                       type="number"
                       step="any"
@@ -1114,16 +1114,16 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                       required
                       value={txQty}
                       onChange={(e) => setTxQty(e.target.value)}
-                      className="w-full py-2.5 px-3.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] font-mono focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                      className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text font-mono focus:bg-white focus:outline-none focus:border-bp-cyan"
                     />
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1.5">Unit</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1.5">Unit</label>
                     <select
                       value={txUnit}
                       onChange={(e) => setTxUnit(e.target.value)}
-                      className="w-full py-2.5 px-3.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                      className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                     >
                       {(categoryDef?.allowed_units || ['Nos', 'Sets', 'Rolls', 'Pairs', 'Meters', 'Pcs']).map(u => (
                         <option key={u} value={u}>{u}</option>
@@ -1132,22 +1132,22 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1.5">Date *</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1.5">Date *</label>
                     <input
                       type="date"
                       required
                       value={txDate}
                       onChange={(e) => setTxDate(e.target.value)}
-                      className="w-full py-2.5 px-3.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                      className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                     />
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1.5">Storage Yard / Location</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1.5">Storage Yard / Location</label>
                     <select
                       value={txLocationId}
                       onChange={(e) => setTxLocationId(e.target.value)}
-                      className="w-full py-2.5 px-3.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                      className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                     >
                       {locations.map(loc => (
                         <option key={loc.id} value={loc.id}>{loc.name}</option>
@@ -1158,11 +1158,11 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                   {(items.find(i => i.name === selectedItemName)?.is_reusable ?? isReusable) && (
                     <>
                       <div>
-                        <label className="block font-semibold text-[#111111] uppercase mb-1.5">Equipment Condition</label>
+                        <label className="block font-semibold text-bp-text uppercase mb-1.5">Equipment Condition</label>
                         <select
                           value={txCondition}
                           onChange={(e) => setTxCondition(e.target.value as any)}
-                          className="w-full py-2.5 px-3.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                          className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                         >
                           <option value="good">Good Condition</option>
                           <option value="fair">Fair / Functional</option>
@@ -1171,75 +1171,75 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                       </div>
 
                       <div>
-                        <label className="block font-semibold text-[#111111] uppercase mb-1.5">Issued To (Worker / Gang / Subcontractor)</label>
+                        <label className="block font-semibold text-bp-text uppercase mb-1.5">Issued To (Worker / Gang / Subcontractor)</label>
                         <input
                           type="text"
                           value={issuedToCrew}
                           onChange={(e) => setIssuedToCrew(e.target.value)}
                           placeholder="e.g. Masonry Gang 2 / Ramesh"
-                          className="w-full py-2.5 px-3.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                          className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                         />
                       </div>
                     </>
                   )}
 
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1.5">Supplier / Party Name</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1.5">Supplier / Party Name</label>
                     <input
                       type="text"
                       value={partyName}
                       onChange={(e) => setPartyName(e.target.value)}
                       placeholder="e.g. National Hardware Depot"
-                      className="w-full py-2.5 px-3.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                      className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                     />
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1.5">Invoice / Challan Reference</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1.5">Invoice / Challan Reference</label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={invoiceNumber}
                         onChange={(e) => setInvoiceNumber(e.target.value)}
                         placeholder="Invoice #"
-                        className="w-1/2 py-2.5 px-3 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] font-mono focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                        className="w-1/2 py-2.5 px-3 rounded-xl border border-bp-border bg-bp-background text-bp-text font-mono focus:bg-white focus:outline-none focus:border-bp-cyan"
                       />
                       <input
                         type="text"
                         value={challanNumber}
                         onChange={(e) => setChallanNumber(e.target.value)}
                         placeholder="Challan #"
-                        className="w-1/2 py-2.5 px-3 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] font-mono focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                        className="w-1/2 py-2.5 px-3 rounded-xl border border-bp-border bg-bp-background text-bp-text font-mono focus:bg-white focus:outline-none focus:border-bp-cyan"
                       />
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-[#111111] uppercase mb-1.5">Remarks & Details</label>
+                  <label className="block font-semibold text-bp-text uppercase mb-1.5">Remarks & Details</label>
                   <input
                     type="text"
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
                     placeholder="e.g. Delivered for Block B scaffolding"
-                    className="w-full py-2.5 px-3.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                    className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
 
                 <AttachmentSections value={attachments} onChange={setAttachments} onUploadFile={onUploadFile} />
 
-                <div className="pt-3 border-t border-[#E8E8E8] flex items-center justify-end gap-2">
+                <div className="pt-3 border-t border-bp-border flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 border border-[#E8E8E8] text-[#666666] font-semibold rounded-xl hover:bg-[#F7F7F7] transition-colors"
+                    className="px-4 py-2 border border-bp-border text-bp-muted font-semibold rounded-xl hover:bg-bp-background transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="px-5 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-5 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
                   >
                     {isSubmitting ? 'Recording...' : 'Confirm Movement'}
                   </button>
@@ -1252,38 +1252,38 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
 
       {/* ADD ITEM MODAL */}
       {isAddItemOpen && (
-        <div className="fixed inset-0 z-50 bg-[#111111]/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-[#E8E8E8] max-w-md w-full p-6 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E8E8E8]">
-              <h3 className="text-base font-bold text-[#111111] flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[#111111]" />
+        <div className="fixed inset-0 z-50 bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-bp-border max-w-md w-full p-6 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-bp-border">
+              <h3 className="text-base font-bold text-bp-text flex items-center gap-2">
+                <Plus className="w-4 h-4 text-bp-text" />
                 Add Item to {categoryDef?.name}
               </h3>
-              <button onClick={() => setIsAddItemOpen(false)} className="text-[#666666] hover:text-[#111111]">
+              <button onClick={() => setIsAddItemOpen(false)} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleAddItemSubmit} className="space-y-4 text-xs mt-4">
               <div>
-                <label className="block font-semibold text-[#111111] uppercase mb-1.5">Material / Item Name *</label>
+                <label className="block font-semibold text-bp-text uppercase mb-1.5">Material / Item Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. 25mm CPVC Ball Valve, Acrylic Sealant"
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] font-medium"
+                  className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan font-medium"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-[#111111] uppercase mb-1.5">Default Unit</label>
+                  <label className="block font-semibold text-bp-text uppercase mb-1.5">Default Unit</label>
                   <select
                     value={newItemUnit}
                     onChange={(e) => setNewItemUnit(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                    className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                   >
                     {(categoryDef?.allowed_units || ['Nos', 'Sets', 'Rolls', 'kg', 'Meters']).map(u => (
                       <option key={u} value={u}>{u}</option>
@@ -1292,51 +1292,51 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-[#111111] uppercase mb-1.5">Min Stock Alert</label>
+                  <label className="block font-semibold text-bp-text uppercase mb-1.5">Min Stock Alert</label>
                   <input
                     type="number"
                     min="1"
                     value={newItemMinStock}
                     onChange={(e) => setNewItemMinStock(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] font-mono"
+                    className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-[#111111] uppercase mb-1.5">Brand / Manufacturer (Optional)</label>
+                <label className="block font-semibold text-bp-text uppercase mb-1.5">Brand / Manufacturer (Optional)</label>
                 <input
                   type="text"
                   placeholder="e.g. Astral, Asian Paints, Bosch"
                   value={newItemBrand}
                   onChange={(e) => setNewItemBrand(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                  className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-[#111111] uppercase mb-1.5">Specification (Optional)</label>
+                <label className="block font-semibold text-bp-text uppercase mb-1.5">Specification (Optional)</label>
                 <textarea
                   rows={2}
                   placeholder="Grade, dimensions, or standard specification"
                   value={newItemSpec}
                   onChange={(e) => setNewItemSpec(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                  className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                 />
               </div>
 
-              <div className="pt-3 border-t border-[#E8E8E8] flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-bp-border flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAddItemOpen(false)}
-                  className="px-4 py-2 border border-[#E8E8E8] text-[#666666] font-semibold rounded-xl hover:bg-[#F7F7F7] transition-colors"
+                  className="px-4 py-2 border border-bp-border text-bp-muted font-semibold rounded-xl hover:bg-bp-background transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isAddingItemSaving}
-                  className="px-5 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold rounded-xl shadow-xs transition-colors disabled:opacity-50"
+                  className="px-5 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold rounded-xl shadow-xs transition-colors disabled:opacity-50"
                 >
                   {isAddingItemSaving ? 'Saving...' : 'Add Material'}
                 </button>
@@ -1348,44 +1348,44 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
 
       {/* EDIT MATERIAL DETAILS MODAL */}
       {isEditItemOpen && editingItem && (
-        <div className="fixed inset-0 z-50 bg-[#111111]/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-[#E8E8E8] max-w-md w-full p-6 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E8E8E8]">
-              <h3 className="text-base font-bold text-[#111111] flex items-center gap-2">
-                <Edit className="w-4 h-4 text-[#111111]" />
+        <div className="fixed inset-0 z-50 bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-bp-border max-w-md w-full p-6 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-bp-border">
+              <h3 className="text-base font-bold text-bp-text flex items-center gap-2">
+                <Edit className="w-4 h-4 text-bp-text" />
                 Edit Material Details
               </h3>
-              <button onClick={() => setIsEditItemOpen(false)} className="text-[#666666] hover:text-[#111111]">
+              <button onClick={() => setIsEditItemOpen(false)} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {editError && (
-              <div className="mt-3 p-2.5 bg-[#F7F7F7] border border-[#E8E8E8] text-[#111111] text-xs rounded-xl flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-[#111111] shrink-0" />
+              <div className="mt-3 p-2.5 bg-bp-background border border-bp-border text-bp-text text-xs rounded-xl flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-bp-text shrink-0" />
                 <span>{editError}</span>
               </div>
             )}
 
             <form onSubmit={handleEditItemSubmit} className="space-y-4 text-xs mt-4">
               <div>
-                <label className="block font-semibold text-[#111111] uppercase mb-1.5">Material Name *</label>
+                <label className="block font-semibold text-bp-text uppercase mb-1.5">Material Name *</label>
                 <input
                   type="text"
                   required
                   value={editItemName}
                   onChange={(e) => setEditItemName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] font-medium"
+                  className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan font-medium"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-[#111111] uppercase mb-1.5">Default Unit</label>
+                  <label className="block font-semibold text-bp-text uppercase mb-1.5">Default Unit</label>
                   <select
                     value={editItemUnit}
                     onChange={(e) => setEditItemUnit(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                    className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                   >
                     {(categoryDef?.allowed_units || ['Nos', 'Sets', 'Rolls', 'kg', 'Meters']).map(u => (
                       <option key={u} value={u}>{u}</option>
@@ -1394,63 +1394,63 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-[#111111] uppercase mb-1.5">Min Stock Alert</label>
+                  <label className="block font-semibold text-bp-text uppercase mb-1.5">Min Stock Alert</label>
                   <input
                     type="number"
                     min="1"
                     value={editItemMinStock}
                     onChange={(e) => setEditItemMinStock(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] font-mono"
+                    className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-[#111111] uppercase mb-1.5">Brand / Manufacturer</label>
+                <label className="block font-semibold text-bp-text uppercase mb-1.5">Brand / Manufacturer</label>
                 <input
                   type="text"
                   placeholder="e.g. Pidilite, Ultra, Havells"
                   value={editItemBrand}
                   onChange={(e) => setEditItemBrand(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                  className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-[#111111] uppercase mb-1.5">Technical Specification</label>
+                <label className="block font-semibold text-bp-text uppercase mb-1.5">Technical Specification</label>
                 <textarea
                   rows={2}
                   placeholder="Grade, thickness, or material standard"
                   value={editItemSpec}
                   onChange={(e) => setEditItemSpec(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                  className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-[#111111] uppercase mb-1.5">Tracking Classification</label>
+                <label className="block font-semibold text-bp-text uppercase mb-1.5">Tracking Classification</label>
                 <select
                   value={editItemReusable ? 'true' : 'false'}
                   onChange={(e) => setEditItemReusable(e.target.value === 'true')}
-                  className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                  className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                 >
                   <option value="false">Consumable Material (Consumed / Used up)</option>
                   <option value="true">Reusable Equipment (Issued / Returned / In Yard)</option>
                 </select>
               </div>
 
-              <div className="pt-3 border-t border-[#E8E8E8] flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-bp-border flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsEditItemOpen(false)}
-                  className="px-4 py-2 border border-[#E8E8E8] text-[#666666] font-semibold rounded-xl hover:bg-[#F7F7F7] transition-colors"
+                  className="px-4 py-2 border border-bp-border text-bp-muted font-semibold rounded-xl hover:bg-bp-background transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isEditSaving}
-                  className="px-5 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold rounded-xl shadow-xs transition-colors disabled:opacity-50"
+                  className="px-5 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold rounded-xl shadow-xs transition-colors disabled:opacity-50"
                 >
                   {isEditSaving ? 'Saving...' : 'Update Details'}
                 </button>
@@ -1462,48 +1462,48 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
 
       {/* REVERSAL MODAL */}
       {reversalTarget && (
-        <div className="fixed inset-0 z-50 bg-[#111111]/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-[#E8E8E8] max-w-md w-full p-6 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E8E8E8]">
-              <h3 className="text-base font-bold text-[#111111] flex items-center gap-2">
-                <RotateCcw className="w-4 h-4 text-[#111111]" />
+        <div className="fixed inset-0 z-50 bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-bp-border max-w-md w-full p-6 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-bp-border">
+              <h3 className="text-base font-bold text-bp-text flex items-center gap-2">
+                <RotateCcw className="w-4 h-4 text-bp-text" />
                 Audited Ledger Reversal
               </h3>
-              <button onClick={() => setReversalTarget(null)} className="text-[#666666] hover:text-[#111111]">
+              <button onClick={() => setReversalTarget(null)} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="mt-4 p-3 bg-[#F7F7F7] rounded-xl border border-[#E8E8E8] text-xs text-[#111111] space-y-1">
+            <div className="mt-4 p-3 bg-bp-background rounded-xl border border-bp-border text-xs text-bp-text space-y-1">
               <p>Reversing transaction for <strong className="font-bold">{reversalTarget.item_name}</strong> ({reversalTarget.quantity} {reversalTarget.unit}).</p>
-              <p className="text-[11px] text-[#666666]">An audited offsetting entry will be posted to preserve the historical audit trail.</p>
+              <p className="text-[11px] text-bp-muted">An audited offsetting entry will be posted to preserve the historical audit trail.</p>
             </div>
 
             <form onSubmit={handleReversalSubmit} className="space-y-4 text-xs mt-4">
               <div>
-                <label className="block font-semibold text-[#111111] uppercase mb-1.5">Reason for Reversal *</label>
+                <label className="block font-semibold text-bp-text uppercase mb-1.5">Reason for Reversal *</label>
                 <textarea
                   rows={3}
                   required
                   placeholder="State the audit justification (e.g. data entry error, duplicate invoice correction)"
                   value={reversalReason}
                   onChange={(e) => setReversalReason(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-[#E8E8E8] rounded-xl bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                  className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                 />
               </div>
 
-              <div className="pt-3 border-t border-[#E8E8E8] flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-bp-border flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setReversalTarget(null)}
-                  className="px-4 py-2 border border-[#E8E8E8] text-[#666666] font-semibold rounded-xl hover:bg-[#F7F7F7] transition-colors"
+                  className="px-4 py-2 border border-bp-border text-bp-muted font-semibold rounded-xl hover:bg-bp-background transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isReversing}
-                  className="px-5 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold rounded-xl shadow-xs transition-colors disabled:opacity-50"
+                  className="px-5 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold rounded-xl shadow-xs transition-colors disabled:opacity-50"
                 >
                   {isReversing ? 'Reversing...' : 'Confirm Reversal'}
                 </button>

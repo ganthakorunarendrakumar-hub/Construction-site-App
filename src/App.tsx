@@ -461,9 +461,9 @@ export default function App() {
 
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen bg-[#F7F7F7] flex flex-col items-center justify-center p-4">
-        <div className="w-10 h-10 border-4 border-[#FFC400] border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-xs font-semibold text-[#111111]">Verifying Secure Session...</p>
+      <div className="min-h-screen bg-bp-background flex flex-col items-center justify-center p-4">
+        <div className="w-10 h-10 border-4 border-bp-cyan border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-semibold text-bp-text">Verifying Secure Session...</p>
       </div>
     );
   }
@@ -474,14 +474,16 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-['Public_Sans',sans-serif]">
+    <div className="min-h-screen bg-bp-background flex flex-col font-sans">
       
       {/* Top Navbar */}
       <Navbar
         currentUser={currentUser}
+        activeView={currentView}
         onSwitchRole={handleSwitchRole}
         onOpenCloudSetup={() => setIsCloudSetupOpen(true)}
         onNavigateHome={() => setCurrentView('home')}
+        onNavigateProjects={() => setCurrentView('ongoing_projects')}
         onNavigateReports={() => setCurrentView('reports')}
         onNavigateAttendance={() => setCurrentView('attendance')}
         onNavigateUserManagement={() => setCurrentView('user_management')}
@@ -686,10 +688,10 @@ export default function App() {
       <aside aria-label="Testing Suite" className="hidden">
         <button
           onClick={() => setIsTestWorkflowOpen(true)}
-          className="px-3.5 py-2 bg-slate-900 text-amber-400 hover:bg-slate-800 rounded-full shadow-lg border border-slate-700 text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
+          className="px-3.5 py-2 bg-bp-navy text-bp-cyan hover:bg-bp-navy-light rounded-full shadow-lg border border-bp-navy-border text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
           title="Click to run Section 16 Automated Workflow Test (100 bags receipt -> 25 used -> 3 damaged = 72 bags)"
         >
-          <PlayCircle className="w-4 h-4 text-amber-400" />
+          <PlayCircle className="w-4 h-4 text-bp-cyan" />
           <span>Run Section 16 Test Suite</span>
         </button>
       </aside>
@@ -700,7 +702,7 @@ export default function App() {
           <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
             <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <PlayCircle className="w-5 h-5 text-amber-400" />
+                <PlayCircle className="w-5 h-5 text-bp-cyan" />
                 <h3 className="font-bold text-base">Section 16 Automated Verification Runner</h3>
               </div>
               <button
@@ -722,7 +724,7 @@ export default function App() {
                   type="button"
                   disabled={isTestingWorkflow}
                   onClick={runSection16Tests}
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
+                  className="px-5 py-2.5 bg-bp-blue hover:bg-bp-blue-dark text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
                 >
                   <PlayCircle className="w-4 h-4" />
                   {isTestingWorkflow ? 'Executing Test Steps...' : 'Execute Full Verification Sequence'}

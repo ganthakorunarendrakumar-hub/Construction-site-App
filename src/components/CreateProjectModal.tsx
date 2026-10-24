@@ -219,23 +219,23 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#111111]/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="relative bg-white rounded-2xl shadow-xl border border-[#E8E8E8] w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="relative bg-white rounded-2xl shadow-xl border border-bp-border w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header */}
-        <div className="bg-[#111111] text-white px-6 py-4 flex items-center justify-between border-b border-[#222222]">
+        <div className="bg-bp-navy text-white px-6 py-4 flex items-center justify-between border-b border-bp-navy-border">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#FFC400] flex items-center justify-center text-[#111111]">
+            <div className="w-8 h-8 rounded-xl bg-bp-cyan flex items-center justify-center text-bp-text">
               <Building2 className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-base font-bold text-white">{isEditMode ? 'Edit Project' : 'Create Project'}</h3>
-              <p className="text-xs text-[#AAAAAA]">{isEditMode ? 'Update the existing construction site details' : 'Add a new construction site to your portfolio'}</p>
+              <p className="text-xs text-bp-border-strong">{isEditMode ? 'Update the existing construction site details' : 'Add a new construction site to your portfolio'}</p>
             </div>
           </div>
           <button
             onClick={resetAndClose}
-            className="text-[#AAAAAA] hover:text-white p-1 rounded-lg transition-colors"
+            className="text-bp-border-strong hover:text-white p-1 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -244,16 +244,16 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         {/* Success Banner if Saved */}
         {successCreated ? (
           <div className="p-8 text-center space-y-4">
-            <div className="w-16 h-16 bg-[#FFC400] text-[#111111] rounded-2xl flex items-center justify-center mx-auto shadow-xs">
+            <div className="w-16 h-16 bg-bp-cyan text-bp-text rounded-2xl flex items-center justify-center mx-auto shadow-xs">
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <div className="space-y-1">
-              <h4 className="text-xl font-bold text-[#111111]">Project Registered</h4>
-              <p className="text-xs text-[#666666]">
-                <strong className="text-[#111111]">{successCreated.name}</strong> ({successCreated.code}) is now active in the system.
+              <h4 className="text-xl font-bold text-bp-text">Project Registered</h4>
+              <p className="text-xs text-bp-muted">
+                <strong className="text-bp-text">{successCreated.name}</strong> ({successCreated.code}) is now active in the system.
               </p>
               <div className="pt-2">
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#F7F7F7] text-[#111111] border border-[#E8E8E8]">
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-bp-background text-bp-text border border-bp-border">
                   Ongoing Project
                 </span>
               </div>
@@ -262,7 +262,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               <button
                 type="button"
                 onClick={resetAndClose}
-                className="px-6 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] text-xs font-bold rounded-xl transition-colors shadow-xs"
+                className="px-6 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-bold rounded-xl transition-colors shadow-xs"
               >
                 Done & Return to Projects
               </button>
@@ -271,18 +271,18 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             {!canCreate && (
-              <div className="bg-[#F7F7F7] border border-[#E8E8E8] text-[#111111] px-4 py-3 rounded-xl flex items-start gap-3 text-xs">
-                <ShieldAlert className="w-4 h-4 text-[#111111] shrink-0 mt-0.5" />
+              <div className="bg-bp-background border border-bp-border text-bp-text px-4 py-3 rounded-xl flex items-start gap-3 text-xs">
+                <ShieldAlert className="w-4 h-4 text-bp-text shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold">Role Restriction</p>
-                  <p className="text-[#666666]">Your current role is <strong className="text-[#111111]">{currentUser.role_title}</strong>. Only Company Administrators and Project Managers can create projects.</p>
+                  <p className="text-bp-muted">Your current role is <strong className="text-bp-text">{currentUser.role_title}</strong>. Only Company Administrators and Project Managers can create projects.</p>
                 </div>
               </div>
             )}
 
             {errorMessage && (
-              <div className="bg-[#F7F7F7] border border-[#E8E8E8] text-[#111111] px-4 py-3 rounded-xl flex items-start gap-2.5 text-xs">
-                <AlertCircle className="w-4 h-4 text-[#111111] shrink-0 mt-0.5" />
+              <div className="bg-bp-background border border-bp-border text-bp-text px-4 py-3 rounded-xl flex items-start gap-2.5 text-xs">
+                <AlertCircle className="w-4 h-4 text-bp-text shrink-0 mt-0.5" />
                 <div className="flex-1 font-medium">{errorMessage}</div>
               </div>
             )}
@@ -291,8 +291,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               
               {/* Project Name */}
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
-                  Project Name <span className="text-[#111111] font-bold">*</span>
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
+                  Project Name <span className="text-bp-text font-bold">*</span>
                 </label>
                 <input
                   type="text"
@@ -300,32 +300,32 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Skyline Commercial Tower - Phase 1"
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] placeholder-[#888888] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] transition-colors"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text placeholder-[#64748B] focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                 />
               </div>
 
               {/* Unique Project Code */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
-                  Project Code <span className="text-[#111111] font-bold">*</span>
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
+                  Project Code <span className="text-bp-text font-bold">*</span>
                 </label>
                 <div className="relative">
-                  <Hash className="w-3.5 h-3.5 text-[#666666] absolute left-3 top-3" />
+                  <Hash className="w-3.5 h-3.5 text-bp-muted absolute left-3 top-3" />
                   <input
                     type="text"
                     required
                     value={code}
                     onChange={(e) => setCode(e.target.value.toUpperCase())}
                     placeholder="PRJ-2026-004"
-                    className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] font-mono focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] transition-colors"
+                    className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text font-mono focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                   />
                 </div>
               </div>
 
               {/* Client Name */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
-                  Client / Customer <span className="text-[#111111] font-bold">*</span>
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
+                  Client / Customer <span className="text-bp-text font-bold">*</span>
                 </label>
                 <input
                   type="text"
@@ -333,40 +333,40 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                   placeholder="e.g. Brigade Realty Infrastructure"
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] transition-colors"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                 />
               </div>
 
               {/* Location */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
-                  Location (City, State) <span className="text-[#111111] font-bold">*</span>
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
+                  Location (City, State) <span className="text-bp-text font-bold">*</span>
                 </label>
                 <div className="relative">
-                  <MapPin className="w-3.5 h-3.5 text-[#666666] absolute left-3 top-3" />
+                  <MapPin className="w-3.5 h-3.5 text-bp-muted absolute left-3 top-3" />
                   <input
                     type="text"
                     required
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="e.g. Hyderabad, Telangana"
-                    className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] transition-colors"
+                    className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                   />
                 </div>
               </div>
 
               {/* Project Manager */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
                   Project Manager
                 </label>
                 <div className="relative">
-                  <User className="w-3.5 h-3.5 text-[#666666] absolute left-3 top-3" />
+                  <User className="w-3.5 h-3.5 text-bp-muted absolute left-3 top-3" />
                   <select
                     value={pmId}
                     onChange={(e) => setPmId(e.target.value)}
                     required={!isEditMode}
-                    className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] transition-colors"
+                    className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                   >
                     <option value="" disabled>
                       {projectManagers.length > 0 ? 'Select a project manager' : 'No eligible active managers found'}
@@ -387,35 +387,35 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
               {/* Start Date */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
-                  Start Date <span className="text-[#111111] font-bold">*</span>
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
+                  Start Date <span className="text-bp-text font-bold">*</span>
                 </label>
                 <input
                   type="date"
                   required
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] transition-colors"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                 />
               </div>
 
               {/* Expected Completion Date */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
-                  Target Completion <span className="text-[#111111] font-bold">*</span>
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
+                  Target Completion <span className="text-bp-text font-bold">*</span>
                 </label>
                 <input
                   type="date"
                   required
                   value={expectedCompletionDate}
                   onChange={(e) => setExpectedCompletionDate(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] transition-colors"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                 />
               </div>
 
               {/* Address */}
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
                   Site Street Address
                 </label>
                 <input
@@ -423,13 +423,13 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="Plot / Survey No., Landmark, Zone"
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] transition-colors"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                 />
               </div>
 
               {/* Description */}
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
                   Scope & Remarks
                 </label>
                 <textarea
@@ -437,19 +437,19 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Scope of work, structural details, concrete grades..."
-                  className="w-full text-xs px-3.5 py-2 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] transition-colors"
+                  className="w-full text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                 />
               </div>
 
               {/* Initial Status */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
                   Status
                 </label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as ProjectStatus)}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] transition-colors"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                 >
                   <option value="in_progress">Ongoing (Active Site)</option>
                   <option value="planning">Planning & Mobilization</option>
@@ -460,20 +460,20 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             </div>
 
             {/* Modal Actions */}
-            <div className="pt-4 border-t border-[#E8E8E8] flex items-center justify-end gap-3">
+            <div className="pt-4 border-t border-bp-border flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={resetAndClose}
-                className="px-4 py-2 text-xs font-semibold text-[#666666] hover:bg-[#F7F7F7] rounded-xl transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || !canCreate}
-                className="px-5 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] text-xs font-bold rounded-xl shadow-xs flex items-center gap-2 transition-all disabled:opacity-50"
+                className="px-5 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-bold rounded-xl shadow-xs flex items-center gap-2 transition-all disabled:opacity-50"
               >
-                <PlusCircle className="w-4 h-4 text-[#111111]" />
+                <PlusCircle className="w-4 h-4 text-bp-text" />
                   {isSubmitting ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Project'}
               </button>
             </div>

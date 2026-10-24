@@ -1,10 +1,80 @@
 @import "tailwindcss";
 
+@theme {
+  --color-bp-navy: #17365D;
+  --color-bp-navy-light: #23496F;
+  --color-bp-navy-outline: #24496F;
+  --color-bp-navy-border: #355A7D;
+  --color-bp-navy-deep: #102948;
+  --color-bp-blue: #087EA4;
+  --color-bp-blue-dark: #066A8A;
+  --color-bp-cyan: #16A6C7;
+  --color-bp-cyan-soft: #EAF6FA;
+  --color-bp-cyan-border: #B8E0EA;
+  --color-bp-cyan-light: #9DE5F3;
+  --color-bp-background: #F4F6F8;
+  --color-bp-card: #FFFFFF;
+  --color-bp-text: #1F2937;
+  --color-bp-text-subtle: #475569;
+  --color-bp-muted: #64748B;
+  --color-bp-border: #E2E8F0;
+  --color-bp-border-strong: #CBD5E1;
+  --color-bp-slate: #334155;
+}
+
+:root {
+  color-scheme: light;
+}
+
 @layer base {
+  html {
+    background-color: var(--color-bp-background);
+  }
+
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background-color: #F7F7F7;
-    color: #111111;
+    background-color: var(--color-bp-background);
+    color: var(--color-bp-text);
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-bp-cyan);
+    outline-offset: 2px;
+  }
+
+  input,
+  select,
+  textarea {
+    color: var(--color-bp-text);
+    border-color: var(--color-bp-border);
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--color-bp-blue);
+    box-shadow: 0 0 0 3px rgb(8 126 164 / 14%);
+    outline: none;
+  }
+
+  table {
+    border-collapse: collapse;
+  }
+
+  th {
+    color: var(--color-bp-muted);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-align: left;
   }
 }
 

@@ -38,7 +38,7 @@ export const AttachmentFileLink: React.FC<{
   }, [file.url]);
 
   if (error) return <span className="text-[10px] text-red-600" title={error}>Unavailable</span>;
-  if (!url) return <span className="text-[10px] text-[#888888]">Loading...</span>;
+  if (!url) return <span className="text-[10px] text-bp-muted">Loading...</span>;
 
   const isImage = file.type?.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(file.name);
   return (
@@ -53,11 +53,13 @@ export const AttachmentFileLink: React.FC<{
           onPreview(file, url);
         }
       }}
-      className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#111111] hover:underline"
+      className="inline-flex min-w-0 items-center gap-2 text-[11px] font-semibold text-bp-text hover:text-bp-blue hover:underline"
       title={file.name}
     >
-      {isImage ? <img src={url} alt={file.name} className={compact ? 'h-10 w-10 rounded object-cover border border-[#E8E8E8]' : 'h-4 w-4 rounded object-cover'} /> : <FileText className="h-3.5 w-3.5" />}
-      {label}
+      {isImage
+        ? <img src={url} alt={file.name} className={compact ? 'h-12 w-12 shrink-0 rounded-lg border border-bp-border object-cover' : 'h-5 w-5 shrink-0 rounded object-cover'} />
+        : <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-bp-cyan-soft text-bp-blue"><FileText className="h-4 w-4" /></span>}
+      <span className="min-w-0 truncate">{label}</span>
     </a>
   );
 };
@@ -73,7 +75,7 @@ export const AttachmentLinks: React.FC<{
     ...(attachments?.images || []).map((file, index) => ({ ...file, label: `Image ${index + 1}` }))
   ].filter(Boolean) as Array<TransactionAttachment & { label: string }>;
   if (!files.length && legacyUrl) files.push({ url: legacyUrl, name: legacyName || 'Attachment', size: 0, label: 'File' });
-  if (!files.length) return <span className="text-[#888888]">—</span>;
+  if (!files.length) return <span className="text-bp-muted">—</span>;
   return <div className="flex flex-wrap justify-center gap-1">{files.map(file => <AttachmentFileLink key={`${file.label}-${file.name}`} file={file} label={file.label} />)}</div>;
 };
 
@@ -121,16 +123,16 @@ export const AttachmentSections: React.FC<AttachmentSectionsProps> = ({
   };
 
   const renderFile = (file: TransactionAttachment, kind: 'invoice' | 'dc' | 'images', index?: number) => (
-    <div key={`${file.name}-${file.size}-${index ?? kind}`} className="flex items-center gap-2 rounded-lg border border-[#E8E8E8] bg-white p-2 text-xs">
+    <div key={`${file.name}-${file.size}-${index ?? kind}`} className="flex items-center gap-2 rounded-lg border border-bp-border bg-white p-2 text-xs">
       <AttachmentFileLink file={file} label={file.name} compact={kind === 'images'} onPreview={(previewFile, url) => setPreview({ file: previewFile, url })} />
       <span className="min-w-0 flex-1 truncate font-medium" title={file.name}>{(file.size / 1024).toFixed(0)} KB</span>
-      <button type="button" onClick={() => remove(kind, index)} disabled={disabled} title="Remove attachment" className="text-[#666666] hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+      <button type="button" onClick={() => remove(kind, index)} disabled={disabled} title="Remove attachment" className="text-bp-muted hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
     </div>
   );
 
   return (
-    <div className="space-y-3 rounded-xl border border-[#E8E8E8] bg-white p-3">
-      <div className="text-[11px] font-bold uppercase tracking-wider text-[#111111]">Attachments</div>
+    <div className="space-y-3 rounded-xl border border-bp-border bg-white p-3">
+      <div className="text-[11px] font-bold uppercase tracking-wider text-bp-text">Attachments</div>
       {error && <div className="rounded-lg bg-red-50 p-2 text-xs text-red-700">{error}</div>}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {(['invoice', 'dc'] as const).map(kind => {
@@ -138,23 +140,30 @@ export const AttachmentSections: React.FC<AttachmentSectionsProps> = ({
           const inputRef = kind === 'invoice' ? invoiceRef : dcRef;
           return (
             <div key={kind} className="space-y-1.5">
-              <div className="text-xs font-semibold text-[#111111]">{kind === 'invoice' ? 'Invoice' : 'DC (Delivery Challan)'}</div>
-              {file ? renderFile(file, kind) : <button type="button" disabled={disabled || uploading !== null} onClick={() => inputRef.current?.click()} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#CFCFCF] p-2 text-xs text-[#666666] hover:border-[#FFC400] hover:text-[#111111]"><Upload className="h-3.5 w-3.5" />{uploading === kind ? 'Uploading...' : 'Upload PDF, JPG, JPEG or PNG'}</button>}
+              <div className="text-xs font-semibold text-bp-text">{kind === 'invoice' ? 'Invoice' : 'DC (Delivery Challan)'}</div>
+              {file ? renderFile(file, kind) : <button type="button" disabled={disabled || uploading !== null} onClick={() => inputRef.current?.click()} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-bp-border-strong p-2 text-xs text-bp-muted hover:border-bp-cyan hover:text-bp-text"><Upload className="h-3.5 w-3.5" />{uploading === kind ? 'Uploading...' : 'Upload PDF, JPG, JPEG or PNG'}</button>}
               <input ref={inputRef} type="file" accept={documentAccept} className="hidden" disabled={disabled} onChange={e => uploadFiles(kind, e.target.files)} />
             </div>
           );
         })}
       </div>
       <div className="space-y-1.5">
-        <div className="text-xs font-semibold text-[#111111]">Images</div>
-        <button type="button" disabled={disabled || uploading !== null} onClick={() => imagesRef.current?.click()} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#CFCFCF] p-2 text-xs text-[#666666] hover:border-[#FFC400] hover:text-[#111111]"><ImagePlus className="h-3.5 w-3.5" />{uploading === 'images' ? 'Uploading...' : 'Add JPG, JPEG or PNG images'}</button>
+        <div className="text-xs font-semibold text-bp-text">Images</div>
+        <button type="button" disabled={disabled || uploading !== null} onClick={() => imagesRef.current?.click()} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-bp-border-strong p-2 text-xs text-bp-muted hover:border-bp-cyan hover:text-bp-text"><ImagePlus className="h-3.5 w-3.5" />{uploading === 'images' ? 'Uploading...' : 'Add JPG, JPEG or PNG images'}</button>
         <input ref={imagesRef} type="file" accept={imageAccept} multiple className="hidden" disabled={disabled} onChange={e => uploadFiles('images', e.target.files)} />
         {value.images.length > 0 && <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{value.images.map((file, index) => renderFile(file, 'images', index))}</div>}
       </div>
       {preview && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-label="Image preview">
-          <button type="button" onClick={() => setPreview(null)} className="absolute right-5 top-5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#111111]">Close</button>
-          <img src={preview.url} alt={preview.file.name} className="max-h-[85vh] max-w-[90vw] rounded-xl object-contain" />
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-bp-navy-deep/75 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label="Image preview">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-bp-border bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-4 border-b border-bp-border px-4 py-3 sm:px-5">
+              <p className="min-w-0 truncate text-sm font-semibold text-bp-text" title={preview.file.name}>{preview.file.name}</p>
+              <button type="button" onClick={() => setPreview(null)} className="min-h-10 shrink-0 rounded-lg border border-bp-border px-3 text-xs font-semibold text-bp-text hover:bg-bp-background">Close</button>
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-bp-background p-2 sm:p-4">
+              <img src={preview.url} alt={preview.file.name} className="max-h-[calc(92vh-88px)] max-w-full rounded-lg object-contain" />
+            </div>
+          </div>
         </div>
       )}
     </div>

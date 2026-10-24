@@ -531,28 +531,28 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     <div className="space-y-6 animate-in fade-in duration-150 font-['Inter',sans-serif]">
       
       {/* Breadcrumb Navigation */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-[#666666]">
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-bp-muted">
         {onNavigateHome && (
-          <button onClick={onNavigateHome} className="hover:text-[#111111] transition-colors">
+          <button onClick={onNavigateHome} className="hover:text-bp-text transition-colors">
             CHEN INFRA
           </button>
         )}
-        <ChevronRight className="w-3.5 h-3.5 text-[#888888]" />
+        <ChevronRight className="w-3.5 h-3.5 text-bp-muted" />
         {selectedGroupId ? (
           <>
             <button
               onClick={() => setSelectedGroupId(null)}
-              className="hover:text-[#111111] transition-colors flex items-center gap-1 font-medium"
+              className="hover:text-bp-text transition-colors flex items-center gap-1 font-medium"
             >
-              <Users className="w-3.5 h-3.5 text-[#FFC400]" />
+              <Users className="w-3.5 h-3.5 text-bp-cyan" />
               Attendance Groups
             </button>
-            <ChevronRight className="w-3.5 h-3.5 text-[#888888]" />
-            <span className="font-semibold text-[#111111]">{activeGroup?.name || 'Group Workspace'}</span>
+            <ChevronRight className="w-3.5 h-3.5 text-bp-muted" />
+            <span className="font-semibold text-bp-text">{activeGroup?.name || 'Group Workspace'}</span>
           </>
         ) : (
-          <span className="font-semibold text-[#111111] flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5 text-[#FFC400]" />
+          <span className="font-semibold text-bp-text flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5 text-bp-cyan" />
             Attendance & Worker Groups
           </span>
         )}
@@ -565,21 +565,21 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         <div className="space-y-6">
           
           {/* Hero Banner with Create Group Button */}
-          <div className="bg-white rounded-2xl border border-[#E8E8E8] p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="bg-white rounded-2xl border border-bp-border p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#FFC400] text-[#111111] font-mono">
+                  <span className="font-bold text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-bp-cyan text-bp-text font-mono">
                     CHEN INFRA ERP
                   </span>
-                  <span className="text-xs text-[#666666] font-medium">
+                  <span className="text-xs text-bp-muted font-medium">
                     Group-Based Attendance & Labor Ledger
                   </span>
                 </div>
-                <h1 className="text-2xl sm:text-[28px] font-bold text-[#111111] tracking-tight">
+                <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight">
                   Worker Groups & Gang Attendance
                 </h1>
-                <p className="text-xs sm:text-sm text-[#666666] max-w-2xl">
+                <p className="text-xs sm:text-sm text-bp-muted max-w-2xl">
                   Manage worker teams, subcontractor gangs, daily attendance registers, wage rates, and CSV payroll statements.
                 </p>
               </div>
@@ -593,10 +593,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         setAddEmployeeDefaultGroupId(undefined);
                         setIsAddEmployeeOpen(true);
                       }}
-                      className="px-4 py-2.5 bg-[#111111] hover:bg-[#222222] text-[#FFC400] font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02] border border-[#333333]"
+                      className="px-4 py-2.5 bg-bp-navy hover:bg-bp-navy-light text-bp-cyan font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02] border border-bp-navy-border"
                       title="Add employee (individual or assign to a group)"
                     >
-                      <UserPlus className="w-4 h-4 text-[#FFC400]" />
+                      <UserPlus className="w-4 h-4 text-bp-cyan" />
                       <span>Add Employee</span>
                     </button>
 
@@ -605,9 +605,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         setEditingGroup(null);
                         setIsCreateGroupOpen(true);
                       }}
-                      className="px-4 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02]"
+                      className="px-4 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02]"
                     >
-                      <Plus className="w-4 h-4 text-[#111111]" />
+                      <Plus className="w-4 h-4 text-bp-text" />
                       <span>Create Group</span>
                     </button>
                   </>
@@ -616,53 +616,53 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             </div>
 
             {/* Quick Metrics Bar */}
-            <div className="pt-4 border-t border-[#E8E8E8] grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-                <p className="text-[11px] font-semibold text-[#666666] uppercase">Active Gang Groups</p>
-                <p className="text-xl font-bold text-[#111111] font-mono mt-0.5">
-                  {groups.filter(g => g.status === 'active').length} <span className="text-xs font-normal text-[#666666]">groups</span>
+            <div className="pt-4 border-t border-bp-border grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+                <p className="text-[11px] font-semibold text-bp-muted uppercase">Active Gang Groups</p>
+                <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
+                  {groups.filter(g => g.status === 'active').length} <span className="text-xs font-normal text-bp-muted">groups</span>
                 </p>
               </div>
-              <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-                <p className="text-[11px] font-semibold text-[#666666] uppercase">Gang Group Workers</p>
-                <p className="text-xl font-bold text-[#111111] font-mono mt-0.5">
-                  {employees.filter(e => e.group_id && e.group_id !== '' && e.status === 'active').length} <span className="text-xs font-normal text-[#666666]">assigned</span>
+              <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+                <p className="text-[11px] font-semibold text-bp-muted uppercase">Gang Group Workers</p>
+                <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
+                  {employees.filter(e => e.group_id && e.group_id !== '' && e.status === 'active').length} <span className="text-xs font-normal text-bp-muted">assigned</span>
                 </p>
               </div>
-              <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-                <p className="text-[11px] font-semibold text-[#666666] uppercase">Individual Workers</p>
-                <p className="text-xl font-bold text-amber-600 font-mono mt-0.5">
-                  {individualEmployees.filter(e => e.status === 'active').length} <span className="text-xs font-normal text-[#666666]">direct</span>
+              <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+                <p className="text-[11px] font-semibold text-bp-muted uppercase">Individual Workers</p>
+                <p className="text-xl font-bold text-bp-blue font-mono mt-0.5">
+                  {individualEmployees.filter(e => e.status === 'active').length} <span className="text-xs font-normal text-bp-muted">direct</span>
                 </p>
               </div>
-              <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-                <p className="text-[11px] font-semibold text-[#666666] uppercase">Active Sites</p>
-                <p className="text-xl font-bold text-[#111111] font-mono mt-0.5">
-                  {projects.filter(p => p.status === 'in_progress').length} <span className="text-xs font-normal text-[#666666]">projects</span>
+              <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+                <p className="text-[11px] font-semibold text-bp-muted uppercase">Active Sites</p>
+                <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
+                  {projects.filter(p => p.status === 'in_progress').length} <span className="text-xs font-normal text-bp-muted">projects</span>
                 </p>
               </div>
             </div>
           </div>
 
           {/* Search & Filter Bar */}
-          <div className="bg-white rounded-2xl border border-[#E8E8E8] p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="bg-white rounded-2xl border border-bp-border p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-[#888888] absolute left-3 top-2.5" />
+              <Search className="w-4 h-4 text-bp-muted absolute left-3 top-2.5" />
               <input
                 type="text"
                 placeholder="Search groups by name, leader, or site..."
                 value={groupSearch}
                 onChange={(e) => setGroupSearch(e.target.value)}
-                className="w-full pl-9 pr-3.5 py-2 text-xs text-[#111111] rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                className="w-full pl-9 pr-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
               />
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className="text-xs font-semibold text-[#666666]">Status:</span>
+              <span className="text-xs font-semibold text-bp-muted">Status:</span>
               <select
                 value={groupStatusFilter}
                 onChange={(e) => setGroupStatusFilter(e.target.value as any)}
-                className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-[#CCCCCC] bg-white text-[#111111] focus:outline-none focus:border-[#FFC400]"
+                className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-bp-border-strong bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
               >
                 <option value="all">All Groups ({groups.length})</option>
                 <option value="active">Active Only ({groups.filter(g => g.status === 'active').length})</option>
@@ -674,10 +674,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           {/* Groups Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredGroups.length === 0 ? (
-              <div className="col-span-full bg-white rounded-2xl border border-dashed border-[#CCCCCC] p-12 text-center space-y-3">
-                <Users className="w-10 h-10 text-[#888888] mx-auto" />
-                <h3 className="text-base font-bold text-[#111111]">No worker groups found</h3>
-                <p className="text-xs text-[#666666] max-w-md mx-auto">
+              <div className="col-span-full bg-white rounded-2xl border border-dashed border-bp-border-strong p-12 text-center space-y-3">
+                <Users className="w-10 h-10 text-bp-muted mx-auto" />
+                <h3 className="text-base font-bold text-bp-text">No worker groups found</h3>
+                <p className="text-xs text-bp-muted max-w-md mx-auto">
                   {groupSearch
                     ? `No groups match the search "${groupSearch}".`
                     : 'Click Create Group to register your first workforce gang.'}
@@ -688,7 +688,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       setEditingGroup(null);
                       setIsCreateGroupOpen(true);
                     }}
-                    className="px-4 py-2 bg-[#FFC400] text-[#111111] font-bold text-xs rounded-xl hover:bg-[#F0B800] transition-colors inline-flex items-center gap-1.5 shadow-xs"
+                    className="px-4 py-2 bg-bp-cyan text-bp-text font-bold text-xs rounded-xl hover:bg-bp-blue transition-colors inline-flex items-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-4 h-4" />
                     Create Group Now
@@ -705,11 +705,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 return (
                   <div
                     key={group.id}
-                    className="bg-white rounded-2xl border border-[#E8E8E8] hover:border-[#FFC400] shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col justify-between group"
+                    className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col justify-between group"
                   >
                     <div>
                       {/* Card Top Banner / Photo */}
-                      <div className="h-28 bg-[#111111] relative overflow-hidden flex items-center justify-center">
+                      <div className="h-28 bg-bp-navy relative overflow-hidden flex items-center justify-center">
                         {group.photo_url ? (
                           <img
                             src={group.photo_url}
@@ -717,7 +717,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                             className="w-full h-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-200"
                           />
                         ) : (
-                          <div className="flex flex-col items-center justify-center text-[#FFC400]">
+                          <div className="flex flex-col items-center justify-center text-bp-cyan">
                             <Users className="w-10 h-10 opacity-70" />
                           </div>
                         )}
@@ -750,36 +750,36 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       {/* Card Content */}
                       <div className="p-4 space-y-3 text-xs">
                         <div className="space-y-1.5">
-                          <div className="flex items-center gap-1.5 text-[#555555]">
-                            <UserCheck className="w-3.5 h-3.5 text-[#111111] shrink-0" />
-                            <span className="font-semibold text-[#111111]">{group.leader_name}</span>
+                          <div className="flex items-center gap-1.5 text-bp-text-subtle">
+                            <UserCheck className="w-3.5 h-3.5 text-bp-text shrink-0" />
+                            <span className="font-semibold text-bp-text">{group.leader_name}</span>
                             {group.leader_phone && (
-                              <span className="text-[#888888] font-mono text-[11px]">
+                              <span className="text-bp-muted font-mono text-[11px]">
                                 ({group.leader_phone})
                               </span>
                             )}
                           </div>
 
-                          <div className="flex items-center gap-1.5 text-[#666666]">
-                            <Building2 className="w-3.5 h-3.5 text-[#888888] shrink-0" />
+                          <div className="flex items-center gap-1.5 text-bp-muted">
+                            <Building2 className="w-3.5 h-3.5 text-bp-muted shrink-0" />
                             <span className="truncate">{group.project_name || 'General Sites'}</span>
                           </div>
 
                           {group.remarks && (
-                            <p className="text-[11px] text-[#777777] line-clamp-2 italic pt-1">
+                            <p className="text-[11px] text-bp-muted line-clamp-2 italic pt-1">
                               &ldquo;{group.remarks}&rdquo;
                             </p>
                           )}
                         </div>
 
                         {/* Quick Stats Pill */}
-                        <div className="pt-2 border-t border-[#E8E8E8] flex items-center justify-between text-xs">
+                        <div className="pt-2 border-t border-bp-border flex items-center justify-between text-xs">
                           <div>
-                            <span className="text-[#888888] block text-[10px] uppercase font-semibold">Total Workers</span>
-                            <span className="font-bold text-sm text-[#111111] font-mono">{count}</span>
+                            <span className="text-bp-muted block text-[10px] uppercase font-semibold">Total Workers</span>
+                            <span className="font-bold text-sm text-bp-text font-mono">{count}</span>
                           </div>
                           <div>
-                            <span className="text-[#888888] block text-[10px] uppercase font-semibold">Today Present</span>
+                            <span className="text-bp-muted block text-[10px] uppercase font-semibold">Today Present</span>
                             <span className="font-bold text-sm text-emerald-700 font-mono">{todayPresent} / {count}</span>
                           </div>
                         </div>
@@ -787,7 +787,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     </div>
 
                     {/* Bottom Action Footer */}
-                    <div className="px-4 py-3 bg-[#F9F9F9] border-t border-[#E8E8E8] flex items-center justify-between gap-2">
+                    <div className="px-4 py-3 bg-bp-background border-t border-bp-border flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1">
                         {canManage && (
                           <button
@@ -795,7 +795,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                               setEditingGroup(group);
                               setIsCreateGroupOpen(true);
                             }}
-                            className="p-1.5 text-[#666666] hover:text-[#111111] hover:bg-[#EAEAEA] rounded-lg transition-colors"
+                            className="p-1.5 text-bp-muted hover:text-bp-text hover:bg-bp-border rounded-lg transition-colors"
                             title="Edit group details"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -821,7 +821,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                               setAddEmployeeDefaultGroupId(group.id);
                               setIsAddEmployeeOpen(true);
                             }}
-                            className="px-2.5 py-1.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] text-xs font-bold rounded-xl flex items-center gap-1 transition-all shadow-xs"
+                            className="px-2.5 py-1.5 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-bold rounded-xl flex items-center gap-1 transition-all shadow-xs"
                             title={`Add new employee directly to ${group.name}`}
                           >
                             <UserPlus className="w-3.5 h-3.5" />
@@ -834,7 +834,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                             setSelectedGroupId(group.id);
                             setActiveTab('mark');
                           }}
-                          className="px-3 py-1.5 bg-[#111111] hover:bg-[#222222] text-[#FFC400] text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
+                          className="px-3 py-1.5 bg-bp-navy hover:bg-bp-navy-light text-bp-cyan text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
                         >
                           <span>Open Workspace</span>
                           <ChevronRight className="w-3.5 h-3.5" />
@@ -851,22 +851,22 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           {/* ======================================================== */}
           {/* SECTION: INDIVIDUAL EMPLOYEES */}
           {/* ======================================================== */}
-          <div className="bg-white rounded-2xl border border-[#E8E8E8] p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="bg-white rounded-2xl border border-bp-border p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#FFC400]/20 text-[#111111] font-mono border border-[#FFC400]/40">
+                  <span className="font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-bp-cyan/20 text-bp-text font-mono border border-bp-cyan/40">
                     Direct Workforce
                   </span>
-                  <span className="text-xs text-[#666666] font-medium">
+                  <span className="text-xs text-bp-muted font-medium">
                     {individualEmployees.length} unassigned / direct staff
                   </span>
                 </div>
-                <h2 className="text-xl sm:text-[22px] font-bold text-[#111111] tracking-tight flex items-center gap-2">
-                  <UserCheck className="w-5 h-5 text-[#FFC400]" />
+                <h2 className="text-xl sm:text-[22px] font-bold text-bp-text tracking-tight flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-bp-cyan" />
                   <span>Individual Employees</span>
                 </h2>
-                <p className="text-xs text-[#666666] max-w-2xl">
+                <p className="text-xs text-bp-muted max-w-2xl">
                   Site workers and specialists registered directly with the company. They can remain unassigned or you can assign them to any gang group at any time without duplicating records.
                 </p>
               </div>
@@ -879,10 +879,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       setAddEmployeeDefaultGroupId('');
                       setIsAddEmployeeOpen(true);
                     }}
-                    className="px-3.5 py-2 bg-[#111111] hover:bg-[#222222] text-[#FFC400] text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
+                    className="px-3.5 py-2 bg-bp-navy hover:bg-bp-navy-light text-bp-cyan text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
                     title="Add an individual employee"
                   >
-                    <UserPlus className="w-3.5 h-3.5 text-[#FFC400]" />
+                    <UserPlus className="w-3.5 h-3.5 text-bp-cyan" />
                     <span>+ Add Employee</span>
                   </button>
                 )}
@@ -898,17 +898,17 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
             {/* Individual Employees Table */}
             {individualEmployees.length === 0 ? (
-              <div className="bg-[#FBFBFB] rounded-xl border border-dashed border-[#CCCCCC] p-8 text-center space-y-2">
-                <Users className="w-8 h-8 text-[#888888] mx-auto" />
-                <p className="text-xs font-semibold text-[#111111]">No unassigned individual workers</p>
-                <p className="text-[11px] text-[#666666]">
+              <div className="bg-bp-background rounded-xl border border-dashed border-bp-border-strong p-8 text-center space-y-2">
+                <Users className="w-8 h-8 text-bp-muted mx-auto" />
+                <p className="text-xs font-semibold text-bp-text">No unassigned individual workers</p>
+                <p className="text-[11px] text-bp-muted">
                   All current site workers are assigned to gang groups. Click <strong>+ Add Employee</strong> to onboard direct site specialists.
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto border border-[#E8E8E8] rounded-xl">
+              <div className="overflow-x-auto border border-bp-border rounded-xl">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-[#111111] text-white">
+                  <thead className="bg-bp-navy text-white">
                     <tr>
                       <th className="px-4 py-3 font-semibold uppercase text-[10px]">Worker Details</th>
                       <th className="px-3 py-3 font-semibold uppercase text-[10px]">Job Type</th>
@@ -919,22 +919,22 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       <th className="px-4 py-3 font-semibold uppercase text-[10px] text-right">Assign Group / Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E8E8E8]">
+                  <tbody className="divide-y divide-[#E2E8F0]">
                     {individualEmployees.map(emp => (
-                      <tr key={emp.id} className="hover:bg-[#F9F9F9] transition-colors">
+                      <tr key={emp.id} className="hover:bg-bp-background transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             {emp.photo_url ? (
-                              <img src={emp.photo_url} alt={emp.full_name} className="w-10 h-10 rounded-xl object-cover border border-[#E8E8E8] shrink-0" />
+                              <img src={emp.photo_url} alt={emp.full_name} className="w-10 h-10 rounded-xl object-cover border border-bp-border shrink-0" />
                             ) : (
-                              <div className="w-10 h-10 rounded-xl bg-[#F7F7F7] border border-[#E8E8E8] text-[#111111] flex items-center justify-center font-bold text-xs shrink-0">
+                              <div className="w-10 h-10 rounded-xl bg-bp-background border border-bp-border text-bp-text flex items-center justify-center font-bold text-xs shrink-0">
                                 {emp.full_name.charAt(0)}
                               </div>
                             )}
                             <div>
-                              <p className="font-bold text-[#111111]">{emp.full_name}</p>
-                              <p className="text-[11px] font-mono text-[#666666]">{emp.employee_code}</p>
-                              {emp.phone && <p className="text-[10px] text-[#888888]">{emp.phone}</p>}
+                              <p className="font-bold text-bp-text">{emp.full_name}</p>
+                              <p className="text-[11px] font-mono text-bp-muted">{emp.employee_code}</p>
+                              {emp.phone && <p className="text-[10px] text-bp-muted">{emp.phone}</p>}
                               <div className="mt-1 flex flex-wrap gap-2">
                                 {emp.photo_url && <AttachmentFileLink file={{ url: emp.photo_url, name: `${emp.employee_code}-photo`, size: 0, type: 'image/*' }} label="Photo" />}
                                 {emp.documents?.aadhaar_pdf && <AttachmentFileLink file={emp.documents.aadhaar_pdf} label="Aadhaar PDF" />}
@@ -945,17 +945,17 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                           </div>
                         </td>
                         <td className="px-3 py-3">
-                          <span className="px-2 py-0.5 rounded-md bg-[#F7F7F7] border border-[#E8E8E8] text-[#111111] font-semibold text-[11px]">
+                          <span className="px-2 py-0.5 rounded-md bg-bp-background border border-bp-border text-bp-text font-semibold text-[11px]">
                             {emp.job_type}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-[#666666]">
+                        <td className="px-3 py-3 text-bp-muted">
                           {emp.project_name || 'General Company Sites'}
                         </td>
-                        <td className="px-3 py-3 font-mono font-bold text-[#111111]">
-                          ₹{emp.salary_amount.toLocaleString()} <span className="text-[10px] font-normal text-[#888888]">/{emp.salary_type === 'daily_wage' ? 'day' : 'mo'}</span>
+                        <td className="px-3 py-3 font-mono font-bold text-bp-text">
+                          ₹{emp.salary_amount.toLocaleString()} <span className="text-[10px] font-normal text-bp-muted">/{emp.salary_type === 'daily_wage' ? 'day' : 'mo'}</span>
                         </td>
-                        <td className="px-3 py-3 font-mono text-[#666666]">
+                        <td className="px-3 py-3 font-mono text-bp-muted">
                           {emp.joining_date}
                         </td>
                         <td className="px-3 py-3">
@@ -977,7 +977,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                     e.target.value = '';
                                   }
                                 }}
-                                className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-[#CCCCCC] bg-white text-[#111111] focus:outline-none focus:border-[#FFC400]"
+                                className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-bp-border-strong bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
                                 title="Assign this employee to an existing group without creating duplicates"
                               >
                                 <option value="">+ Assign to Group...</option>
@@ -995,7 +995,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                   setEditingEmployee(emp);
                                   setIsAddEmployeeOpen(true);
                                 }}
-                                className="p-1.5 text-[#666666] hover:text-[#111111] hover:bg-[#EAEAEA] rounded-lg transition-colors"
+                                className="p-1.5 text-bp-muted hover:text-bp-text hover:bg-bp-border rounded-lg transition-colors"
                                 title="Edit employee details"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
@@ -1019,40 +1019,40 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         <div className="space-y-6">
           
           {/* Workspace Header */}
-          <div className="bg-white rounded-2xl border border-[#E8E8E8] p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="bg-white rounded-2xl border border-bp-border p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-start gap-4">
                 {activeGroup?.photo_url ? (
                   <img
                     src={activeGroup.photo_url}
                     alt={activeGroup.name}
-                    className="w-16 h-16 rounded-2xl object-cover border-2 border-[#FFC400] shrink-0"
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-bp-cyan shrink-0"
                   />
                 ) : (
-                  <div className="w-16 h-16 rounded-2xl bg-[#111111] text-[#FFC400] flex items-center justify-center font-bold shrink-0">
+                  <div className="w-16 h-16 rounded-2xl bg-bp-navy text-bp-cyan flex items-center justify-center font-bold shrink-0">
                     <Users className="w-8 h-8" />
                   </div>
                 )}
 
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#FFC400] text-[#111111] uppercase font-mono">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-bp-cyan text-bp-text uppercase font-mono">
                       Group Workspace
                     </span>
-                    <span className="text-xs text-[#666666]">
-                      Site: <strong className="text-[#111111]">{activeGroup?.project_name || 'All Sites'}</strong>
+                    <span className="text-xs text-bp-muted">
+                      Site: <strong className="text-bp-text">{activeGroup?.project_name || 'All Sites'}</strong>
                     </span>
-                    <span className="text-xs text-[#666666]">
-                      Leader: <strong className="text-[#111111]">{activeGroup?.leader_name}</strong>
+                    <span className="text-xs text-bp-muted">
+                      Leader: <strong className="text-bp-text">{activeGroup?.leader_name}</strong>
                     </span>
                   </div>
 
-                  <h1 className="text-2xl sm:text-[28px] font-bold text-[#111111] tracking-tight">
+                  <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight">
                     {activeGroup?.name}
                   </h1>
 
-                  <p className="text-xs text-[#666666]">
-                    Total Registered Workers: <strong className="text-[#111111] font-mono">{groupEmployees.length} active</strong>
+                  <p className="text-xs text-bp-muted">
+                    Total Registered Workers: <strong className="text-bp-text font-mono">{groupEmployees.length} active</strong>
                   </p>
                 </div>
               </div>
@@ -1066,10 +1066,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       setAddEmployeeDefaultGroupId(activeGroup?.id);
                       setIsAddEmployeeOpen(true);
                     }}
-                    className="px-3 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-xs"
+                    className="px-3 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-xs"
                     title={`Add new employee to ${activeGroup?.name}`}
                   >
-                    <UserPlus className="w-3.5 h-3.5 text-[#111111]" />
+                    <UserPlus className="w-3.5 h-3.5 text-bp-text" />
                     <span>+ Add Employee</span>
                   </button>
                 )}
@@ -1077,7 +1077,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 <select
                   value={selectedGroupId || ''}
                   onChange={(e) => setSelectedGroupId(e.target.value)}
-                  className="px-3 py-2 bg-[#F7F7F7] text-xs font-bold text-[#111111] rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                  className="px-3 py-2 bg-bp-background text-xs font-bold text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                 >
                   {groups.map(g => (
                     <option key={g.id} value={g.id}>{g.name}</option>
@@ -1086,7 +1086,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
                 <button
                   onClick={() => setSelectedGroupId(null)}
-                  className="px-3 py-2 bg-[#111111] hover:bg-[#222222] text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors"
+                  className="px-3 py-2 bg-bp-navy hover:bg-bp-navy-light text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>All Groups</span>
@@ -1095,16 +1095,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             </div>
 
             {/* Navigation Tabs */}
-            <div className="pt-3 border-t border-[#E8E8E8] flex items-center gap-2 overflow-x-auto pb-1">
+            <div className="pt-3 border-t border-bp-border flex items-center gap-2 overflow-x-auto pb-1">
               <button
                 onClick={() => setActiveTab('mark')}
                 className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
                   activeTab === 'mark'
-                    ? 'bg-[#FFC400] text-[#111111] shadow-xs'
-                    : 'text-[#666666] hover:text-[#111111] hover:bg-[#F7F7F7]'
+                    ? 'bg-bp-cyan text-bp-text shadow-xs'
+                    : 'text-bp-muted hover:text-bp-text hover:bg-bp-background'
                 }`}
               >
-                <Clock className="w-3.5 h-3.5 text-[#111111]" />
+                <Clock className="w-3.5 h-3.5 text-bp-text" />
                 Daily Attendance Register
               </button>
 
@@ -1112,11 +1112,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 onClick={() => setActiveTab('employees')}
                 className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
                   activeTab === 'employees'
-                    ? 'bg-[#FFC400] text-[#111111] shadow-xs'
-                    : 'text-[#666666] hover:text-[#111111] hover:bg-[#F7F7F7]'
+                    ? 'bg-bp-cyan text-bp-text shadow-xs'
+                    : 'text-bp-muted hover:text-bp-text hover:bg-bp-background'
                 }`}
               >
-                <Users className="w-3.5 h-3.5 text-[#111111]" />
+                <Users className="w-3.5 h-3.5 text-bp-text" />
                 Worker Management ({groupEmployees.length})
               </button>
 
@@ -1124,11 +1124,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 onClick={() => setActiveTab('history')}
                 className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
                   activeTab === 'history'
-                    ? 'bg-[#FFC400] text-[#111111] shadow-xs'
-                    : 'text-[#666666] hover:text-[#111111] hover:bg-[#F7F7F7]'
+                    ? 'bg-bp-cyan text-bp-text shadow-xs'
+                    : 'text-bp-muted hover:text-bp-text hover:bg-bp-background'
                 }`}
               >
-                <History className="w-3.5 h-3.5 text-[#111111]" />
+                <History className="w-3.5 h-3.5 text-bp-text" />
                 Attendance History
               </button>
 
@@ -1136,11 +1136,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 onClick={() => setActiveTab('salary')}
                 className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
                   activeTab === 'salary'
-                    ? 'bg-[#FFC400] text-[#111111] shadow-xs'
-                    : 'text-[#666666] hover:text-[#111111] hover:bg-[#F7F7F7]'
+                    ? 'bg-bp-cyan text-bp-text shadow-xs'
+                    : 'text-bp-muted hover:text-bp-text hover:bg-bp-background'
                 }`}
               >
-                <DollarSign className="w-3.5 h-3.5 text-[#111111]" />
+                <DollarSign className="w-3.5 h-3.5 text-bp-text" />
                 Salary & Payments
               </button>
 
@@ -1148,11 +1148,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 onClick={() => setActiveTab('reports')}
                 className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
                   activeTab === 'reports'
-                    ? 'bg-[#FFC400] text-[#111111] shadow-xs'
-                    : 'text-[#666666] hover:text-[#111111] hover:bg-[#F7F7F7]'
+                    ? 'bg-bp-cyan text-bp-text shadow-xs'
+                    : 'text-bp-muted hover:text-bp-text hover:bg-bp-background'
                 }`}
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-[#111111]" />
+                <FileSpreadsheet className="w-3.5 h-3.5 text-bp-text" />
                 Reports & CSV Export
               </button>
             </div>
@@ -1165,10 +1165,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             <div className="space-y-4">
               
               {/* Register Date Selector & Quick Controls */}
-              <div className="bg-white rounded-2xl border border-[#E8E8E8] p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="bg-white rounded-2xl border border-bp-border p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-[#666666] uppercase mb-1">
+                    <label className="block text-[10px] font-bold text-bp-muted uppercase mb-1">
                       Attendance Date
                     </label>
                     <div className="flex items-center gap-2">
@@ -1176,23 +1176,23 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         type="date"
                         value={attendanceDate}
                         onChange={(e) => setAttendanceDate(e.target.value)}
-                        className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400] text-[#111111]"
+                        className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan text-bp-text"
                       />
                       <button
                         type="button"
                         onClick={() => setAttendanceDate(getLocalDateString())}
-                        className="px-2.5 py-1 text-[11px] font-medium bg-[#F7F7F7] hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
+                        className="px-2.5 py-1 text-[11px] font-medium bg-bp-background hover:bg-bp-border text-bp-text rounded-lg border border-bp-border-strong"
                       >
                         Today
                       </button>
                     </div>
                   </div>
 
-                  <div className="h-8 border-l border-[#E8E8E8] hidden sm:block" />
+                  <div className="h-8 border-l border-bp-border hidden sm:block" />
 
                   {/* Bulk Mark Buttons */}
                   <div className="flex items-center gap-1.5 pt-4 sm:pt-0">
-                    <span className="text-[11px] font-semibold text-[#666666] mr-1">Quick:</span>
+                    <span className="text-[11px] font-semibold text-bp-muted mr-1">Quick:</span>
                     <button
                       type="button"
                       onClick={() => handleMarkAll('Present')}
@@ -1203,7 +1203,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     <button
                       type="button"
                       onClick={() => handleMarkAll('Not Marked')}
-                      className="px-2.5 py-1 text-xs font-semibold bg-[#F7F7F7] hover:bg-[#E8E8E8] text-[#666666] rounded-xl transition-colors"
+                      className="px-2.5 py-1 text-xs font-semibold bg-bp-background hover:bg-bp-border text-bp-muted rounded-xl transition-colors"
                     >
                       Clear All
                     </button>
@@ -1221,9 +1221,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     <button
                       onClick={handleSaveDailyAttendance}
                       disabled={isSavingAttendance || groupEmployees.length === 0}
-                      className="px-5 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
+                      className="px-5 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
                     >
-                      <Check className="w-4 h-4 text-[#111111]" />
+                      <Check className="w-4 h-4 text-bp-text" />
                       <span>{isSavingAttendance ? 'Saving Register...' : 'Save Attendance Register'}</span>
                     </button>
                   )}
@@ -1231,10 +1231,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               </div>
 
               {/* Attendance Register Table */}
-              <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-xs">
+              <div className="bg-white rounded-2xl border border-bp-border overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-[#111111] text-white uppercase font-bold text-[11px]">
+                    <thead className="bg-bp-navy text-white uppercase font-bold text-[11px]">
                       <tr>
                         <th className="px-4 py-3">Worker / ID</th>
                         <th className="px-3 py-3">Trade</th>
@@ -1244,14 +1244,14 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <th className="px-2 py-3 text-center">Hours</th>
                         <th className="px-2 py-3 text-center">OT (h)</th>
                         <th className="px-3 py-3 text-right">Daily Wage</th>
-                        <th className="px-3 py-3 text-right bg-[#222222] text-[#FFC400]">Earnings</th>
+                        <th className="px-3 py-3 text-right bg-bp-navy-light text-bp-cyan">Earnings</th>
                         <th className="px-4 py-3">Remarks / Task Proof</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#E8E8E8]">
+                    <tbody className="divide-y divide-[#E2E8F0]">
                       {groupEmployees.length === 0 ? (
                         <tr>
-                          <td colSpan={10} className="px-4 py-10 text-center text-[#666666]">
+                          <td colSpan={10} className="px-4 py-10 text-center text-bp-muted">
                             No active employees registered in this group yet. Click <strong>Worker Management</strong> to add workers.
                           </td>
                         </tr>
@@ -1277,7 +1277,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                           const hasJoined = !emp.joining_date || emp.joining_date <= attendanceDate;
 
                           return (
-                            <tr key={emp.id} className={`hover:bg-[#F9F9F9] transition-colors ${!hasJoined ? 'opacity-50 bg-[#FBFBFB]' : ''}`}>
+                            <tr key={emp.id} className={`hover:bg-bp-background transition-colors ${!hasJoined ? 'opacity-50 bg-bp-background' : ''}`}>
                               {/* Photo + Name + ID */}
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2.5">
@@ -1285,16 +1285,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                     <img
                                       src={emp.photo_url}
                                       alt={emp.full_name}
-                                      className="w-9 h-9 rounded-xl object-cover border border-[#E8E8E8] shrink-0"
+                                      className="w-9 h-9 rounded-xl object-cover border border-bp-border shrink-0"
                                     />
                                   ) : (
-                                    <div className="w-9 h-9 rounded-xl bg-[#F7F7F7] border border-[#E8E8E8] text-[#111111] flex items-center justify-center font-bold text-xs shrink-0">
+                                    <div className="w-9 h-9 rounded-xl bg-bp-background border border-bp-border text-bp-text flex items-center justify-center font-bold text-xs shrink-0">
                                       {emp.full_name.charAt(0)}
                                     </div>
                                   )}
                                   <div>
-                                    <p className="font-bold text-[#111111]">{emp.full_name}</p>
-                                    <p className="text-[10px] text-[#666666] font-mono">{emp.employee_code}</p>
+                                    <p className="font-bold text-bp-text">{emp.full_name}</p>
+                                    <p className="text-[10px] text-bp-muted font-mono">{emp.employee_code}</p>
                                     {!hasJoined && (
                                       <span className="text-[9px] text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200 block mt-0.5">
                                         Joins on {emp.joining_date}
@@ -1306,7 +1306,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
                               {/* Trade / Job Type */}
                               <td className="px-3 py-3">
-                                <span className="px-2 py-0.5 rounded-md bg-[#F7F7F7] border border-[#E8E8E8] text-[11px] font-medium text-[#444444]">
+                                <span className="px-2 py-0.5 rounded-md bg-bp-background border border-bp-border text-[11px] font-medium text-bp-slate">
                                   {emp.job_type}
                                 </span>
                               </td>
@@ -1314,7 +1314,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                               {/* Attendance Status Selector */}
                               <td className="px-3 py-3 text-center">
                                 {!hasJoined ? (
-                                  <span className="text-[11px] font-medium text-[#888888] italic">
+                                  <span className="text-[11px] font-medium text-bp-muted italic">
                                     Not joined yet
                                   </span>
                                 ) : (
@@ -1353,7 +1353,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                   value={form.checkIn}
                                   onChange={(e) => handleFormChange(emp.id, 'checkIn', e.target.value)}
                                   disabled={form.status === 'Absent' || form.status === 'Not Marked'}
-                                  className="px-2 py-1 text-xs font-mono rounded-lg border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400] disabled:opacity-40"
+                                  className="px-2 py-1 text-xs font-mono rounded-lg border border-bp-border-strong focus:outline-none focus:border-bp-cyan disabled:opacity-40"
                                 />
                               </td>
 
@@ -1364,7 +1364,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                   value={form.checkOut}
                                   onChange={(e) => handleFormChange(emp.id, 'checkOut', e.target.value)}
                                   disabled={form.status === 'Absent' || form.status === 'Not Marked'}
-                                  className="px-2 py-1 text-xs font-mono rounded-lg border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400] disabled:opacity-40"
+                                  className="px-2 py-1 text-xs font-mono rounded-lg border border-bp-border-strong focus:outline-none focus:border-bp-cyan disabled:opacity-40"
                                 />
                               </td>
 
@@ -1378,7 +1378,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                   value={form.workingHours}
                                   onChange={(e) => handleFormChange(emp.id, 'workingHours', Number(e.target.value))}
                                   disabled={form.status === 'Absent' || form.status === 'Not Marked'}
-                                  className="w-16 px-1.5 py-1 text-xs font-mono text-center font-bold rounded-lg border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400] disabled:opacity-40"
+                                  className="w-16 px-1.5 py-1 text-xs font-mono text-center font-bold rounded-lg border border-bp-border-strong focus:outline-none focus:border-bp-cyan disabled:opacity-40"
                                 />
                               </td>
 
@@ -1392,20 +1392,20 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                   value={form.overtimeHours}
                                   onChange={(e) => handleFormChange(emp.id, 'overtimeHours', Number(e.target.value))}
                                   disabled={form.status === 'Absent' || form.status === 'Not Marked'}
-                                  className="w-14 px-1.5 py-1 text-xs font-mono text-center text-blue-700 font-bold rounded-lg border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400] disabled:opacity-40"
+                                  className="w-14 px-1.5 py-1 text-xs font-mono text-center text-blue-700 font-bold rounded-lg border border-bp-border-strong focus:outline-none focus:border-bp-cyan disabled:opacity-40"
                                 />
                               </td>
 
                               {/* Daily Wage / Rate */}
-                              <td className="px-3 py-3 text-right font-mono font-semibold text-[#555555]">
+                              <td className="px-3 py-3 text-right font-mono font-semibold text-bp-text-subtle">
                                 ₹{emp.salary_amount}
-                                <span className="block text-[9px] text-[#888888] font-sans">
+                                <span className="block text-[9px] text-bp-muted font-sans">
                                   {emp.salary_type === 'daily_wage' ? 'per day' : 'monthly'}
                                 </span>
                               </td>
 
                               {/* Calculated Earnings */}
-                              <td className="px-3 py-3 text-right font-mono font-bold text-sm bg-[#FFC400]/10 text-[#111111]">
+                              <td className="px-3 py-3 text-right font-mono font-bold text-sm bg-bp-cyan/10 text-bp-text">
                                 ₹{dailyEarnings.toLocaleString()}
                               </td>
 
@@ -1416,7 +1416,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                   placeholder="e.g., Column casting grid 3"
                                   value={form.remarks}
                                   onChange={(e) => handleFormChange(emp.id, 'remarks', e.target.value)}
-                                  className="w-full px-2.5 py-1 text-xs rounded-lg border border-[#E8E8E8] focus:outline-none focus:border-[#FFC400]"
+                                  className="w-full px-2.5 py-1 text-xs rounded-lg border border-bp-border focus:outline-none focus:border-bp-cyan"
                                 />
                               </td>
                             </tr>
@@ -1427,7 +1427,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   </table>
                 </div>
 
-                <div className="p-4 bg-[#FAFAFA] border-t border-[#E8E8E8] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#666666]">
+                <div className="p-4 bg-bp-background border-t border-bp-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-bp-muted">
                   <p>
                     Showing {groupEmployees.length} worker(s) in {activeGroup?.name}. Earnings calculate live based on attendance status, working hours, and overtime rates.
                   </p>
@@ -1435,9 +1435,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     <button
                       onClick={handleSaveDailyAttendance}
                       disabled={isSavingAttendance || groupEmployees.length === 0}
-                      className="px-4 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+                      className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
                     >
-                      <Check className="w-3.5 h-3.5 text-[#111111]" />
+                      <Check className="w-3.5 h-3.5 text-bp-text" />
                       Save Register for {attendanceDate}
                     </button>
                   )}
@@ -1452,12 +1452,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           {/* ======================================================== */}
           {activeTab === 'employees' && (
             <div className="space-y-4">
-              <div className="bg-white rounded-2xl border border-[#E8E8E8] p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="bg-white rounded-2xl border border-bp-border p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="space-y-0.5">
-                  <h3 className="text-base font-bold text-[#111111]">
+                  <h3 className="text-base font-bold text-bp-text">
                     Workers in {activeGroup?.name}
                   </h3>
-                  <p className="text-xs text-[#666666]">
+                  <p className="text-xs text-bp-muted">
                     Manage gang members, photo IDs, trade types, wages, and group assignments
                   </p>
                 </div>
@@ -1469,9 +1469,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       setAddEmployeeDefaultGroupId(activeGroup?.id);
                       setIsAddEmployeeOpen(true);
                     }}
-                    className="px-4 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-colors"
+                    className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-colors"
                   >
-                    <UserPlus className="w-4 h-4 text-[#111111]" />
+                    <UserPlus className="w-4 h-4 text-bp-text" />
                     <span>+ Add Employee</span>
                   </button>
                 )}
@@ -1482,24 +1482,24 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 {groupEmployees.map(emp => (
                   <div
                     key={emp.id}
-                    className="bg-white rounded-2xl border border-[#E8E8E8] hover:border-[#FFC400] shadow-xs p-4 flex flex-col justify-between space-y-3 transition-colors"
+                    className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs p-4 flex flex-col justify-between space-y-3 transition-colors"
                   >
                     <div className="flex items-start gap-3">
                       {emp.photo_url ? (
                         <img
                           src={emp.photo_url}
                           alt={emp.full_name}
-                          className="w-14 h-14 rounded-2xl object-cover border border-[#E8E8E8] shrink-0"
+                          className="w-14 h-14 rounded-2xl object-cover border border-bp-border shrink-0"
                         />
                       ) : (
-                        <div className="w-14 h-14 rounded-2xl bg-[#F7F7F7] border border-[#CCCCCC] text-[#111111] flex items-center justify-center font-bold text-base shrink-0">
+                        <div className="w-14 h-14 rounded-2xl bg-bp-background border border-bp-border-strong text-bp-text flex items-center justify-center font-bold text-base shrink-0">
                           {emp.full_name.charAt(0)}
                         </div>
                       )}
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1">
-                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#F7F7F7] border border-[#E8E8E8] text-[#111111]">
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-bp-background border border-bp-border text-bp-text">
                             {emp.employee_code}
                           </span>
                           <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
@@ -1509,10 +1509,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                           </span>
                         </div>
 
-                        <h4 className="font-bold text-sm text-[#111111] truncate mt-1">
+                        <h4 className="font-bold text-sm text-bp-text truncate mt-1">
                           {emp.full_name}
                         </h4>
-                        <p className="text-xs text-[#666666] font-medium">
+                        <p className="text-xs text-bp-muted font-medium">
                           {emp.job_type}
                         </p>
                         <div className="mt-1 flex flex-wrap gap-2">
@@ -1524,35 +1524,35 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-[#E8E8E8] text-xs space-y-1">
+                    <div className="pt-2 border-t border-bp-border text-xs space-y-1">
                       <div className="flex justify-between">
-                        <span className="text-[#666666]">Wage / Rate:</span>
-                        <span className="font-mono font-bold text-[#111111]">
+                        <span className="text-bp-muted">Wage / Rate:</span>
+                        <span className="font-mono font-bold text-bp-text">
                           ₹{emp.salary_amount} / {emp.salary_type === 'daily_wage' ? 'day' : 'month'}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-[#666666]">Std / Overtime:</span>
-                        <span className="font-mono text-[#555555]">
+                        <span className="text-bp-muted">Std / Overtime:</span>
+                        <span className="font-mono text-bp-text-subtle">
                           {emp.standard_hours_per_day}h &bull; ₹{emp.overtime_rate_per_hour}/h
                         </span>
                       </div>
                       {emp.phone && (
                         <div className="flex justify-between">
-                          <span className="text-[#666666]">Phone:</span>
-                          <span className="font-mono text-[#555555]">{emp.phone}</span>
+                          <span className="text-bp-muted">Phone:</span>
+                          <span className="font-mono text-bp-text-subtle">{emp.phone}</span>
                         </div>
                       )}
                     </div>
 
                     {canManage && (
-                      <div className="pt-2 border-t border-[#E8E8E8] flex items-center justify-end gap-2">
+                      <div className="pt-2 border-t border-bp-border flex items-center justify-end gap-2">
                         <button
                           onClick={() => {
                             setEditingEmployee(emp);
                             setIsAddEmployeeOpen(true);
                           }}
-                          className="px-3 py-1 bg-[#F7F7F7] hover:bg-[#E8E8E8] text-xs font-semibold text-[#111111] rounded-xl flex items-center gap-1 transition-colors"
+                          className="px-3 py-1 bg-bp-background hover:bg-bp-border text-xs font-semibold text-bp-text rounded-xl flex items-center gap-1 transition-colors"
                         >
                           <Edit2 className="w-3 h-3" />
                           Edit Details
@@ -1570,47 +1570,47 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           {/* ======================================================== */}
           {activeTab === 'history' && (
             <div className="space-y-4">
-              <div className="bg-white rounded-2xl border border-[#E8E8E8] p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="bg-white rounded-2xl border border-bp-border p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-[#666666] uppercase mb-1">
+                    <label className="block text-[10px] font-bold text-bp-muted uppercase mb-1">
                       Select Past Register Date
                     </label>
                     <input
                       type="date"
                       value={historyDate}
                       onChange={(e) => setHistoryDate(e.target.value)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400] text-[#111111]"
+                      className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan text-bp-text"
                     />
                   </div>
                   <div className="pt-4 flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => setHistoryDate(getLocalDateStringOffset(-1))}
-                      className="px-2.5 py-1 text-xs font-medium bg-[#F7F7F7] hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
+                      className="px-2.5 py-1 text-xs font-medium bg-bp-background hover:bg-bp-border text-bp-text rounded-lg border border-bp-border-strong"
                     >
                       Oct 16
                     </button>
                     <button
                       type="button"
                       onClick={() => setHistoryDate(getLocalDateStringOffset(-2))}
-                      className="px-2.5 py-1 text-xs font-medium bg-[#F7F7F7] hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
+                      className="px-2.5 py-1 text-xs font-medium bg-bp-background hover:bg-bp-border text-bp-text rounded-lg border border-bp-border-strong"
                     >
                       Oct 15
                     </button>
                   </div>
                 </div>
 
-                <span className="text-xs text-[#666666]">
+                <span className="text-xs text-bp-muted">
                   Showing historical saved entries for <strong>{historyDate}</strong>
                 </span>
               </div>
 
               {/* History Table */}
-              <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-xs">
+              <div className="bg-white rounded-2xl border border-bp-border overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-[#111111] text-white uppercase font-bold text-[11px]">
+                    <thead className="bg-bp-navy text-white uppercase font-bold text-[11px]">
                       <tr>
                         <th className="px-4 py-3">Worker / ID</th>
                         <th className="px-3 py-3">Trade</th>
@@ -1624,10 +1624,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <th className="px-4 py-3">Remarks</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#E8E8E8]">
+                    <tbody className="divide-y divide-[#E2E8F0]">
                       {attendanceRecords.filter(r => r.group_id === selectedGroupId && r.date === historyDate).length === 0 ? (
                         <tr>
-                          <td colSpan={10} className="px-4 py-10 text-center text-[#666666]">
+                          <td colSpan={10} className="px-4 py-10 text-center text-bp-muted">
                             No saved attendance record found for {historyDate}.
                           </td>
                         </tr>
@@ -1635,12 +1635,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         attendanceRecords
                           .filter(r => r.group_id === selectedGroupId && r.date === historyDate)
                           .map(rec => (
-                            <tr key={rec.id} className="hover:bg-[#F9F9F9] transition-colors">
-                              <td className="px-4 py-3 font-semibold text-[#111111]">
+                            <tr key={rec.id} className="hover:bg-bp-background transition-colors">
+                              <td className="px-4 py-3 font-semibold text-bp-text">
                                 {rec.employee_name}
-                                <span className="block text-[10px] text-[#666666] font-mono">{rec.employee_code}</span>
+                                <span className="block text-[10px] text-bp-muted font-mono">{rec.employee_code}</span>
                               </td>
-                              <td className="px-3 py-3 text-[#555555]">{rec.job_type}</td>
+                              <td className="px-3 py-3 text-bp-text-subtle">{rec.job_type}</td>
                               <td className="px-3 py-3 text-center">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                   rec.status === 'Present'
@@ -1656,11 +1656,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                               <td className="px-3 py-3 font-mono">{rec.check_out_time || '—'}</td>
                               <td className="px-3 py-3 text-center font-mono font-bold">{rec.working_hours}h</td>
                               <td className="px-3 py-3 text-center font-mono text-blue-700">{rec.overtime_hours}h</td>
-                              <td className="px-3 py-3 text-right font-mono font-bold text-[#111111]">
+                              <td className="px-3 py-3 text-right font-mono font-bold text-bp-text">
                                 ₹{rec.daily_earnings.toLocaleString()}
                               </td>
-                              <td className="px-4 py-3 text-[#666666]">{rec.recorded_by_name}</td>
-                              <td className="px-4 py-3 text-[#666666]">{rec.remarks || '—'}</td>
+                              <td className="px-4 py-3 text-bp-muted">{rec.recorded_by_name}</td>
+                              <td className="px-4 py-3 text-bp-muted">{rec.remarks || '—'}</td>
                             </tr>
                           ))
                       )}
@@ -1678,13 +1678,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             <div className="space-y-4">
               
               {/* Controls & Record Payment button */}
-              <div className="bg-white rounded-2xl border border-[#E8E8E8] p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="bg-white rounded-2xl border border-bp-border p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-[#666666]">Period:</span>
+                  <span className="text-xs font-semibold text-bp-muted">Period:</span>
                   <select
                     value={salaryPeriod}
                     onChange={(e) => setSalaryPeriod(e.target.value as any)}
-                    className="px-3 py-1.5 text-xs font-bold text-[#111111] rounded-xl border border-[#CCCCCC] bg-white focus:outline-none focus:border-[#FFC400]"
+                    className="px-3 py-1.5 text-xs font-bold text-bp-text rounded-xl border border-bp-border-strong bg-white focus:outline-none focus:border-bp-cyan"
                   >
                     <option value="this_month">This Month (October 2026)</option>
                     <option value="last_30_days">Last 30 Days</option>
@@ -1699,19 +1699,19 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       setPaymentSuggestedAmount(undefined);
                       setIsRecordPaymentOpen(true);
                     }}
-                    className="px-4 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-colors"
+                    className="px-4 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-colors"
                   >
-                    <DollarSign className="w-4 h-4 text-[#111111]" />
+                    <DollarSign className="w-4 h-4 text-bp-text" />
                     <span>Record Salary / Advance Payment</span>
                   </button>
                 )}
               </div>
 
               {/* Salary Ledger Table */}
-              <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-xs">
+              <div className="bg-white rounded-2xl border border-bp-border overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-[#111111] text-white uppercase font-bold text-[11px]">
+                    <thead className="bg-bp-navy text-white uppercase font-bold text-[11px]">
                       <tr>
                         <th className="px-4 py-3">Worker Name</th>
                         <th className="px-3 py-3">Trade</th>
@@ -1719,39 +1719,39 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <th className="px-2 py-3 text-center">P / HD / A</th>
                         <th className="px-2 py-3 text-center">Pay Days</th>
                         <th className="px-2 py-3 text-center">Hours (OT)</th>
-                        <th className="px-3 py-3 text-right bg-[#222222] text-[#FFC400]">Gross Earned</th>
+                        <th className="px-3 py-3 text-right bg-bp-navy-light text-bp-cyan">Gross Earned</th>
                         <th className="px-3 py-3 text-right text-rose-400">Advances / Ded.</th>
                         <th className="px-3 py-3 text-right text-emerald-400">Paid Out</th>
                         <th className="px-3 py-3 text-right font-bold text-white bg-slate-900">Remaining Balance</th>
                         <th className="px-3 py-3 text-center">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#E8E8E8]">
+                    <tbody className="divide-y divide-[#E2E8F0]">
                       {salarySummaries.length === 0 ? (
                         <tr>
-                          <td colSpan={11} className="px-4 py-10 text-center text-[#666666]">
+                          <td colSpan={11} className="px-4 py-10 text-center text-bp-muted">
                             No salary or payment records calculated for this period.
                           </td>
                         </tr>
                       ) : (
                         salarySummaries.map(s => (
-                          <tr key={s.employee_id} className="hover:bg-[#F9F9F9] transition-colors">
-                            <td className="px-4 py-3 font-semibold text-[#111111]">
+                          <tr key={s.employee_id} className="hover:bg-bp-background transition-colors">
+                            <td className="px-4 py-3 font-semibold text-bp-text">
                               {s.employee_name}
-                              <span className="block text-[10px] text-[#666666] font-mono">{s.employee_code}</span>
+                              <span className="block text-[10px] text-bp-muted font-mono">{s.employee_code}</span>
                             </td>
-                            <td className="px-3 py-3 text-[#555555]">{s.job_type}</td>
+                            <td className="px-3 py-3 text-bp-text-subtle">{s.job_type}</td>
                             <td className="px-2 py-3 text-center font-mono">₹{s.salary_rate}</td>
                             <td className="px-2 py-3 text-center font-mono">
                               <span className="text-emerald-700 font-bold">{s.present_days}</span> / <span className="text-blue-700">{s.half_days}</span> / <span className="text-rose-700">{s.absent_days}</span>
                             </td>
-                            <td className="px-2 py-3 text-center font-mono font-bold text-[#111111]">
+                            <td className="px-2 py-3 text-center font-mono font-bold text-bp-text">
                               {s.total_payable_days}d
                             </td>
                             <td className="px-2 py-3 text-center font-mono">
                               {s.total_working_hours}h {s.total_overtime_hours > 0 && `(+${s.total_overtime_hours}h)`}
                             </td>
-                            <td className="px-3 py-3 text-right font-mono font-bold bg-[#FFC400]/10 text-[#111111]">
+                            <td className="px-3 py-3 text-right font-mono font-bold bg-bp-cyan/10 text-bp-text">
                               ₹{s.gross_earnings.toLocaleString()}
                             </td>
                             <td className="px-3 py-3 text-right font-mono text-rose-700">
@@ -1760,7 +1760,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                             <td className="px-3 py-3 text-right font-mono text-emerald-700 font-semibold">
                               ₹{s.total_paid.toLocaleString()}
                             </td>
-                            <td className="px-3 py-3 text-right font-mono font-bold text-sm bg-slate-50 text-[#111111]">
+                            <td className="px-3 py-3 text-right font-mono font-bold text-sm bg-slate-50 text-bp-text">
                               ₹{s.net_payable_balance.toLocaleString()}
                             </td>
                             <td className="px-3 py-3 text-center">
@@ -1772,7 +1772,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                     setPaymentSuggestedAmount(Math.max(0, s.net_payable_balance));
                                     setIsRecordPaymentOpen(true);
                                   }}
-                                  className="px-2.5 py-1 text-xs font-semibold bg-[#111111] text-[#FFC400] hover:bg-[#222222] rounded-xl transition-colors shadow-xs"
+                                  className="px-2.5 py-1 text-xs font-semibold bg-bp-navy text-bp-cyan hover:bg-bp-navy-light rounded-xl transition-colors shadow-xs"
                                 >
                                   Pay
                                 </button>
@@ -1787,31 +1787,31 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               </div>
 
               {/* Payment History Ledger */}
-              <div className="bg-white rounded-2xl border border-[#E8E8E8] p-5 shadow-xs space-y-3">
-                <h4 className="text-sm font-bold text-[#111111] uppercase tracking-wider flex items-center gap-1.5">
-                  <CreditCard className="w-4 h-4 text-[#111111]" />
+              <div className="bg-white rounded-2xl border border-bp-border p-5 shadow-xs space-y-3">
+                <h4 className="text-sm font-bold text-bp-text uppercase tracking-wider flex items-center gap-1.5">
+                  <CreditCard className="w-4 h-4 text-bp-text" />
                   Recent Payment Disbursements for {activeGroup?.name}
                 </h4>
 
-                <div className="divide-y divide-[#E8E8E8] text-xs">
+                <div className="divide-y divide-[#E2E8F0] text-xs">
                   {paymentRecords.filter(p => p.group_id === selectedGroupId).length === 0 ? (
-                    <p className="py-4 text-[#888888] text-center">No payment transactions recorded for this group yet.</p>
+                    <p className="py-4 text-bp-muted text-center">No payment transactions recorded for this group yet.</p>
                   ) : (
                     paymentRecords
                       .filter(p => p.group_id === selectedGroupId)
                       .map(p => (
                         <div key={p.id} className="py-2.5 flex items-center justify-between gap-3">
                           <div>
-                            <span className="font-bold text-[#111111]">{p.employee_name}</span>
-                            <span className="text-[10px] text-[#666666] font-mono ml-2">({p.employee_code})</span>
-                            <span className="text-xs text-[#666666] block">
+                            <span className="font-bold text-bp-text">{p.employee_name}</span>
+                            <span className="text-[10px] text-bp-muted font-mono ml-2">({p.employee_code})</span>
+                            <span className="text-xs text-bp-muted block">
                               Method: {p.payment_method} {p.reference_no && `• Ref: ${p.reference_no}`} {p.remarks && `• "${p.remarks}"`}
                             </span>
                             <AttachmentLinks attachments={p.attachments} />
                           </div>
                           <div className="text-right">
-                            <span className="font-mono font-bold text-sm text-[#111111]">₹{p.amount.toLocaleString()}</span>
-                            <span className="text-[10px] text-[#888888] block">{p.payment_date}</span>
+                            <span className="font-mono font-bold text-sm text-bp-text">₹{p.amount.toLocaleString()}</span>
+                            <span className="text-[10px] text-bp-muted block">{p.payment_date}</span>
                           </div>
                         </div>
                       ))
@@ -1829,22 +1829,22 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             <div className="space-y-4">
               
               {/* TWO SEPARATE REPORT OPTIONS WORKFLOW */}
-              <div className="bg-white rounded-2xl border border-[#E8E8E8] p-5 shadow-xs space-y-4">
+              <div className="bg-white rounded-2xl border border-bp-border p-5 shadow-xs space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h3 className="text-base font-bold text-[#111111]">
+                    <h3 className="text-base font-bold text-bp-text">
                       Attendance & Labor Wage Reports
                     </h3>
-                    <p className="text-xs text-[#666666]">
+                    <p className="text-xs text-bp-muted">
                       Generate audited daily attendance registers, working hours, and CSV exports for Excel.
                     </p>
                   </div>
 
                   <button
                     onClick={handleDownloadReportCsv}
-                    className="px-4 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02]"
+                    className="px-4 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02]"
                   >
-                    <Download className="w-4 h-4 text-[#111111]" />
+                    <Download className="w-4 h-4 text-bp-text" />
                     <span>Download Matching CSV</span>
                   </button>
                 </div>
@@ -1857,15 +1857,15 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     onClick={() => setReportMode('date_range')}
                     className={`text-left p-4 rounded-xl border-2 transition-all ${
                       reportMode === 'date_range'
-                        ? 'border-[#FFC400] bg-[#FFC400]/10 shadow-sm'
-                        : 'border-[#E8E8E8] hover:border-[#CCCCCC] bg-white'
+                        ? 'border-bp-cyan bg-bp-cyan/10 shadow-sm'
+                        : 'border-bp-border hover:border-bp-border-strong bg-white'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-[#111111]">Option A: Date Range Report</h4>
-                      {reportMode === 'date_range' && <CheckCircle2 className="w-4 h-4 text-[#111111]" />}
+                      <h4 className="font-bold text-sm text-bp-text">Option A: Date Range Report</h4>
+                      {reportMode === 'date_range' && <CheckCircle2 className="w-4 h-4 text-bp-text" />}
                     </div>
-                    <p className="text-xs text-[#666666] mt-1">
+                    <p className="text-xs text-bp-muted mt-1">
                       Prompts for <strong>From Date</strong> and <strong>To Date</strong> (both dates included).
                     </p>
                   </button>
@@ -1876,45 +1876,45 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     onClick={() => setReportMode('up_to_date')}
                     className={`text-left p-4 rounded-xl border-2 transition-all ${
                       reportMode === 'up_to_date'
-                        ? 'border-[#FFC400] bg-[#FFC400]/10 shadow-sm'
-                        : 'border-[#E8E8E8] hover:border-[#CCCCCC] bg-white'
+                        ? 'border-bp-cyan bg-bp-cyan/10 shadow-sm'
+                        : 'border-bp-border hover:border-bp-border-strong bg-white'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-[#111111]">Option B: Total Report Up To Date</h4>
-                      {reportMode === 'up_to_date' && <CheckCircle2 className="w-4 h-4 text-[#111111]" />}
+                      <h4 className="font-bold text-sm text-bp-text">Option B: Total Report Up To Date</h4>
+                      {reportMode === 'up_to_date' && <CheckCircle2 className="w-4 h-4 text-bp-text" />}
                     </div>
-                    <p className="text-xs text-[#666666] mt-1">
+                    <p className="text-xs text-bp-muted mt-1">
                       Prompts for <strong>only one date: Report Up To Date</strong>. (No From Date asked).
                     </p>
                   </button>
                 </div>
 
                 {/* Filter Controls Bar (Dynamic based on selected option) */}
-                <div className="p-4 bg-[#F7F7F7] rounded-xl border border-[#E8E8E8] space-y-3 text-xs">
+                <div className="p-4 bg-bp-background rounded-xl border border-bp-border space-y-3 text-xs">
                   {reportMode === 'date_range' ? (
                     /* Date Range: Shows From Date and To Date */
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                       <div>
-                        <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1">
+                        <label className="block text-[11px] font-bold text-bp-text uppercase mb-1">
                           From Date *
                         </label>
                         <input
                           type="date"
                           value={reportFromDate}
                           onChange={(e) => setReportFromDate(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-white text-xs text-[#111111] font-semibold rounded-xl border border-[#CCCCCC]"
+                          className="w-full px-3 py-1.5 bg-white text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong"
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1">
+                        <label className="block text-[11px] font-bold text-bp-text uppercase mb-1">
                           To Date * (Inclusive)
                         </label>
                         <input
                           type="date"
                           value={reportToDate}
                           onChange={(e) => setReportToDate(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-white text-xs text-[#111111] font-semibold rounded-xl border border-[#CCCCCC]"
+                          className="w-full px-3 py-1.5 bg-white text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong"
                         />
                       </div>
                       <div className="sm:col-span-2 flex items-center gap-1.5 pt-1">
@@ -1924,7 +1924,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                             setReportFromDate(getLocalMonthStartString());
                             setReportToDate(getLocalDateString());
                           }}
-                          className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
+                          className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-bp-border text-bp-text rounded-lg border border-bp-border-strong"
                         >
                           October 2026
                         </button>
@@ -1934,7 +1934,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                             setReportFromDate(getLocalDateStringOffset(-6));
                             setReportToDate(getLocalDateString());
                           }}
-                          className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
+                          className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-bp-border text-bp-text rounded-lg border border-bp-border-strong"
                         >
                           Last 7 Days
                         </button>
@@ -1944,28 +1944,28 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     /* Up To Date: Shows ONLY Report Up To Date (Never ask for From Date!) */
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                       <div>
-                        <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1">
+                        <label className="block text-[11px] font-bold text-bp-text uppercase mb-1">
                           Report Up To Date * (Cut-off Date)
                         </label>
                         <input
                           type="date"
                           value={reportUpToDate}
                           onChange={(e) => setReportUpToDate(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-white text-xs text-[#111111] font-semibold rounded-xl border border-[#CCCCCC]"
+                          className="w-full px-3 py-1.5 bg-white text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong"
                         />
                       </div>
                       <div className="sm:col-span-3 flex items-center gap-1.5 pt-1">
                         <button
                           type="button"
                           onClick={() => setReportUpToDate(getLocalDateString())}
-                          className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
+                          className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-bp-border text-bp-text rounded-lg border border-bp-border-strong"
                         >
                           Today (Oct 17)
                         </button>
                         <button
                           type="button"
                           onClick={() => setReportUpToDate(getLocalDateStringOffset(-2))}
-                          className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-[#E8E8E8] text-[#111111] rounded-lg border border-[#CCCCCC]"
+                          className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-bp-border text-bp-text rounded-lg border border-bp-border-strong"
                         >
                           Oct 15
                         </button>
@@ -1976,13 +1976,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   {/* Group & Employee Scope */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     <div>
-                      <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1">
+                      <label className="block text-[11px] font-bold text-bp-text uppercase mb-1">
                         Group Scope
                       </label>
                       <select
                         value={reportGroupScope}
                         onChange={(e) => setReportGroupScope(e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white text-xs text-[#111111] font-semibold rounded-xl border border-[#CCCCCC]"
+                        className="w-full px-3 py-1.5 bg-white text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong"
                       >
                         <option value="all">All Groups & Direct Workers (Company Wide)</option>
                         <option value="ungrouped">Individual / Direct Workers Only</option>
@@ -1993,13 +1993,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1">
+                      <label className="block text-[11px] font-bold text-bp-text uppercase mb-1">
                         Employee Filter
                       </label>
                       <select
                         value={reportEmployeeFilter}
                         onChange={(e) => setReportEmployeeFilter(e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white text-xs text-[#111111] font-semibold rounded-xl border border-[#CCCCCC]"
+                        className="w-full px-3 py-1.5 bg-white text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong"
                       >
                         <option value="all">All Workers in Selected Scope</option>
                         {employees
@@ -2015,12 +2015,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               </div>
 
               {/* Report Preview Table */}
-              <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-xs">
-                <div className="px-5 py-3 border-b border-[#E8E8E8] flex items-center justify-between bg-[#FAFAFA]">
-                  <span className="text-xs font-bold text-[#111111] uppercase tracking-wider">
+              <div className="bg-white rounded-2xl border border-bp-border overflow-hidden shadow-xs">
+                <div className="px-5 py-3 border-b border-bp-border flex items-center justify-between bg-bp-background">
+                  <span className="text-xs font-bold text-bp-text uppercase tracking-wider">
                     On-Screen Report Summary ({reportSummaries.length} workers)
                   </span>
-                  <span className="text-xs text-[#666666]">
+                  <span className="text-xs text-bp-muted">
                     {reportMode === 'date_range'
                       ? `Range: ${reportFromDate} to ${reportToDate}`
                       : `Cumulative Up To: ${reportUpToDate}`}
@@ -2029,7 +2029,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-[#111111] text-white uppercase font-bold text-[11px]">
+                    <thead className="bg-bp-navy text-white uppercase font-bold text-[11px]">
                       <tr>
                         <th className="px-4 py-3">Group</th>
                         <th className="px-4 py-3">Worker Name</th>
@@ -2039,39 +2039,39 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <th className="px-2 py-3 text-center">Half Day</th>
                         <th className="px-2 py-3 text-center">Hours</th>
                         <th className="px-2 py-3 text-center">OT (h)</th>
-                        <th className="px-3 py-3 text-right bg-[#222222] text-[#FFC400]">Gross Earnings</th>
+                        <th className="px-3 py-3 text-right bg-bp-navy-light text-bp-cyan">Gross Earnings</th>
                         <th className="px-3 py-3 text-right text-emerald-400">Total Paid</th>
                         <th className="px-3 py-3 text-right font-bold text-white bg-slate-900">Remaining</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#E8E8E8]">
+                    <tbody className="divide-y divide-[#E2E8F0]">
                       {reportSummaries.length === 0 ? (
                         <tr>
-                          <td colSpan={11} className="px-4 py-10 text-center text-[#666666]">
+                          <td colSpan={11} className="px-4 py-10 text-center text-bp-muted">
                             No attendance records match the selected date parameters.
                           </td>
                         </tr>
                       ) : (
                         reportSummaries.map(s => (
-                          <tr key={s.employee_id} className="hover:bg-[#F9F9F9] transition-colors">
-                            <td className="px-4 py-3 text-[#555555] font-medium">{s.group_name}</td>
-                            <td className="px-4 py-3 font-semibold text-[#111111]">
+                          <tr key={s.employee_id} className="hover:bg-bp-background transition-colors">
+                            <td className="px-4 py-3 text-bp-text-subtle font-medium">{s.group_name}</td>
+                            <td className="px-4 py-3 font-semibold text-bp-text">
                               {s.employee_name}
-                              <span className="block text-[10px] text-[#666666] font-mono">{s.employee_code}</span>
+                              <span className="block text-[10px] text-bp-muted font-mono">{s.employee_code}</span>
                             </td>
-                            <td className="px-3 py-3 text-[#555555]">{s.job_type}</td>
+                            <td className="px-3 py-3 text-bp-text-subtle">{s.job_type}</td>
                             <td className="px-2 py-3 text-center font-mono">₹{s.salary_rate}</td>
                             <td className="px-2 py-3 text-center font-mono font-bold text-emerald-700">{s.present_days}</td>
                             <td className="px-2 py-3 text-center font-mono text-blue-700">{s.half_days}</td>
                             <td className="px-2 py-3 text-center font-mono">{s.total_working_hours}h</td>
                             <td className="px-2 py-3 text-center font-mono text-blue-700">{s.total_overtime_hours}h</td>
-                            <td className="px-3 py-3 text-right font-mono font-bold bg-[#FFC400]/10 text-[#111111]">
+                            <td className="px-3 py-3 text-right font-mono font-bold bg-bp-cyan/10 text-bp-text">
                               ₹{s.gross_earnings.toLocaleString()}
                             </td>
                             <td className="px-3 py-3 text-right font-mono text-emerald-700 font-semibold">
                               ₹{s.total_paid.toLocaleString()}
                             </td>
-                            <td className="px-3 py-3 text-right font-mono font-bold text-sm bg-slate-50 text-[#111111]">
+                            <td className="px-3 py-3 text-right font-mono font-bold text-sm bg-slate-50 text-bp-text">
                               ₹{s.net_payable_balance.toLocaleString()}
                             </td>
                           </tr>
@@ -2081,13 +2081,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   </table>
                 </div>
 
-                <div className="p-4 bg-[#FAFAFA] border-t border-[#E8E8E8] flex items-center justify-between">
-                  <p className="text-xs text-[#666666]">
+                <div className="p-4 bg-bp-background border-t border-bp-border flex items-center justify-between">
+                  <p className="text-xs text-bp-muted">
                     Ready to export. CSV includes detailed itemized records with job type, check-in, check-out, payable days, and earnings.
                   </p>
                   <button
                     onClick={handleDownloadReportCsv}
-                    className="px-4 py-2 bg-[#111111] hover:bg-[#222222] text-[#FFC400] font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-xs transition-colors"
+                    className="px-4 py-2 bg-bp-navy hover:bg-bp-navy-light text-bp-cyan font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-xs transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     Download CSV

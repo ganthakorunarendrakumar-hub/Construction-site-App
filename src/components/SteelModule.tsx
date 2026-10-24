@@ -242,44 +242,44 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
     <div className="space-y-6 animate-in fade-in duration-150">
       
       {/* Breadcrumb Navigation */}
-      <nav className="flex items-center gap-2 text-xs text-[#666666]">
-        <button onClick={onNavigateHome} className="hover:text-[#111111] transition-colors">
+      <nav className="flex items-center gap-2 text-xs text-bp-muted">
+        <button onClick={onNavigateHome} className="hover:text-bp-text transition-colors">
           Company Home
         </button>
-        <ChevronRight className="w-3.5 h-3.5 text-[#888888]" />
-        <button onClick={onNavigateBack} className="hover:text-[#111111] transition-colors truncate max-w-xs">
+        <ChevronRight className="w-3.5 h-3.5 text-bp-muted" />
+        <button onClick={onNavigateBack} className="hover:text-bp-text transition-colors truncate max-w-xs">
           {project.name}
         </button>
-        <ChevronRight className="w-3.5 h-3.5 text-[#888888]" />
-        <span className="font-semibold text-[#111111]">Steel & TMT Rebars</span>
+        <ChevronRight className="w-3.5 h-3.5 text-bp-muted" />
+        <span className="font-semibold text-bp-text">Steel & TMT Rebars</span>
       </nav>
 
       {/* Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#E8E8E8] pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-bp-border pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FFC400]" />
-            <h1 className="text-2xl sm:text-[28px] font-bold text-[#111111] tracking-tight">
+            <span className="w-2.5 h-2.5 rounded-full bg-bp-cyan" />
+            <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight">
               Steel & TMT Rebars
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-[#666666] mt-0.5">
-            Site: <strong className="text-[#111111] font-semibold">{project.name}</strong> ({project.code}) &bull; Unit: {unitView.toUpperCase()} (1 tonne = 1,000 kg)
+          <p className="text-xs sm:text-sm text-bp-muted mt-0.5">
+            Site: <strong className="text-bp-text font-semibold">{project.name}</strong> ({project.code}) &bull; Unit: {unitView.toUpperCase()} (1 tonne = 1,000 kg)
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Unit Toggle */}
-          <div className="bg-[#F7F7F7] border border-[#E8E8E8] p-1 rounded-xl flex items-center text-xs font-semibold">
+          <div className="bg-bp-background border border-bp-border p-1 rounded-xl flex items-center text-xs font-semibold">
             <button
               onClick={() => setUnitView('kg')}
-              className={`px-3 py-1 rounded-lg transition-all ${unitView === 'kg' ? 'bg-[#FFC400] text-[#111111]' : 'text-[#666666] hover:text-[#111111]'}`}
+              className={`px-3 py-1 rounded-lg transition-all ${unitView === 'kg' ? 'bg-bp-cyan text-bp-text' : 'text-bp-muted hover:text-bp-text'}`}
             >
               Kilograms (kg)
             </button>
             <button
               onClick={() => setUnitView('tonnes')}
-              className={`px-3 py-1 rounded-lg transition-all ${unitView === 'tonnes' ? 'bg-[#FFC400] text-[#111111]' : 'text-[#666666] hover:text-[#111111]'}`}
+              className={`px-3 py-1 rounded-lg transition-all ${unitView === 'tonnes' ? 'bg-bp-cyan text-bp-text' : 'text-bp-muted hover:text-bp-text'}`}
             >
               Tonnes (t)
             </button>
@@ -287,7 +287,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
           <button
             onClick={handleExportCsv}
-            className="px-3 py-1.5 bg-white border border-[#E8E8E8] hover:bg-[#F7F7F7] text-[#111111] text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
+            className="px-3 py-1.5 bg-white border border-bp-border hover:bg-bp-background text-bp-text text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
           >
             <Download className="w-3.5 h-3.5" />
             Export CSV
@@ -300,9 +300,9 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                 setFormError(null);
                 setIsModalOpen(true);
               }}
-              className="px-4 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] text-xs font-semibold rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+              className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-semibold rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
             >
-              <PlusCircle className="w-4 h-4 text-[#111111]" />
+              <PlusCircle className="w-4 h-4 text-bp-text" />
               Record Transaction
             </button>
           )}
@@ -311,69 +311,69 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
       {/* KPI Overview Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-[#111111] text-white p-5 rounded-2xl border border-[#222222] shadow-xs">
-          <p className="text-xs font-medium text-[#AAAAAA]">Available Steel</p>
+        <div className="bg-bp-navy text-white p-5 rounded-2xl border border-bp-navy-border shadow-xs">
+          <p className="text-xs font-medium text-bp-border-strong">Available Steel</p>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-[28px] font-bold text-[#FFC400] font-mono tabular-nums">
+            <span className="text-2xl sm:text-[28px] font-bold text-bp-cyan font-mono tabular-nums">
               {formatQty(stockMetrics?.totalAvailableAggregate ?? 0)}
             </span>
-            <span className="text-xs text-[#AAAAAA]">{unitView}</span>
+            <span className="text-xs text-bp-border-strong">{unitView}</span>
           </div>
-          <p className="text-[11px] text-[#888888] mt-2 font-mono">
+          <p className="text-[11px] text-bp-muted mt-2 font-mono">
             {filteredSummaries.length} tracked lines
           </p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-[#E8E8E8] shadow-xs">
-          <div className="flex items-center justify-between text-xs font-medium text-[#666666]">
+        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Total Received</span>
-            <TrendingUp className="w-4 h-4 text-[#111111]" />
+            <TrendingUp className="w-4 h-4 text-bp-text" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-[28px] font-bold text-[#111111] font-mono tabular-nums">
+            <span className="text-2xl sm:text-[28px] font-bold text-bp-text font-mono tabular-nums">
               {formatQty(stockMetrics?.items.reduce((s, i) => s + i.total_received, 0) ?? 0)}
             </span>
-            <span className="text-xs text-[#666666]">{unitView}</span>
+            <span className="text-xs text-bp-muted">{unitView}</span>
           </div>
-          <p className="text-[11px] text-[#666666] mt-2">Certified TMT receipts</p>
+          <p className="text-[11px] text-bp-muted mt-2">Certified TMT receipts</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-[#E8E8E8] shadow-xs">
-          <div className="flex items-center justify-between text-xs font-medium text-[#666666]">
+        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Total Used / Bent</span>
-            <TrendingDown className="w-4 h-4 text-[#111111]" />
+            <TrendingDown className="w-4 h-4 text-bp-text" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-[28px] font-bold text-[#111111] font-mono tabular-nums">
+            <span className="text-2xl sm:text-[28px] font-bold text-bp-text font-mono tabular-nums">
               {formatQty(stockMetrics?.items.reduce((s, i) => s + i.total_used, 0) ?? 0)}
             </span>
-            <span className="text-xs text-[#666666]">{unitView}</span>
+            <span className="text-xs text-bp-muted">{unitView}</span>
           </div>
-          <p className="text-[11px] text-[#666666] mt-2">Bar bending & cages</p>
+          <p className="text-[11px] text-bp-muted mt-2">Bar bending & cages</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-[#E8E8E8] shadow-xs">
-          <div className="flex items-center justify-between text-xs font-medium text-[#666666]">
+        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Scrap & Cut-Offs</span>
-            <AlertOctagon className="w-4 h-4 text-[#111111]" />
+            <AlertOctagon className="w-4 h-4 text-bp-text" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-[28px] font-bold text-[#111111] font-mono tabular-nums">
+            <span className="text-2xl sm:text-[28px] font-bold text-bp-text font-mono tabular-nums">
               {formatQty(stockMetrics?.items.reduce((s, i) => s + i.total_damaged, 0) ?? 0)}
             </span>
-            <span className="text-xs text-[#666666]">{unitView}</span>
+            <span className="text-xs text-bp-muted">{unitView}</span>
           </div>
-          <p className="text-[11px] text-[#666666] mt-2">End pieces & wastage</p>
+          <p className="text-[11px] text-bp-muted mt-2">End pieces & wastage</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center justify-between border-b border-[#E8E8E8]">
+      <div className="flex items-center justify-between border-b border-bp-border">
         <div className="flex items-center gap-4">
           <button
             onClick={() => setActiveTab('stock_overview')}
             className={`pb-3 text-xs font-semibold border-b-2 flex items-center gap-2 transition-all ${
-              activeTab === 'stock_overview' ? 'border-[#FFC400] text-[#111111]' : 'border-transparent text-[#666666] hover:text-[#111111]'
+              activeTab === 'stock_overview' ? 'border-bp-cyan text-bp-text' : 'border-transparent text-bp-muted hover:text-bp-text'
             }`}
           >
             <Layers className="w-4 h-4" />
@@ -382,7 +382,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
           <button
             onClick={() => setActiveTab('ledger_history')}
             className={`pb-3 text-xs font-semibold border-b-2 flex items-center gap-2 transition-all ${
-              activeTab === 'ledger_history' ? 'border-[#FFC400] text-[#111111]' : 'border-transparent text-[#666666] hover:text-[#111111]'
+              activeTab === 'ledger_history' ? 'border-bp-cyan text-bp-text' : 'border-transparent text-bp-muted hover:text-bp-text'
             }`}
           >
             Transaction History ({transactions.length})
@@ -393,14 +393,14 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
           <div className="flex items-center gap-3 pb-2 text-xs">
             <button
               onClick={() => setIsAddingBrand(!isAddingBrand)}
-              className="text-[#111111] hover:underline font-semibold flex items-center gap-1"
+              className="text-bp-text hover:underline font-semibold flex items-center gap-1"
             >
               <Plus className="w-3.5 h-3.5" />
               Add Brand
             </button>
             <button
               onClick={() => setIsAddingSize(!isAddingSize)}
-              className="text-[#111111] hover:underline font-semibold flex items-center gap-1"
+              className="text-bp-text hover:underline font-semibold flex items-center gap-1"
             >
               <Plus className="w-3.5 h-3.5" />
               Add Size
@@ -411,13 +411,13 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
       {/* Admin Quick Add Drawers */}
       {isAddingBrand && (
-        <div className="bg-white p-4 rounded-2xl border border-[#E8E8E8] flex items-center gap-3 shadow-xs animate-in fade-in">
+        <div className="bg-white p-4 rounded-2xl border border-bp-border flex items-center gap-3 shadow-xs animate-in fade-in">
           <input
             type="text"
             value={newBrandInput}
             onChange={(e) => setNewBrandInput(e.target.value)}
             placeholder="Enter custom steel brand (e.g. Jindal Panther, Rathi TMT)"
-            className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+            className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
           />
           <button
             onClick={async () => {
@@ -427,22 +427,22 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
               setIsAddingBrand(false);
               await loadModuleData();
             }}
-            className="px-4 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-semibold text-xs rounded-xl shadow-xs"
+            className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold text-xs rounded-xl shadow-xs"
           >
             Save Brand
           </button>
-          <button onClick={() => setIsAddingBrand(false)} className="text-xs text-[#666666]">Cancel</button>
+          <button onClick={() => setIsAddingBrand(false)} className="text-xs text-bp-muted">Cancel</button>
         </div>
       )}
 
       {isAddingSize && (
-        <div className="bg-white p-4 rounded-2xl border border-[#E8E8E8] flex items-center gap-3 shadow-xs animate-in fade-in">
+        <div className="bg-white p-4 rounded-2xl border border-bp-border flex items-center gap-3 shadow-xs animate-in fade-in">
           <input
             type="text"
             value={newSizeInput}
             onChange={(e) => setNewSizeInput(e.target.value)}
             placeholder="Enter diameter (e.g. 36 mm, 40 mm)"
-            className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+            className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
           />
           <button
             onClick={async () => {
@@ -452,26 +452,26 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
               setIsAddingSize(false);
               await loadModuleData();
             }}
-            className="px-4 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-semibold text-xs rounded-xl shadow-xs"
+            className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold text-xs rounded-xl shadow-xs"
           >
             Save Size
           </button>
-          <button onClick={() => setIsAddingSize(false)} className="text-xs text-[#666666]">Cancel</button>
+          <button onClick={() => setIsAddingSize(false)} className="text-xs text-bp-muted">Cancel</button>
         </div>
       )}
 
       {/* VIEW 1: STOCK BY BRAND & DIAMETER */}
       {activeTab === 'stock_overview' && (
         <div className="space-y-4">
-          <div className="bg-white p-3.5 rounded-2xl border border-[#E8E8E8] flex flex-wrap gap-3 items-center justify-between shadow-xs">
+          <div className="bg-white p-3.5 rounded-2xl border border-bp-border flex flex-wrap gap-3 items-center justify-between shadow-xs">
             <div className="relative flex-1 min-w-[200px]">
-              <Search className="w-4 h-4 text-[#666666] absolute left-3.5 top-2.5" />
+              <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-2.5" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search steel brand or diameter..."
-                className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
               />
             </div>
 
@@ -479,7 +479,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
               <select
                 value={brandFilter}
                 onChange={(e) => setBrandFilter(e.target.value)}
-                className="text-xs py-2 px-3 rounded-xl border border-[#E8E8E8] bg-white text-[#111111] focus:outline-none focus:border-[#FFC400]"
+                className="text-xs py-2 px-3 rounded-xl border border-bp-border bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
               >
                 <option value="all">All Brands</option>
                 {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
@@ -488,7 +488,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
               <select
                 value={sizeFilter}
                 onChange={(e) => setSizeFilter(e.target.value)}
-                className="text-xs py-2 px-3 rounded-xl border border-[#E8E8E8] bg-white text-[#111111] focus:outline-none focus:border-[#FFC400]"
+                className="text-xs py-2 px-3 rounded-xl border border-bp-border bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
               >
                 <option value="all">All Diameters</option>
                 {sizes.map(s => <option key={s} value={s}>{s}</option>)}
@@ -496,46 +496,46 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-xs">
+          <div className="bg-white rounded-2xl border border-bp-border overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-[#F7F7F7] border-b border-[#E8E8E8] text-[11px] font-semibold text-[#666666] uppercase tracking-wider">
+                  <tr className="bg-bp-background border-b border-bp-border text-[11px] font-semibold text-bp-muted uppercase tracking-wider">
                     <th className="py-3 px-4">Brand</th>
                     <th className="py-3 px-4">Diameter</th>
                     <th className="py-3 px-4 text-right">Received ({unitView})</th>
                     <th className="py-3 px-4 text-right">Used ({unitView})</th>
                     <th className="py-3 px-4 text-right">Scrap ({unitView})</th>
-                    <th className="py-3 px-4 text-right bg-[#FFC400]/10">Available ({unitView})</th>
+                    <th className="py-3 px-4 text-right bg-bp-cyan/10">Available ({unitView})</th>
                     <th className="py-3 px-4 text-center">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E8E8E8]">
+                <tbody className="divide-y divide-[#E2E8F0]">
                   {filteredSummaries.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-[#666666]">
+                      <td colSpan={7} className="py-12 text-center text-bp-muted">
                         No steel items found matching filters. Record a new receipt to initialize inventory.
                       </td>
                     </tr>
                   ) : (
                     filteredSummaries.map((item) => (
-                      <tr key={item.key} className="hover:bg-[#F7F7F7] transition-colors">
-                        <td className="py-3 px-4 font-semibold text-[#111111]">{item.brand_name || item.item_name}</td>
-                        <td className="py-3 px-4 font-mono font-medium text-[#111111]">
-                          <span className="px-2 py-0.5 rounded-md bg-[#F7F7F7] border border-[#E8E8E8]">
+                      <tr key={item.key} className="hover:bg-bp-background transition-colors">
+                        <td className="py-3 px-4 font-semibold text-bp-text">{item.brand_name || item.item_name}</td>
+                        <td className="py-3 px-4 font-mono font-medium text-bp-text">
+                          <span className="px-2 py-0.5 rounded-md bg-bp-background border border-bp-border">
                             {item.diameter_or_size || '—'}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-semibold text-[#111111]">
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-bp-text">
                           {formatQty(item.total_received)}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-semibold text-[#111111]">
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-bp-text">
                           {formatQty(item.total_used)}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-semibold text-[#111111]">
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-bp-text">
                           {formatQty(item.total_damaged)}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-sm tabular-nums text-[#111111] bg-[#FFC400]/10">
+                        <td className="py-3 px-4 text-right font-mono font-bold text-sm tabular-nums text-bp-text bg-bp-cyan/10">
                           {formatQty(item.available_stock)}
                         </td>
                         <td className="py-3 px-4 text-center">
@@ -546,7 +546,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                                 setTxDiameter(item.diameter_or_size || '12 mm');
                                 setIsModalOpen(true);
                               }}
-                              className="px-3 py-1 text-xs font-semibold text-[#111111] bg-[#FFC400] hover:bg-[#F0B800] rounded-lg transition-colors shadow-xs"
+                              className="px-3 py-1 text-xs font-semibold text-bp-text bg-bp-cyan hover:bg-bp-blue rounded-lg transition-colors shadow-xs"
                             >
                               + Move
                             </button>
@@ -564,40 +564,40 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
       {/* VIEW 2: TRANSACTION LEDGER */}
       {activeTab === 'ledger_history' && (
-        <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-xs">
+        <div className="bg-white rounded-2xl border border-bp-border overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-[#F7F7F7] border-b border-[#E8E8E8] text-[11px] font-semibold text-[#666666] uppercase tracking-wider">
+                <tr className="bg-bp-background border-b border-bp-border text-[11px] font-semibold text-bp-muted uppercase tracking-wider">
                   <th className="py-3 px-4">Date</th>
                   <th className="py-3 px-4">Brand</th>
                   <th className="py-3 px-4">Diameter</th>
                   <th className="py-3 px-4">Type</th>
                   <th className="py-3 px-4 text-right">Quantity</th>
-                  <th className="py-3 px-4 text-right bg-[#FFC400]/10">Running Stock</th>
+                  <th className="py-3 px-4 text-right bg-bp-cyan/10">Running Stock</th>
                   <th className="py-3 px-4">Invoice / Challan</th>
                   <th className="py-3 px-4">Recorded By</th>
                   <th className="py-3 px-4 text-center">Document</th>
                   {isAdmin && <th className="py-3 px-4 text-right">Action</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E8E8E8]">
+              <tbody className="divide-y divide-[#E2E8F0]">
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-12 text-center text-[#666666]">
+                    <td colSpan={10} className="py-12 text-center text-bp-muted">
                       No transactions recorded yet for steel.
                     </td>
                   </tr>
                 ) : (
                   transactions.map((tx) => (
-                    <tr key={tx.id} className={`hover:bg-[#F7F7F7] transition-colors ${tx.is_reversal ? 'line-through opacity-60' : ''}`}>
+                    <tr key={tx.id} className={`hover:bg-bp-background transition-colors ${tx.is_reversal ? 'line-through opacity-60' : ''}`}>
                       <td className="py-3 px-4 font-mono">{tx.transaction_date}</td>
-                      <td className="py-3 px-4 font-semibold text-[#111111]">{tx.brand_name || tx.item_name}</td>
-                      <td className="py-3 px-4 font-mono text-[#111111]">{tx.diameter_or_size}</td>
+                      <td className="py-3 px-4 font-semibold text-bp-text">{tx.brand_name || tx.item_name}</td>
+                      <td className="py-3 px-4 font-mono text-bp-text">{tx.diameter_or_size}</td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase ${
-                          tx.transaction_type === 'receipt' ? 'bg-[#FFC400]/20 text-[#111111] border border-[#FFC400]/40' :
-                          'bg-[#F7F7F7] text-[#111111] border border-[#E8E8E8]'
+                          tx.transaction_type === 'receipt' ? 'bg-bp-cyan/20 text-bp-text border border-bp-cyan/40' :
+                          'bg-bp-background text-bp-text border border-bp-border'
                         }`}>
                           {tx.transaction_type}
                         </span>
@@ -605,13 +605,13 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                       <td className="py-3 px-4 text-right font-mono font-semibold">
                         {tx.quantity.toLocaleString()} kg
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-[#111111] bg-[#FFC400]/10">
+                      <td className="py-3 px-4 text-right font-mono font-bold text-bp-text bg-bp-cyan/10">
                         {tx.running_balance !== undefined ? `${tx.running_balance.toLocaleString()} kg` : '—'}
                       </td>
-                      <td className="py-3 px-4 font-mono text-[#666666]">
+                      <td className="py-3 px-4 font-mono text-bp-muted">
                         {tx.invoice_number || tx.challan_number || '—'}
                       </td>
-                      <td className="py-3 px-4 text-[#111111]">{tx.created_by_name}</td>
+                      <td className="py-3 px-4 text-bp-text">{tx.created_by_name}</td>
                       <td className="py-3 px-4 text-center">
                         <AttachmentLinks attachments={tx.attachments} legacyUrl={tx.attachment_url} legacyName={tx.attachment_name} />
                       </td>
@@ -624,7 +624,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                                 setReversalReason('');
                                 setReversalError(null);
                               }}
-                              className="text-[11px] text-[#666666] hover:text-[#111111] hover:underline font-semibold"
+                              className="text-[11px] text-bp-muted hover:text-bp-text hover:underline font-semibold"
                             >
                               Reverse
                             </button>
@@ -642,23 +642,23 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
       {/* RECORD TRANSACTION MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-[#111111]/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-[#E8E8E8] max-w-xl w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-[#E8E8E8] pb-3">
-              <h3 className="font-bold text-base text-[#111111] flex items-center gap-2">
-                <Layers className="w-5 h-5 text-[#111111]" />
+        <div className="fixed inset-0 z-50 bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl border border-bp-border max-w-xl w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-bp-border pb-3">
+              <h3 className="font-bold text-base text-bp-text flex items-center gap-2">
+                <Layers className="w-5 h-5 text-bp-text" />
                 Record Steel Transaction
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-[#666666] hover:text-[#111111]">
+              <button onClick={() => setIsModalOpen(false)} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {successSaved ? (
               <div className="py-6 text-center space-y-3">
-                <CheckCircle2 className="w-12 h-12 text-[#111111] mx-auto" />
-                <h4 className="font-bold text-lg text-[#111111]">Steel Transaction Recorded</h4>
-                <p className="text-xs text-[#666666]">
+                <CheckCircle2 className="w-12 h-12 text-bp-text mx-auto" />
+                <h4 className="font-bold text-lg text-bp-text">Steel Transaction Recorded</h4>
+                <p className="text-xs text-bp-muted">
                   Recorded {successSaved.quantity} kg of {successSaved.brand_name} ({successSaved.diameter_or_size}).
                 </p>
                 <button
@@ -666,7 +666,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                     setIsModalOpen(false);
                     setSuccessSaved(null);
                   }}
-                  className="px-5 py-2 bg-[#FFC400] text-[#111111] font-semibold text-xs rounded-xl shadow-xs"
+                  className="px-5 py-2 bg-bp-cyan text-bp-text font-semibold text-xs rounded-xl shadow-xs"
                 >
                   Done
                 </button>
@@ -674,34 +674,34 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
             ) : (
               <form onSubmit={handleRecordSubmit} className="space-y-4 text-xs">
                 {formError && (
-                  <div className="p-2.5 bg-[#F7F7F7] border border-[#E8E8E8] text-[#111111] rounded-xl flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-[#111111] shrink-0" />
+                  <div className="p-2.5 bg-bp-background border border-bp-border text-bp-text rounded-xl flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-bp-text shrink-0" />
                     <span>{formError}</span>
                   </div>
                 )}
 
                 {/* Type */}
                 <div>
-                  <label className="block font-semibold text-[#111111] uppercase mb-1">Transaction Type</label>
+                  <label className="block font-semibold text-bp-text uppercase mb-1">Transaction Type</label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setTxType('receipt')}
-                      className={`py-2 rounded-xl font-semibold border transition-colors ${txType === 'receipt' ? 'bg-[#FFC400] text-[#111111] border-[#FFC400]' : 'border-[#E8E8E8] text-[#666666]'}`}
+                      className={`py-2 rounded-xl font-semibold border transition-colors ${txType === 'receipt' ? 'bg-bp-cyan text-bp-text border-bp-cyan' : 'border-bp-border text-bp-muted'}`}
                     >
                       + Receipt
                     </button>
                     <button
                       type="button"
                       onClick={() => setTxType('usage')}
-                      className={`py-2 rounded-xl font-semibold border transition-colors ${txType === 'usage' ? 'bg-[#FFC400] text-[#111111] border-[#FFC400]' : 'border-[#E8E8E8] text-[#666666]'}`}
+                      className={`py-2 rounded-xl font-semibold border transition-colors ${txType === 'usage' ? 'bg-bp-cyan text-bp-text border-bp-cyan' : 'border-bp-border text-bp-muted'}`}
                     >
                       - Site Usage
                     </button>
                     <button
                       type="button"
                       onClick={() => setTxType('damage')}
-                      className={`py-2 rounded-xl font-semibold border transition-colors ${txType === 'damage' ? 'bg-[#FFC400] text-[#111111] border-[#FFC400]' : 'border-[#E8E8E8] text-[#666666]'}`}
+                      className={`py-2 rounded-xl font-semibold border transition-colors ${txType === 'damage' ? 'bg-bp-cyan text-bp-text border-bp-cyan' : 'border-bp-border text-bp-muted'}`}
                     >
                       - Scrap / Wastage
                     </button>
@@ -710,11 +710,11 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1">Steel Brand</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1">Steel Brand</label>
                     <select
                       value={txBrand}
                       onChange={(e) => setTxBrand(e.target.value)}
-                      className="w-full py-2 px-3 rounded-xl border border-[#E8E8E8] bg-white text-[#111111] focus:outline-none focus:border-[#FFC400]"
+                      className="w-full py-2 px-3 rounded-xl border border-bp-border bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
                     >
                       {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                     </select>
@@ -724,18 +724,18 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                         placeholder="Enter brand name"
                         value={customBrandName}
                         onChange={(e) => setCustomBrandName(e.target.value)}
-                        className="mt-1.5 w-full py-2 px-3 rounded-xl border border-[#E8E8E8]"
+                        className="mt-1.5 w-full py-2 px-3 rounded-xl border border-bp-border"
                         required
                       />
                     )}
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1">Diameter (mm)</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1">Diameter (mm)</label>
                     <select
                       value={txDiameter}
                       onChange={(e) => setTxDiameter(e.target.value)}
-                      className="w-full py-2 px-3 rounded-xl border border-[#E8E8E8] bg-white text-[#111111] focus:outline-none focus:border-[#FFC400]"
+                      className="w-full py-2 px-3 rounded-xl border border-bp-border bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
                     >
                       {sizes.map(s => <option key={s} value={s}>{s}</option>)}
                       <option value="Other">Other Size</option>
@@ -746,14 +746,14 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                         placeholder="e.g. 36 mm"
                         value={customDiameter}
                         onChange={(e) => setCustomDiameter(e.target.value)}
-                        className="mt-1.5 w-full py-2 px-3 rounded-xl border border-[#E8E8E8]"
+                        className="mt-1.5 w-full py-2 px-3 rounded-xl border border-bp-border"
                         required
                       />
                     )}
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1">Quantity & Unit</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1">Quantity & Unit</label>
                     <div className="flex gap-2">
                       <input
                         type="number"
@@ -763,12 +763,12 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                         value={txQty}
                         onChange={(e) => setTxQty(e.target.value)}
                         placeholder="e.g. 5000"
-                        className="w-full py-2 px-3 rounded-xl border border-[#E8E8E8] font-mono"
+                        className="w-full py-2 px-3 rounded-xl border border-bp-border font-mono"
                       />
                       <select
                         value={txUnit}
                         onChange={(e) => setTxUnit(e.target.value as any)}
-                        className="py-2 px-3 rounded-xl border border-[#E8E8E8] bg-white font-semibold"
+                        className="py-2 px-3 rounded-xl border border-bp-border bg-white font-semibold"
                       >
                         <option value="kg">kg</option>
                         <option value="tonnes">Tonnes</option>
@@ -777,65 +777,65 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1">Date</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1">Date</label>
                     <input
                       type="date"
                       required
                       value={txDate}
                       onChange={(e) => setTxDate(e.target.value)}
-                      className="w-full py-2 px-3 rounded-xl border border-[#E8E8E8]"
+                      className="w-full py-2 px-3 rounded-xl border border-bp-border"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1">Supplier / Stockist</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1">Supplier / Stockist</label>
                     <input
                       type="text"
                       value={supplierName}
                       onChange={(e) => setSupplierName(e.target.value)}
                       placeholder="e.g. Tata Steel Stockyard"
-                      className="w-full py-2 px-3 rounded-xl border border-[#E8E8E8]"
+                      className="w-full py-2 px-3 rounded-xl border border-bp-border"
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold text-[#111111] uppercase mb-1">Invoice / Challan #</label>
+                    <label className="block font-semibold text-bp-text uppercase mb-1">Invoice / Challan #</label>
                     <input
                       type="text"
                       value={invoiceNumber}
                       onChange={(e) => setInvoiceNumber(e.target.value)}
                       placeholder="e.g. INV-ST-991"
-                      className="w-full py-2 px-3 rounded-xl border border-[#E8E8E8] font-mono"
+                      className="w-full py-2 px-3 rounded-xl border border-bp-border font-mono"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-[#111111] uppercase mb-1">Remarks</label>
+                  <label className="block font-semibold text-bp-text uppercase mb-1">Remarks</label>
                   <input
                     type="text"
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
                     placeholder="e.g. Fe 550D TMT Grade batch for slab beams"
-                    className="w-full py-2 px-3 rounded-xl border border-[#E8E8E8]"
+                    className="w-full py-2 px-3 rounded-xl border border-bp-border"
                   />
                 </div>
 
                 <AttachmentSections value={attachments} onChange={setAttachments} onUploadFile={onUploadFile} />
 
-                <div className="pt-3 border-t border-[#E8E8E8] flex justify-end gap-2">
+                <div className="pt-3 border-t border-bp-border flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-[#666666] hover:bg-[#F7F7F7] font-medium"
+                    className="px-4 py-2 rounded-xl text-bp-muted hover:bg-bp-background font-medium"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="px-5 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-semibold rounded-xl shadow-xs"
+                    className="px-5 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold rounded-xl shadow-xs"
                   >
                     {isSubmitting ? 'Recording...' : 'Commit to Stock Ledger'}
                   </button>
@@ -848,31 +848,31 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
       {/* REVERSAL MODAL */}
       {reversalTarget && (
-        <div className="fixed inset-0 z-50 bg-[#111111]/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-[#E8E8E8]">
-            <h3 className="font-bold text-base text-[#111111] flex items-center gap-2">
-              <RotateCcw className="w-5 h-5 text-[#111111]" />
+        <div className="fixed inset-0 z-50 bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-bp-border">
+            <h3 className="font-bold text-base text-bp-text flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-bp-text" />
               Reverse Steel Transaction
             </h3>
-            <p className="text-xs text-[#666666]">
+            <p className="text-xs text-bp-muted">
               Reverse {reversalTarget.quantity} kg of {reversalTarget.brand_name} ({reversalTarget.diameter_or_size}). An offsetting entry will be written.
             </p>
-            {reversalError && <p className="text-xs text-[#111111]">{reversalError}</p>}
+            {reversalError && <p className="text-xs text-bp-text">{reversalError}</p>}
             <form onSubmit={handleReversalSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-[#111111] uppercase mb-1">Audited Reason *</label>
+                <label className="block font-semibold text-bp-text uppercase mb-1">Audited Reason *</label>
                 <textarea
                   required
                   rows={3}
                   value={reversalReason}
                   onChange={(e) => setReversalReason(e.target.value)}
                   placeholder="e.g. Wrong diameter selected during delivery logging."
-                  className="w-full p-2.5 border border-[#E8E8E8] rounded-xl"
+                  className="w-full p-2.5 border border-bp-border rounded-xl"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setReversalTarget(null)} className="px-3 py-1.5 rounded-xl text-[#666666]">Cancel</button>
-                <button type="submit" disabled={isReversing} className="px-4 py-1.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-semibold rounded-xl">
+                <button type="button" onClick={() => setReversalTarget(null)} className="px-3 py-1.5 rounded-xl text-bp-muted">Cancel</button>
+                <button type="submit" disabled={isReversing} className="px-4 py-1.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold rounded-xl">
                   {isReversing ? 'Reversing...' : 'Commit Reversal'}
                 </button>
               </div>

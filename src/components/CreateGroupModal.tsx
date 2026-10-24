@@ -109,27 +109,27 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#111111]/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-[#E8E8E8] max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-bp-border max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header */}
-        <div className="bg-[#111111] text-white px-6 py-4 flex items-center justify-between">
+        <div className="bg-bp-navy text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#FFC400] text-[#111111] flex items-center justify-center font-bold">
-              <Users className="w-4 h-4 text-[#111111]" />
+            <div className="w-8 h-8 rounded-xl bg-bp-cyan text-bp-text flex items-center justify-center font-bold">
+              <Users className="w-4 h-4 text-bp-text" />
             </div>
             <div>
               <h2 className="text-base font-bold text-white">
                 {editingGroup ? 'Edit Worker Group' : 'Create New Worker Group'}
               </h2>
-              <p className="text-[11px] text-[#888888]">
+              <p className="text-[11px] text-bp-muted">
                 Group-based workforce and gang management for CHEN INFRA
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-[#888888] hover:text-white p-1 rounded-lg transition-colors"
+            className="text-bp-muted hover:text-white p-1 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -147,7 +147,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           {/* Group Name & Status */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
-              <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1">
+              <label className="block text-[11px] font-bold text-bp-text uppercase mb-1">
                 Group Name *
               </label>
               <input
@@ -156,18 +156,18 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                 placeholder="e.g., Dan Group, Ram Group, Tile Masons..."
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs text-[#111111] font-semibold rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400]"
+                className="w-full px-3.5 py-2 text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1">
+              <label className="block text-[11px] font-bold text-bp-text uppercase mb-1">
                 Status
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}
-                className="w-full px-3 py-2 text-xs text-[#111111] font-semibold rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400] bg-white"
+                className="w-full px-3 py-2 text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan bg-white"
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -178,8 +178,8 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           {/* Leader Details */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1 flex items-center gap-1.5">
-                <UserCheck className="w-3.5 h-3.5 text-[#111111]" />
+              <label className="block text-[11px] font-bold text-bp-text uppercase mb-1 flex items-center gap-1.5">
+                <UserCheck className="w-3.5 h-3.5 text-bp-text" />
                 Supervisor / Group Leader *
               </label>
               <input
@@ -188,13 +188,13 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                 placeholder="e.g., Daniel Murmu"
                 value={leaderName}
                 onChange={(e) => setLeaderName(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs text-[#111111] rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                className="w-full px-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1 flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-[#111111]" />
+              <label className="block text-[11px] font-bold text-bp-text uppercase mb-1 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-bp-text" />
                 Leader Phone (Optional)
               </label>
               <input
@@ -202,21 +202,21 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                 placeholder="+91 98450 00000"
                 value={leaderPhone}
                 onChange={(e) => setLeaderPhone(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs text-[#111111] rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                className="w-full px-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
               />
             </div>
           </div>
 
           {/* Project / Site Assignment */}
           <div>
-            <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-[#111111]" />
+            <label className="block text-[11px] font-bold text-bp-text uppercase mb-1 flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-bp-text" />
               Project / Site Assignment
             </label>
             <select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
-              className="w-full px-3.5 py-2 text-xs text-[#111111] font-semibold rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400] bg-white"
+              className="w-full px-3.5 py-2 text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan bg-white"
             >
               <option value="">Unassigned / Floating Gang</option>
               {projects.map((p) => (
@@ -229,27 +229,27 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
 
           {/* Group Photo Upload & Preview */}
           <div>
-            <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1 flex items-center gap-1.5">
-              <Upload className="w-3.5 h-3.5 text-[#111111]" />
+            <label className="block text-[11px] font-bold text-bp-text uppercase mb-1 flex items-center gap-1.5">
+              <Upload className="w-3.5 h-3.5 text-bp-text" />
               Group Photo / Badge (Optional)
             </label>
             
             <div className="flex items-center gap-4">
               {photoUrl ? (
-                <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-[#E8E8E8] shrink-0 bg-[#F7F7F7]">
+                <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-bp-border shrink-0 bg-bp-background">
                   <img src={photoUrl} alt="Group preview" className="w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => setPhotoUrl('')}
-                    className="absolute top-1 right-1 p-0.5 bg-[#111111]/80 text-white rounded-full hover:bg-black"
+                    className="absolute top-1 right-1 p-0.5 bg-bp-navy/80 text-white rounded-full hover:bg-bp-navy-deep"
                     title="Remove photo"
                   >
                     <X className="w-3 h-3" />
                   </button>
                 </div>
               ) : (
-                <div className="w-16 h-16 rounded-xl border border-dashed border-[#CCCCCC] flex items-center justify-center text-[#888888] shrink-0 bg-[#F7F7F7]">
-                  <Users className="w-6 h-6 text-[#AAAAAA]" />
+                <div className="w-16 h-16 rounded-xl border border-dashed border-bp-border-strong flex items-center justify-center text-bp-muted shrink-0 bg-bp-background">
+                  <Users className="w-6 h-6 text-bp-border-strong" />
                 </div>
               )}
 
@@ -259,9 +259,9 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                   accept="image/*"
                   onChange={handlePhotoUpload}
                   disabled={uploadingPhoto}
-                  className="block w-full text-xs text-[#666666] file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#111111] file:text-[#FFC400] hover:file:bg-[#222222] file:cursor-pointer"
+                  className="block w-full text-xs text-bp-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-bp-navy file:text-bp-cyan hover:file:bg-bp-navy-light file:cursor-pointer"
                 />
-                <p className="text-[10px] text-[#888888]">
+                <p className="text-[10px] text-bp-muted">
                   {uploadingPhoto ? 'Processing photo...' : 'Upload gang team photo (JPEG, PNG, WEBP)'}
                 </p>
               </div>
@@ -270,7 +270,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
 
           {/* Remarks */}
           <div>
-            <label className="block text-[11px] font-bold text-[#111111] uppercase mb-1">
+            <label className="block text-[11px] font-bold text-bp-text uppercase mb-1">
               Work Scope & Remarks
             </label>
             <textarea
@@ -278,24 +278,24 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               placeholder="e.g., Specialized in RCC casting, brickwork, floor slab bar bending..."
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              className="w-full px-3.5 py-2 text-xs text-[#111111] rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+              className="w-full px-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
             />
           </div>
 
           {/* Modal Actions */}
-          <div className="pt-3 border-t border-[#E8E8E8] flex items-center justify-end gap-2">
+          <div className="pt-3 border-t border-bp-border flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 text-xs font-semibold text-[#666666] hover:bg-[#F7F7F7] rounded-xl transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              className="px-5 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
             >
               {isSubmitting ? 'Saving...' : editingGroup ? 'Update Group' : 'Create Group'}
             </button>

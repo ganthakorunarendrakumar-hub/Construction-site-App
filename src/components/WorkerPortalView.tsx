@@ -104,34 +104,34 @@ export const WorkerPortalView: React.FC<WorkerPortalViewProps> = ({ currentUser 
     <div className="space-y-6 font-['Inter',sans-serif] animate-in fade-in duration-150">
       
       {/* Worker Header Card */}
-      <div className="bg-white rounded-2xl border border-[#E8E8E8] p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white rounded-2xl border border-bp-border p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             {employee?.photo_url ? (
               <img
                 src={employee.photo_url}
                 alt={currentUser.full_name}
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-[#FFC400] shrink-0"
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-bp-cyan shrink-0"
               />
             ) : (
-              <div className="w-16 h-16 rounded-2xl bg-[#111111] text-[#FFC400] flex items-center justify-center font-bold text-xl shrink-0">
+              <div className="w-16 h-16 rounded-2xl bg-bp-navy text-bp-cyan flex items-center justify-center font-bold text-xl shrink-0">
                 {currentUser.full_name.charAt(0)}
               </div>
             )}
 
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#FFC400] text-[#111111] font-mono">
+                <span className="font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-bp-cyan text-bp-text font-mono">
                   WORKER PORTAL
                 </span>
-                <span className="text-xs text-[#666666]">
-                  User ID: <strong className="font-mono text-[#111111]">{currentUser.user_id || 'CHEN-WRK'}</strong>
+                <span className="text-xs text-bp-muted">
+                  User ID: <strong className="font-mono text-bp-text">{currentUser.user_id || 'CHEN-WRK'}</strong>
                 </span>
               </div>
-              <h1 className="text-2xl font-bold text-[#111111] tracking-tight mt-0.5">
+              <h1 className="text-2xl font-bold text-bp-text tracking-tight mt-0.5">
                 {currentUser.full_name}
               </h1>
-              <p className="text-xs text-[#666666] flex items-center gap-2 mt-1">
+              <p className="text-xs text-bp-muted flex items-center gap-2 mt-1">
                 <span>Trade: <strong>{employee?.job_type || 'Specialist Worker'}</strong></span>
                 <span>•</span>
                 <span>Team: <strong>{employee?.group_name || 'Assigned Gang'}</strong></span>
@@ -145,38 +145,38 @@ export const WorkerPortalView: React.FC<WorkerPortalViewProps> = ({ currentUser 
             <button
               onClick={handleDownloadPersonalCsv}
               disabled={records.length === 0}
-              className="px-4 py-2.5 bg-[#111111] hover:bg-[#222222] text-[#FFC400] font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all disabled:opacity-50"
+              className="px-4 py-2.5 bg-bp-navy hover:bg-bp-navy-light text-bp-cyan font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all disabled:opacity-50"
             >
-              <Download className="w-4 h-4 text-[#FFC400]" />
+              <Download className="w-4 h-4 text-bp-cyan" />
               <span>Download My Statement (CSV)</span>
             </button>
           </div>
         </div>
 
         {/* Worker Financial & Attendance Summary */}
-        <div className="pt-4 border-t border-[#E8E8E8] grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-            <p className="text-[11px] font-semibold text-[#666666] uppercase">Days Worked</p>
-            <p className="text-xl font-bold text-[#111111] font-mono mt-0.5">
-              {totalDays} <span className="text-xs font-normal text-[#666666]">present</span>
+        <div className="pt-4 border-t border-bp-border grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+            <p className="text-[11px] font-semibold text-bp-muted uppercase">Days Worked</p>
+            <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
+              {totalDays} <span className="text-xs font-normal text-bp-muted">present</span>
               {halfDays > 0 && <span className="text-xs text-amber-700 ml-1">({halfDays} half)</span>}
             </p>
           </div>
-          <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-            <p className="text-[11px] font-semibold text-[#666666] uppercase">Hours Logged</p>
-            <p className="text-xl font-bold text-[#111111] font-mono mt-0.5">
-              {totalHours} <span className="text-xs font-normal text-[#666666]">hrs</span>
+          <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+            <p className="text-[11px] font-semibold text-bp-muted uppercase">Hours Logged</p>
+            <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
+              {totalHours} <span className="text-xs font-normal text-bp-muted">hrs</span>
               {totalOtHours > 0 && <span className="text-xs text-blue-700 ml-1">(+{totalOtHours} OT)</span>}
             </p>
           </div>
-          <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-            <p className="text-[11px] font-semibold text-[#666666] uppercase">Gross Earnings</p>
-            <p className="text-xl font-bold text-[#111111] font-mono mt-0.5">
+          <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+            <p className="text-[11px] font-semibold text-bp-muted uppercase">Gross Earnings</p>
+            <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
               ₹{grossEarnings.toLocaleString()}
             </p>
           </div>
-          <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-            <p className="text-[11px] font-semibold text-[#666666] uppercase">Pending Balance</p>
+          <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+            <p className="text-[11px] font-semibold text-bp-muted uppercase">Pending Balance</p>
             <p className="text-xl font-bold text-emerald-700 font-mono mt-0.5">
               ₹{remainingBalance.toLocaleString()}
             </p>
@@ -185,18 +185,18 @@ export const WorkerPortalView: React.FC<WorkerPortalViewProps> = ({ currentUser 
       </div>
 
       {/* Daily Attendance History */}
-      <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-xs space-y-3 p-5">
+      <div className="bg-white rounded-2xl border border-bp-border overflow-hidden shadow-xs space-y-3 p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-[#FFC400]" />
-            <h2 className="text-base font-bold text-[#111111]">My Daily Attendance & Daily Wage Records</h2>
+            <Clock className="w-4 h-4 text-bp-cyan" />
+            <h2 className="text-base font-bold text-bp-text">My Daily Attendance & Daily Wage Records</h2>
           </div>
-          <span className="text-xs text-[#666666]">{records.length} logged shifts</span>
+          <span className="text-xs text-bp-muted">{records.length} logged shifts</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#111111] text-white uppercase font-bold text-[11px]">
+            <thead className="bg-bp-navy text-white uppercase font-bold text-[11px]">
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-3 py-3 text-center">Status</th>
@@ -204,21 +204,21 @@ export const WorkerPortalView: React.FC<WorkerPortalViewProps> = ({ currentUser 
                 <th className="px-2 py-3 text-center">Hours</th>
                 <th className="px-2 py-3 text-center">OT (h)</th>
                 <th className="px-3 py-3 text-right">Applicable Wage</th>
-                <th className="px-3 py-3 text-right bg-[#222222] text-[#FFC400]">Daily Earnings</th>
+                <th className="px-3 py-3 text-right bg-bp-navy-light text-bp-cyan">Daily Earnings</th>
                 <th className="px-4 py-3">Site / Work Note</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E8E8E8]">
+            <tbody className="divide-y divide-[#E2E8F0]">
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-[#666666]">
+                  <td colSpan={8} className="px-4 py-8 text-center text-bp-muted">
                     No attendance records marked for your profile yet.
                   </td>
                 </tr>
               ) : (
                 records.map(r => (
-                  <tr key={r.id} className="hover:bg-[#F9F9F9]">
-                    <td className="px-4 py-3 font-mono font-bold text-[#111111]">
+                  <tr key={r.id} className="hover:bg-bp-background">
+                    <td className="px-4 py-3 font-mono font-bold text-bp-text">
                       {r.date}
                     </td>
                     <td className="px-3 py-3 text-center">
@@ -232,22 +232,22 @@ export const WorkerPortalView: React.FC<WorkerPortalViewProps> = ({ currentUser 
                         {r.status}
                       </span>
                     </td>
-                    <td className="px-3 py-3 font-mono text-[#666666]">
+                    <td className="px-3 py-3 font-mono text-bp-muted">
                       {r.check_in_time || '—'} – {r.check_out_time || '—'}
                     </td>
-                    <td className="px-2 py-3 text-center font-mono font-semibold text-[#111111]">
+                    <td className="px-2 py-3 text-center font-mono font-semibold text-bp-text">
                       {r.working_hours}
                     </td>
                     <td className="px-2 py-3 text-center font-mono text-blue-700 font-bold">
                       {r.overtime_hours > 0 ? `+${r.overtime_hours}` : '—'}
                     </td>
-                    <td className="px-3 py-3 text-right font-mono text-[#555555]">
+                    <td className="px-3 py-3 text-right font-mono text-bp-text-subtle">
                       ₹{r.salary_rate}
                     </td>
-                    <td className="px-3 py-3 text-right font-mono font-bold text-[#111111] bg-[#FFC400]/10">
+                    <td className="px-3 py-3 text-right font-mono font-bold text-bp-text bg-bp-cyan/10">
                       ₹{r.daily_earnings.toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 text-[#666666] italic">
+                    <td className="px-4 py-3 text-bp-muted italic">
                       {r.remarks || 'Standard site shift'}
                     </td>
                   </tr>
@@ -259,18 +259,18 @@ export const WorkerPortalView: React.FC<WorkerPortalViewProps> = ({ currentUser 
       </div>
 
       {/* Payment Receipts History */}
-      <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-xs space-y-3 p-5">
+      <div className="bg-white rounded-2xl border border-bp-border overflow-hidden shadow-xs space-y-3 p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-emerald-600" />
-            <h2 className="text-base font-bold text-[#111111]">Payment Receipts & Advances</h2>
+            <h2 className="text-base font-bold text-bp-text">Payment Receipts & Advances</h2>
           </div>
-          <span className="text-xs text-[#666666]">{payments.length} transactions</span>
+          <span className="text-xs text-bp-muted">{payments.length} transactions</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#F7F7F7] text-[#666666] uppercase font-bold text-[10px] border-b border-[#E8E8E8]">
+            <thead className="bg-bp-background text-bp-muted uppercase font-bold text-[10px] border-b border-bp-border">
               <tr>
                 <th className="px-4 py-2.5">Date</th>
                 <th className="px-3 py-2.5">Payment Type</th>
@@ -279,27 +279,27 @@ export const WorkerPortalView: React.FC<WorkerPortalViewProps> = ({ currentUser 
                 <th className="px-4 py-2.5">Reference / Notes</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E8E8E8]">
+            <tbody className="divide-y divide-[#E2E8F0]">
               {payments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-[#666666]">
+                  <td colSpan={5} className="px-4 py-6 text-center text-bp-muted">
                     No payments or advances recorded for your profile.
                   </td>
                 </tr>
               ) : (
                 payments.map(p => (
-                  <tr key={p.id} className="hover:bg-[#F9F9F9]">
+                  <tr key={p.id} className="hover:bg-bp-background">
                     <td className="px-4 py-2.5 font-mono">{p.payment_date}</td>
                     <td className="px-3 py-2.5">
                       <span className="px-2 py-0.5 rounded-md font-semibold text-[10px] uppercase bg-emerald-50 text-emerald-800 border border-emerald-200">
                         {p.payment_type}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-[#555555]">{p.payment_method}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-bold text-[#111111]">
+                    <td className="px-3 py-2.5 text-bp-text-subtle">{p.payment_method}</td>
+                    <td className="px-3 py-2.5 text-right font-mono font-bold text-bp-text">
                       ₹{p.amount.toLocaleString()}
                     </td>
-                    <td className="px-4 py-2.5 text-[#666666]">
+                    <td className="px-4 py-2.5 text-bp-muted">
                       {p.reference_no && <span className="font-mono mr-2">{p.reference_no}</span>}
                       {p.remarks}
                     </td>
