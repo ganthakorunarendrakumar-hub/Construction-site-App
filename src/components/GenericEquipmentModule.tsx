@@ -792,9 +792,9 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
               <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-3" />
               <input
                 type="text"
+                aria-label="Search inventory items"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={`Search ${categoryDef?.name.toLowerCase()}...`}
                 className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
               />
             </div>
@@ -906,9 +906,9 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
               <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-3" />
               <input
                 type="text"
+                aria-label="Search inventory ledger"
                 value={ledgerSearch}
                 onChange={(e) => setLedgerSearch(e.target.value)}
-                placeholder="Search ledger by item, supplier, invoice, challan..."
                 className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
               />
             </div>
@@ -1275,7 +1275,6 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                           type="text"
                           value={issuedToCrew}
                           onChange={(e) => setIssuedToCrew(e.target.value)}
-                          placeholder="e.g. Masonry Gang 2 / Ramesh"
                           className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                         />
                       </div>
@@ -1288,7 +1287,6 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                       type="text"
                       value={partyName}
                       onChange={(e) => setPartyName(e.target.value)}
-                      placeholder="e.g. National Hardware Depot"
                       className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                     />
                   </div>
@@ -1300,14 +1298,12 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                         type="text"
                         value={invoiceNumber}
                         onChange={(e) => setInvoiceNumber(e.target.value)}
-                        placeholder="Invoice #"
                         className="w-1/2 py-2.5 px-3 rounded-xl border border-bp-border bg-bp-background text-bp-text font-mono focus:bg-white focus:outline-none focus:border-bp-cyan"
                       />
                       <input
                         type="text"
                         value={challanNumber}
                         onChange={(e) => setChallanNumber(e.target.value)}
-                        placeholder="Challan #"
                         className="w-1/2 py-2.5 px-3 rounded-xl border border-bp-border bg-bp-background text-bp-text font-mono focus:bg-white focus:outline-none focus:border-bp-cyan"
                       />
                     </div>
@@ -1320,7 +1316,6 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                     type="text"
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="e.g. Delivered for Block B scaffolding"
                     className="w-full py-2.5 px-3.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
@@ -1369,7 +1364,6 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. 25mm CPVC Ball Valve, Acrylic Sealant"
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan font-medium"
@@ -1406,7 +1400,6 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <label className="block font-semibold text-bp-text uppercase mb-1.5">Brand / Manufacturer (Optional)</label>
                 <input
                   type="text"
-                  placeholder="e.g. Astral, Asian Paints, Bosch"
                   value={newItemBrand}
                   onChange={(e) => setNewItemBrand(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
@@ -1417,7 +1410,6 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <label className="block font-semibold text-bp-text uppercase mb-1.5">Specification (Optional)</label>
                 <textarea
                   rows={2}
-                  placeholder="Grade, dimensions, or standard specification"
                   value={newItemSpec}
                   onChange={(e) => setNewItemSpec(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
@@ -1508,7 +1500,6 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <label className="block font-semibold text-bp-text uppercase mb-1.5">Brand / Manufacturer</label>
                 <input
                   type="text"
-                  placeholder="e.g. Pidilite, Ultra, Havells"
                   value={editItemBrand}
                   onChange={(e) => setEditItemBrand(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
@@ -1519,7 +1510,6 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <label className="block font-semibold text-bp-text uppercase mb-1.5">Technical Specification</label>
                 <textarea
                   rows={2}
-                  placeholder="Grade, thickness, or material standard"
                   value={editItemSpec}
                   onChange={(e) => setEditItemSpec(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
@@ -1584,7 +1574,6 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <textarea
                   rows={3}
                   required
-                  placeholder="State the audit justification (e.g. data entry error, duplicate invoice correction)"
                   value={reversalReason}
                   onChange={(e) => setReversalReason(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"

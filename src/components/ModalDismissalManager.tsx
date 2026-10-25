@@ -62,7 +62,7 @@ const getTopLayer = (): HTMLElement | null => {
 
 const getDialogSnapshot = (overlay: HTMLElement): string => {
   const fields = Array.from(overlay.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
-    'input:not([type="hidden"]), select, textarea'
+    'input:not([type="hidden"]):not([data-bp-ignore-unsaved]), select:not([data-bp-ignore-unsaved]), textarea:not([data-bp-ignore-unsaved])'
   )).map(field => {
     if (field instanceof HTMLInputElement && field.type === 'file') {
       return [field.name, 'file', Array.from(field.files || []).map(file => [file.name, file.size, file.type, file.lastModified])];

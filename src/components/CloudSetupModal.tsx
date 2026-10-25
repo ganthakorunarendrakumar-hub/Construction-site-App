@@ -14,7 +14,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { SupabaseConfig } from '../types';
-import { SUPABASE_SCHEMA_SQL } from '../services/supabaseSchemaSql';
+import { COMPANY_BRANDING_MIGRATION_SQL, SUPABASE_SCHEMA_SQL } from '../services/supabaseSchemaSql';
 
 interface CloudSetupModalProps {
   isOpen: boolean;
@@ -38,6 +38,7 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [copiedBrandingSql, setCopiedBrandingSql] = useState(false);
 
   if (!isOpen) return null;
 
@@ -62,6 +63,12 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
     setTimeout(() => setCopiedSql(false), 2500);
   };
 
+  const handleCopyBrandingMigration = () => {
+    navigator.clipboard.writeText(COMPANY_BRANDING_MIGRATION_SQL);
+    setCopiedBrandingSql(true);
+    setTimeout(() => setCopiedBrandingSql(false), 2500);
+  };
+
   const handleClose = () => {
     if (isTesting) return;
     setUrl(config.url || '');
@@ -69,6 +76,7 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
     setActiveTab('credentials');
     setTestResult(null);
     setCopiedSql(false);
+    setCopiedBrandingSql(false);
     onClose();
   };
 
@@ -189,7 +197,6 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
                     type="url"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://xyzcompany.supabase.co"
                     className="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                   />
                 </div>
@@ -202,7 +209,6 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
                     rows={3}
                     value={anonKey}
                     onChange={(e) => setAnonKey(e.target.value)}
-                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                     className="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                   />
                 </div>
@@ -250,6 +256,23 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
                   {SUPABASE_SCHEMA_SQL}
                 </pre>
               </div>
+
+              <section className="space-y-3 rounded-xl border border-bp-cyan-border bg-bp-cyan-soft p-4" aria-labelledby="company-branding-migration-title">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h5 id="company-branding-migration-title" className="text-xs font-bold text-bp-navy">Existing Supabase installation</h5>
+                    <p className="mt-1 text-[11px] text-bp-text-subtle">Run this additive migration once to add company branding fields, administrator policies, and a private company-logo bucket.</p>
+                  </div>
+                  <button type="button" onClick={handleCopyBrandingMigration} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-bp-navy px-3 py-2 text-xs font-semibold text-white hover:bg-bp-blue">
+                    {copiedBrandingSql ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedBrandingSql ? 'Copied!' : 'Copy Branding Migration'}
+                  </button>
+                </div>
+                <details>
+                  <summary className="cursor-pointer text-[11px] font-semibold text-bp-blue">Review migration SQL</summary>
+                  <pre className="mt-2 max-h-72 overflow-auto rounded-xl border border-bp-navy-border bg-bp-navy p-3 text-[10px] leading-relaxed text-bp-border">{COMPANY_BRANDING_MIGRATION_SQL}</pre>
+                </details>
+              </section>
             </div>
           )}
 
@@ -268,11 +291,11 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
                   </li>
                   <li>
                     <strong className="text-bp-text">Execute Schema</strong>:
-                    Go to <strong>SQL Editor</strong>, switch to tab 2 in this modal, copy the SQL, paste and click <strong>Run</strong>.
+                    For a new database, run the full schema. For an existing database, run the company branding migration shown below the schema preview. Both are available in tab 2.
                   </li>
                   <li>
                     <strong className="text-bp-text">Create Storage Bucket</strong>:
-                    In Supabase, navigate to <strong>Storage</strong> &rarr; <strong>New Bucket</strong> &rarr; name it <code>construction-docs</code>. Keep it private.
+                    The branding migration creates the private <code>company-branding</code> bucket. Keep the existing <code>construction-docs</code> bucket private for attachments.
                   </li>
                   <li>
                     <strong className="text-bp-text">Copy API Credentials</strong>:
@@ -301,7 +324,7 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
                     Company & Projects
                   </div>
                   <p className="text-bp-muted text-[11px]">
-                    Editable company name (CHEN INFRA), duplicate code validation, Ongoing & Completed archives.
+                    Company settings, duplicate project-code validation, ongoing and completed project archives.
                   </p>
                 </div>
 

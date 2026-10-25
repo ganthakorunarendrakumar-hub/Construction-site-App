@@ -49,6 +49,8 @@ import { AddEmployeeModal } from './AddEmployeeModal';
 import { RecordPaymentModal } from './RecordPaymentModal';
 import { AttachmentFileLink, AttachmentLinks } from './AttachmentSections';
 import { getLocalDateString, getLocalDateStringOffset, getLocalMonthStartString, getLocalYearStartString } from '../utils/dateUtils';
+import { useCompanyBranding } from '../contexts/CompanyBrandingContext';
+import { CompanyLogo } from './CompanyLogo';
 
 interface AttendanceViewProps {
   currentUser: UserProfile;
@@ -63,6 +65,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   onNavigateHome,
   onNavigateProjects
 }) => {
+  const { companyName, companyLogoUrl } = useCompanyBranding();
   // Navigation State
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroupId || null);
   const [activeTab, setActiveTab] = useState<'mark' | 'employees' | 'history' | 'salary' | 'reports'>('mark');
@@ -518,14 +521,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       toDate: reportToDate,
       upToDate: reportUpToDate,
       groupName,
+      companyName: companyName || 'BuildPulse ERP',
       summaries: reportSummaries,
       records: reportRecords,
       payments: paymentRecords
     });
 
+    const companyFilePrefix = (companyName || 'BuildPulse').replace(/[^a-zA-Z0-9]/g, '_');
     const filename = reportMode === 'date_range'
-      ? `CHEN_INFRA_Attendance_Report_${reportFromDate}_to_${reportToDate}.csv`
-      : `CHEN_INFRA_Cumulative_Attendance_Report_UpTo_${reportUpToDate}.csv`;
+      ? `${companyFilePrefix}_Attendance_Report_${reportFromDate}_to_${reportToDate}.csv`
+      : `${companyFilePrefix}_Cumulative_Attendance_Report_UpTo_${reportUpToDate}.csv`;
 
     attendanceService.downloadCsv(filename, csv);
   };
@@ -547,8 +552,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-bp-muted">
         {onNavigateHome && (
-          <button onClick={onNavigateHome} className="hover:text-bp-text transition-colors">
-            CHEN INFRA
+          <button onClick={onNavigateHome} className="inline-flex items-center gap-1.5 hover:text-bp-text transition-colors">
+            <CompanyLogo src={companyLogoUrl} companyName={companyName} size={20} />
+            <span>{companyName || 'Company'}</span>
           </button>
         )}
         <ChevronRight className="w-3.5 h-3.5 text-bp-muted" />
@@ -656,7 +662,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               <Search className="w-4 h-4 text-bp-muted absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder="Search groups by name, leader, or site..."
+                aria-label="Search attendance groups"
                 value={groupSearch}
                 onChange={(e) => setGroupSearch(e.target.value)}
                 className="w-full pl-9 pr-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -1413,7 +1419,6 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                               <td className="px-4 py-3">
                                 <input
                                   type="text"
-                                  placeholder="e.g., Column casting grid 3"
                                   value={form.remarks}
                                   onChange={(e) => handleFormChange(emp.id, 'remarks', e.target.value)}
                                   className="w-full px-2.5 py-1 text-xs rounded-lg border border-bp-border focus:outline-none focus:border-bp-cyan"

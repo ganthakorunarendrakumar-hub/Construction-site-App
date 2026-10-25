@@ -177,7 +177,6 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 required
                 min="1"
                 step="1"
-                placeholder="e.g., 2000"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className="w-full px-3.5 py-2 text-xs font-mono font-bold text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -242,7 +241,6 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             </label>
             <input
               type="text"
-              placeholder="e.g., UPI-9988110022 or Cash Voucher #104"
               value={referenceNo}
               onChange={(e) => setReferenceNo(e.target.value)}
               className="w-full px-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -256,7 +254,6 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             </label>
             <input
               type="text"
-              placeholder="e.g., Weekly wages for slab casting work"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               className="w-full px-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"

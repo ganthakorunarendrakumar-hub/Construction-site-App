@@ -29,12 +29,15 @@ import { AuthAccount, UserRole, Project, Employee } from '../types';
 import { authService, ROLE_TITLES } from '../services/authService';
 import { attendanceService } from '../services/attendanceService';
 import { dataService } from '../services/dataService';
+import { useCompanyBranding } from '../contexts/CompanyBrandingContext';
+import { CompanyLogo } from './CompanyLogo';
 
 interface UserManagementViewProps {
   onNavigateHome: () => void;
 }
 
 export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNavigateHome }) => {
+  const { companyName, companyLogoUrl } = useCompanyBranding();
   const [accounts, setAccounts] = useState<AuthAccount[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -309,8 +312,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       
       {/* Top Breadcrumb */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-bp-muted">
-        <button onClick={onNavigateHome} className="hover:text-bp-text transition-colors">
-          CHEN INFRA
+        <button onClick={onNavigateHome} className="inline-flex items-center gap-1.5 hover:text-bp-text transition-colors">
+          <CompanyLogo src={companyLogoUrl} companyName={companyName} size={20} />
+          <span>{companyName || 'Company'}</span>
         </button>
         <ChevronRight className="w-3.5 h-3.5 text-bp-muted" />
         <span className="font-semibold text-bp-text flex items-center gap-1.5">
@@ -437,7 +441,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
           <Search className="w-4 h-4 text-bp-muted absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Search by name, User ID, email, or phone..."
+            aria-label="Search users"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -503,6 +507,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
               ) : (
                 filteredAccounts.map(acc => {
                   const linkedEmp = employees.find(e => e.id === acc.employee_id);
+                  const assignedProjects = (acc.assigned_projects || [])
+                    .map(projectId => projects.find(project => project.id === projectId))
+                    .filter((project): project is Project => Boolean(project));
                   const isLocked = acc.lockout_until && new Date(acc.lockout_until) > new Date();
 
                   return (
@@ -548,19 +555,18 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
 
                       {/* Assigned Sites */}
                       <td className="px-3 py-3.5">
-                        {acc.assigned_projects && acc.assigned_projects.length > 0 ? (
+                        {assignedProjects.length > 0 ? (
                           <div className="space-y-0.5">
-                            {acc.assigned_projects.map(pid => {
-                              const proj = projects.find(p => p.id === pid);
+                            {assignedProjects.map(proj => {
                               return (
-                                <span key={pid} className="inline-block px-1.5 py-0.5 mr-1 mb-0.5 rounded bg-bp-background border border-bp-border text-[10px] text-bp-text-subtle">
-                                  {proj?.name ? proj.name.slice(0, 20) + '...' : pid}
+                                <span key={proj.id} className="inline-block px-1.5 py-0.5 mr-1 mb-0.5 rounded bg-bp-background border border-bp-border text-[10px] text-bp-text-subtle">
+                                  {proj.name.slice(0, 20) + (proj.name.length > 20 ? '...' : '')}
                                 </span>
                               );
                             })}
                           </div>
                         ) : (
-                          <span className="text-bp-muted italic text-[11px]">All Sites (Unrestricted)</span>
+                          <span className="text-bp-muted text-[11px]">—</span>
                         )}
                       </td>
 
@@ -686,7 +692,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Anand Mahindra"
                     value={createFullName}
                     onChange={(e) => setCreateFullName(e.target.value)}
                     className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -700,7 +705,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                   <input
                     type="text"
                     required
-                    placeholder="e.g. CHEN-SUP-05"
                     value={createUserId}
                     onChange={(e) => setCreateUserId(e.target.value.toUpperCase())}
                     className="w-full px-3 py-2 text-xs font-mono font-bold text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -716,7 +720,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                   <input
                     type="email"
                     required
-                    placeholder="e.g. user@cheninfra.com"
                     value={createEmail}
                     onChange={(e) => setCreateEmail(e.target.value)}
                     className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -729,7 +732,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                   </label>
                   <input
                     type="tel"
-                    placeholder="e.g. +91 98450 00000"
                     value={createPhone}
                     onChange={(e) => setCreatePhone(e.target.value)}
                     className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -820,7 +822,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                     required
                     value={createPassword}
                     onChange={(e) => setCreatePassword(e.target.value)}
-                    placeholder="Set a password for the new account"
                     className="min-h-11 w-full rounded-lg border border-bp-border-strong bg-white py-2 pl-3 pr-12 text-sm text-bp-text"
                   />
                   <button

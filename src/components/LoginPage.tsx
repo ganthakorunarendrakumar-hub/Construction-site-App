@@ -96,10 +96,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   type="text"
                   autoComplete="username"
                   required
-                  placeholder="Enter your email address or User ID"
                   value={identifier}
                   onChange={e => setIdentifier(e.target.value)}
-                  className="min-h-12 w-full rounded-xl border border-bp-border-strong bg-white py-3 pl-10 pr-3.5 text-sm text-bp-text placeholder:text-bp-muted focus:border-bp-blue focus:outline-none focus:ring-2 focus:ring-bp-blue/15"
+                  className="min-h-12 w-full rounded-xl border border-bp-border-strong bg-white py-3 pl-10 pr-3.5 text-sm text-bp-text focus:border-bp-blue focus:outline-none focus:ring-2 focus:ring-bp-blue/15"
                 />
               </div>
             </div>
@@ -122,10 +121,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  placeholder="Enter your password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="min-h-12 w-full rounded-xl border border-bp-border-strong bg-white py-3 pl-10 pr-12 text-sm text-bp-text placeholder:text-bp-muted focus:border-bp-blue focus:outline-none focus:ring-2 focus:ring-bp-blue/15"
+                  className="min-h-12 w-full rounded-xl border border-bp-border-strong bg-white py-3 pl-10 pr-12 text-sm text-bp-text focus:border-bp-blue focus:outline-none focus:ring-2 focus:ring-bp-blue/15"
                 />
                 <button
                   type="button"

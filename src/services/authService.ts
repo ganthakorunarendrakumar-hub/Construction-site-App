@@ -9,6 +9,29 @@ const STORAGE_KEYS = {
   AUTH_LOGS: 'buildpulse_auth_audit_logs_v1'
 };
 
+type BootstrapStaffIdentity = Pick<AuthAccount, 'auth_uid' | 'user_id' | 'email' | 'full_name' | 'role' | 'company_id'>;
+
+// These exact rows were created by the former first-run sample-account seed.
+// Keep the administrator row; only remove the four confirmed sample staff rows.
+const LEGACY_BOOTSTRAP_STAFF: BootstrapStaffIdentity[] = [
+  { auth_uid: 'auth-usr-sup-02', user_id: 'CHEN-SUP-02', email: 'supervisor.ananya@cheninfra.com', full_name: 'Ananya Rao', role: 'site_supervisor', company_id: 'comp-apex-01' },
+  { auth_uid: 'auth-usr-acc-03', user_id: 'CHEN-ACC-03', email: 'accountant.kavita@cheninfra.com', full_name: 'Kavita Sundaram', role: 'accountant', company_id: 'comp-apex-01' },
+  { auth_uid: 'auth-usr-wrk-04', user_id: 'CHEN-WRK-04', email: 'worker.daniel@cheninfra.com', full_name: 'Daniel Murmu', role: 'worker', company_id: 'comp-apex-01' },
+  { auth_uid: 'auth-usr-str-05', user_id: 'CHEN-STR-05', email: 'storekeeper.manoj@cheninfra.com', full_name: 'Manoj Kumar', role: 'storekeeper', company_id: 'comp-apex-01' }
+];
+
+const LEGACY_COMPANY_ADMIN = {
+  auth_uid: 'auth-usr-admin-01',
+  user_id: 'CHEN-ADM-01',
+  email: 'admin@cheninfra.com',
+  company_id: 'comp-apex-01',
+  previous_names: ['Rajesh Sharma', 'Uma Mahesh'],
+  current_name: 'Uma Mahesh',
+  role: 'admin' as const,
+  created_by: 'system_bootstrap',
+  incorrect_project_assignments: ['proj-skyline-01', 'proj-emerald-02']
+};
+
 // ==========================================
 // CRYPTOGRAPHIC UTILITIES (Web Crypto API)
 // ==========================================
@@ -130,7 +153,7 @@ export const PROJECT_MANAGER_ROLES: UserRole[] = [
 // ==========================================
 // AUTHENTICATION & USER MANAGEMENT SERVICE
 // ==========================================
-class AuthService {
+export class AuthService {
   private accounts: AuthAccount[] = [];
   private currentSession: UserSession | null = null;
   private isInitialized = false;
@@ -140,132 +163,148 @@ class AuthService {
   }
 
   private isLocalAdminRecoveryMode(): boolean {
-    return import.meta.env.DEV === true && import.meta.env.MODE === 'local-recovery';
+    const environment = (import.meta as unknown as { env?: { DEV?: boolean; MODE?: string } }).env;
+    return environment?.DEV === true && environment.MODE === 'local-recovery';
+  }
+
+  private isLegacyBootstrapStaffAccount(account: AuthAccount): boolean {
+    return account.created_by === 'system_bootstrap' && LEGACY_BOOTSTRAP_STAFF.some(sample =>
+      sample.auth_uid === account.auth_uid
+      && sample.user_id === account.user_id
+      && sample.email === account.email.toLocaleLowerCase()
+      && sample.full_name === account.full_name
+      && sample.role === account.role
+      && sample.company_id === account.company_id
+    );
+  }
+
+  private matchesKnownCompanyAdminIdentity(identity: Pick<AuthAccount, 'auth_uid' | 'user_id' | 'email' | 'role' | 'company_id'>): boolean {
+    return identity.auth_uid === LEGACY_COMPANY_ADMIN.auth_uid
+      && identity.user_id === LEGACY_COMPANY_ADMIN.user_id
+      && identity.email.toLocaleLowerCase() === LEGACY_COMPANY_ADMIN.email
+      && identity.role === LEGACY_COMPANY_ADMIN.role
+      && identity.company_id === LEGACY_COMPANY_ADMIN.company_id;
+  }
+
+  private migrateKnownCompanyAdmin(account: AuthAccount): AuthAccount {
+    if (account.created_by !== LEGACY_COMPANY_ADMIN.created_by
+      || !this.matchesKnownCompanyAdminIdentity(account)
+      || !LEGACY_COMPANY_ADMIN.previous_names.includes(account.full_name)) {
+      return account;
+    }
+
+    const updated: AuthAccount = { ...account };
+    let changed = false;
+    if (updated.full_name !== LEGACY_COMPANY_ADMIN.current_name) {
+      updated.full_name = LEGACY_COMPANY_ADMIN.current_name;
+      changed = true;
+    }
+    if (updated.role_title !== ROLE_TITLES.admin) {
+      updated.role_title = ROLE_TITLES.admin;
+      changed = true;
+    }
+    if (Array.isArray(updated.assigned_projects)) {
+      const incorrectAssignments = new Set(LEGACY_COMPANY_ADMIN.incorrect_project_assignments);
+      const remainingAssignments = updated.assigned_projects.filter(projectId => !incorrectAssignments.has(projectId));
+      if (remainingAssignments.length !== updated.assigned_projects.length) {
+        updated.assigned_projects = remainingAssignments;
+        changed = true;
+      }
+    }
+    if (changed) updated.updated_at = new Date().toISOString();
+    return updated;
   }
 
   /**
-   * Initialize local accounts and use the existing fresh-install seed outside
-   * the owner-only recovery mode.
+   * Load the authoritative local account store. Fresh installs stay empty until
+   * the owner uses the explicit local recovery flow; they never get preset users.
    */
   public async ensureInitialized(): Promise<void> {
     if (this.isInitialized) return;
 
+    let stored: string | null;
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
-      if (stored) {
-        this.accounts = JSON.parse(stored);
-        this.isInitialized = true;
-        return;
-      }
-    } catch (e) {
-      if (this.isLocalAdminRecoveryMode()) {
-        // Recovery must never replace a missing or malformed account store with
-        // the normal preset accounts. The recovery screen validates the store
-        // and fails closed if it exists but cannot be parsed.
-        this.accounts = [];
-        this.isInitialized = true;
-        return;
-      }
-      console.warn('Failed reading stored auth accounts, re-seeding.', e);
+      stored = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
+    } catch {
+      throw new Error('Saved user-account data cannot be read. No account records were changed.');
     }
 
-    if (this.isLocalAdminRecoveryMode()) {
-      // The ordinary initialization path creates preset users when no store
-      // exists. Skip that behavior during owner recovery so no default account
-      // or password is introduced.
+    if (stored === null) {
       this.accounts = [];
       this.isInitialized = true;
       return;
     }
 
-    // Default Seed Accounts with real PBKDF2 cryptography
-    const defaultPassword = 'ChenInfra@2026';
-
-    const seedConfigs: Array<{
-      auth_uid: string;
-      user_id: string;
-      email: string;
-      full_name: string;
-      role: UserRole;
-      phone: string;
-      assigned_projects?: string[];
-      employee_id?: string;
-    }> = [
-      {
-        auth_uid: 'auth-usr-admin-01',
-        user_id: 'CHEN-ADM-01',
-        email: 'admin@cheninfra.com',
-        full_name: 'Rajesh Sharma',
-        role: 'admin',
-        phone: '+91 98450 11223',
-        assigned_projects: ['proj-skyline-01', 'proj-emerald-02']
-      },
-      {
-        auth_uid: 'auth-usr-sup-02',
-        user_id: 'CHEN-SUP-02',
-        email: 'supervisor.ananya@cheninfra.com',
-        full_name: 'Ananya Rao',
-        role: 'site_supervisor',
-        phone: '+91 97410 77889',
-        assigned_projects: ['proj-skyline-01']
-      },
-      {
-        auth_uid: 'auth-usr-acc-03',
-        user_id: 'CHEN-ACC-03',
-        email: 'accountant.kavita@cheninfra.com',
-        full_name: 'Kavita Sundaram',
-        role: 'accountant',
-        phone: '+91 98190 66778',
-        assigned_projects: ['proj-skyline-01', 'proj-emerald-02']
-      },
-      {
-        auth_uid: 'auth-usr-wrk-04',
-        user_id: 'CHEN-WRK-04',
-        email: 'worker.daniel@cheninfra.com',
-        full_name: 'Daniel Murmu',
-        role: 'worker',
-        phone: '+91 98452 33441',
-        assigned_projects: ['proj-skyline-01'],
-        employee_id: 'emp-dan-001'
-      },
-      {
-        auth_uid: 'auth-usr-str-05',
-        user_id: 'CHEN-STR-05',
-        email: 'storekeeper.manoj@cheninfra.com',
-        full_name: 'Manoj Kumar',
-        role: 'storekeeper',
-        phone: '+91 94480 33221',
-        assigned_projects: ['proj-skyline-01']
-      }
-    ];
-
-    const seededAccounts: AuthAccount[] = [];
-    for (const cfg of seedConfigs) {
-      const salt = AuthCrypto.generateSalt(16);
-      const hash = await AuthCrypto.hashPassword(defaultPassword, salt);
-      seededAccounts.push({
-        auth_uid: cfg.auth_uid,
-        user_id: cfg.user_id,
-        email: cfg.email,
-        full_name: cfg.full_name,
-        role: cfg.role,
-        role_title: ROLE_TITLES[cfg.role] || 'Team Member',
-        company_id: 'comp-apex-01',
-        phone: cfg.phone,
-        assigned_projects: cfg.assigned_projects || [],
-        employee_id: cfg.employee_id,
-        status: 'active',
-        password_hash: hash,
-        password_salt: salt,
-        failed_attempts: 0,
-        created_at: new Date('2026-01-10T09:00:00Z').toISOString(),
-        updated_at: new Date('2026-01-10T09:00:00Z').toISOString(),
-        created_by: 'system_bootstrap'
-      });
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(stored);
+    } catch {
+      throw new Error('Saved user-account data is unreadable. No account records were changed.');
     }
 
-    this.accounts = seededAccounts;
-    this.saveAccountsToStorage();
+    const validAccountArray = Array.isArray(parsed) && parsed.every((value: unknown) => {
+      if (!value || typeof value !== 'object') return false;
+      const account = value as Partial<AuthAccount>;
+      return typeof account.auth_uid === 'string'
+        && typeof account.user_id === 'string'
+        && typeof account.email === 'string'
+        && typeof account.full_name === 'string'
+        && typeof account.role === 'string'
+        && typeof account.company_id === 'string'
+        && typeof account.password_hash === 'string'
+        && typeof account.password_salt === 'string';
+    });
+    if (!validAccountArray) {
+      throw new Error('Saved user-account data is invalid. No account records were changed.');
+    }
+
+    const storedAccounts = parsed as AuthAccount[];
+    const accounts = storedAccounts
+      .filter(account => !this.isLegacyBootstrapStaffAccount(account))
+      .map(account => this.migrateKnownCompanyAdmin(account));
+    const accountsChanged = JSON.stringify(accounts) !== JSON.stringify(storedAccounts);
+
+    let updatedSession: UserSession | null = null;
+    const previousSession = localStorage.getItem(STORAGE_KEYS.SESSION);
+    if (previousSession) {
+      try {
+        const session = JSON.parse(previousSession) as UserSession;
+        const administrator = accounts.find(account => this.matchesKnownCompanyAdminIdentity(account));
+        if (administrator && this.matchesKnownCompanyAdminIdentity(session)) {
+          updatedSession = {
+            ...session,
+            full_name: administrator.full_name,
+            role_title: administrator.role_title,
+            assigned_projects: administrator.assigned_projects || []
+          };
+        }
+      } catch {
+        // A malformed session is already treated as unauthenticated by initSession.
+      }
+    }
+    const sessionChanged = Boolean(updatedSession && JSON.stringify(updatedSession) !== previousSession);
+
+    if (accountsChanged || sessionChanged) {
+      try {
+        if (accountsChanged) localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(accounts));
+        if (sessionChanged && updatedSession) localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(updatedSession));
+      } catch {
+        // Restore the exact pre-migration values if either profile write fails.
+        try {
+          localStorage.setItem(STORAGE_KEYS.ACCOUNTS, stored);
+          if (previousSession !== null) localStorage.setItem(STORAGE_KEYS.SESSION, previousSession);
+        } catch {
+          // Surface the original failure; do not continue with partial in-memory state.
+        }
+        throw new Error('The verified Company Administrator profile could not be updated. No password or business records were changed.');
+      }
+    }
+
+    this.accounts = accounts;
+    if (sessionChanged && updatedSession) {
+      this.currentSession = updatedSession;
+      this.syncDataServiceUser(updatedSession);
+    }
     this.isInitialized = true;
   }
 
@@ -745,7 +784,8 @@ class AuthService {
     }
 
     // Password setup: provided password or secure auto-generated temporary password
-    const pwdToHash = input.initial_password?.trim() || 'ChenInfra@2026';
+    const pwdToHash = input.initial_password?.trim();
+    if (!pwdToHash) throw new Error('An initial password is required for new accounts.');
     if (pwdToHash.length < 8) {
       throw new Error('Initial password must be at least 8 characters.');
     }

@@ -491,7 +491,6 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
             type="text"
             value={newTypeInput}
             onChange={(e) => setNewTypeInput(e.target.value)}
-            placeholder="Enter custom masonry type (e.g. Wire-cut Clay Bricks, Cellular Lightweight Blocks)"
             className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
           />
           <button
@@ -514,9 +513,9 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
               <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-2.5" />
               <input
                 type="text"
+                aria-label="Search brick and block types"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search brick or block type..."
                 className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
               />
             </div>
@@ -747,7 +746,6 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
                     {txBrickType === 'Other' && (
                       <input
                         type="text"
-                        placeholder="Enter custom type"
                         value={customTypeInput}
                         onChange={(e) => setCustomTypeInput(e.target.value)}
                         className="mt-1.5 w-full py-2 px-3 rounded-xl border border-bp-border"
@@ -766,7 +764,6 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
                         required
                         value={txQty}
                         onChange={(e) => setTxQty(e.target.value)}
-                        placeholder="e.g. 2000"
                         className="w-full py-2 px-3 rounded-xl border border-bp-border font-mono"
                       />
                       <select
@@ -797,7 +794,6 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
                       type="text"
                       value={supplierName}
                       onChange={(e) => setSupplierName(e.target.value)}
-                      placeholder="e.g. SIPOREX / Local Brick Kiln"
                       className="w-full py-2 px-3 rounded-xl border border-bp-border"
                     />
                   </div>
@@ -810,7 +806,6 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
                       type="text"
                       value={invoiceNumber}
                       onChange={(e) => setInvoiceNumber(e.target.value)}
-                      placeholder="e.g. INV-BLK-104"
                       className="w-full py-2 px-3 rounded-xl border border-bp-border font-mono"
                     />
                   </div>
@@ -820,7 +815,6 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
                       type="text"
                       value={challanNumber}
                       onChange={(e) => setChallanNumber(e.target.value)}
-                      placeholder="e.g. KA-02-CD-5678"
                       className="w-full py-2 px-3 rounded-xl border border-bp-border"
                     />
                   </div>
@@ -832,7 +826,6 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
                     type="text"
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="e.g. 6-inch solid blocks for basement perimeter wall"
                     className="w-full py-2 px-3 rounded-xl border border-bp-border"
                   />
                 </div>
@@ -880,7 +873,6 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
                   rows={3}
                   value={reversalReason}
                   onChange={(e) => setReversalReason(e.target.value)}
-                  placeholder="e.g. Pallet count miscalculated on gate entry."
                   className="w-full p-2.5 border border-bp-border rounded-xl"
                 />
               </div>

@@ -72,6 +72,9 @@ export interface Company {
   address?: string;
   gstin?: string;
   logo_url?: string;
+  watermark_enabled?: boolean;
+  watermark_opacity?: number;
+  watermark_size?: number;
   created_at: string;
   updated_at: string;
 }
@@ -389,6 +392,101 @@ export interface VehicleHireRecord {
   working_hours: number;
   remarks?: string;
   attachments?: TransactionAttachments;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type VehicleFuelType = 'diesel' | 'petrol' | 'electric' | 'other';
+export type VehicleHireBillingBasis = 'daily' | 'monthly';
+export type VehicleHireDateRule = 'inclusive' | 'exclusive';
+export type VehicleAssetCondition = 'available' | 'maintenance';
+
+/** A registered company vehicle. New contract and movement records reference this stable asset ID. */
+export interface VehicleAssetRecord {
+  id: string;
+  company_id: string;
+  vehicle_equipment_id: string;
+  vehicle_type: string;
+  vehicle_category: string;
+  vendor: string;
+  model: string;
+  fuel_type: VehicleFuelType;
+  registration_number?: string;
+  project_id: string;
+  project_name: string;
+  site_id?: string;
+  site_name: string;
+  condition: VehicleAssetCondition;
+  remarks?: string;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleTypeRecord {
+  id: string;
+  company_id: string;
+  name: string;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+}
+
+/** A dated rental of a registered vehicle, with the chosen billing rule stored for auditability. */
+export interface VehicleRentalRecord {
+  id: string;
+  company_id: string;
+  asset_id: string;
+  project_id: string;
+  project_name: string;
+  site_id?: string;
+  site_name: string;
+  in_date: string;
+  out_date: string;
+  billing_basis: VehicleHireBillingBasis;
+  date_rule: VehicleHireDateRule;
+  rent_per_month?: number;
+  rent_per_day?: number;
+  total_months: number;
+  total_days: number;
+  billable_days: number;
+  estimated_hire_cost: number;
+  remarks?: string;
+  attachments?: TransactionAttachments;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleWorkingSession {
+  id: string;
+  start_time: string;
+  stop_time: string;
+  duration_minutes: number;
+}
+
+/** Append-only vehicle movement/work record. Session durations are actual working time. */
+export interface VehicleMovementRecord {
+  id: string;
+  company_id: string;
+  asset_id: string;
+  project_id: string;
+  project_name: string;
+  site_id?: string;
+  site_name: string;
+  operator_name: string;
+  work_date: string;
+  sessions: VehicleWorkingSession[];
+  total_working_minutes: number;
+  idle_minutes: number;
+  scheduled_minutes: number;
+  idle_reason?: string;
+  remarks?: string;
+  idempotency_key: string;
   created_by: string;
   created_by_name: string;
   created_at: string;

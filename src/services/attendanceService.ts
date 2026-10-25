@@ -1531,6 +1531,7 @@ class AttendanceService {
     toDate?: string;
     upToDate?: string;
     groupName: string;
+    companyName?: string;
     summaries: EmployeeSalarySummary[];
     records: DailyAttendanceRecord[];
     payments: SalaryPaymentRecord[];
@@ -1542,7 +1543,7 @@ class AttendanceService {
       return `"${s}"`;
     };
 
-    lines.push(escapeCsv('CHEN INFRA - BUILDPULSE ERP'));
+    lines.push(escapeCsv(`${params.companyName || 'BuildPulse ERP'}`));
     lines.push(
       params.reportType === 'date_range'
         ? escapeCsv(`GROUP ATTENDANCE & PAYROLL REPORT (${params.fromDate} to ${params.toDate})`)

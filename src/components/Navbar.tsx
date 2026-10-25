@@ -17,10 +17,12 @@ import {
 } from 'lucide-react';
 import { UserProfile, SupabaseConfig } from '../types';
 import { authService } from '../services/authService';
+import { CompanyLogo } from './CompanyLogo';
 
 interface NavbarProps {
   currentUser: UserProfile;
   companyName: string;
+  companyLogoUrl?: string;
   activeView: string;
   onOpenCloudSetup: () => void;
   onNavigateHome: () => void;
@@ -45,6 +47,7 @@ type NavigationItem = {
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   companyName,
+  companyLogoUrl,
   activeView,
   onOpenCloudSetup,
   onNavigateHome,
@@ -133,6 +136,13 @@ export const Navbar: React.FC<NavbarProps> = ({
     .slice(0, 2)
     .toUpperCase();
 
+  const renderCompanyIdentity = (compact = false) => companyName.trim() ? (
+    <div className={`flex min-w-0 items-center gap-2 ${compact ? 'px-4 pb-2 sm:px-6' : 'mt-3 border-t border-bp-border px-5 pt-3'}`}>
+      <CompanyLogo src={companyLogoUrl} companyName={companyName} size={compact ? 28 : 30} />
+      <span className="min-w-0 break-words text-xs font-semibold leading-snug text-bp-text">{companyName}</span>
+    </div>
+  ) : null;
+
   const openProfileDetails = () => {
     setShowProfileMenu(false);
     setShowMobileMenu(false);
@@ -177,7 +187,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="block truncate text-sm font-semibold text-bp-text">{currentUser.full_name}</span>
           <span className="block truncate text-xs text-bp-muted">{currentUser.email}</span>
           <span className="mt-1 block truncate text-[11px] font-medium text-bp-blue">{currentUser.role_title}</span>
-          <span className="block truncate text-[11px] text-bp-muted">{companyName}</span>
+          <span className="mt-1 flex min-w-0 items-center gap-2 text-[11px] text-bp-muted">
+            <CompanyLogo src={companyLogoUrl} companyName={companyName} size={22} />
+            <span className="min-w-0 break-words">{companyName || 'Company name not configured'}</span>
+          </span>
         </span>
       </div>
       <div className="bp-profile-menu-actions" aria-label="Profile options">
@@ -253,6 +266,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
+        {renderCompanyIdentity(true)}
+
         {showMobileMenu && (
           <div id="buildpulse-mobile-navigation" className="bp-mobile-menu px-4 pb-4 sm:px-6">
             <p className="bp-nav-caption">Workspace</p>
@@ -295,7 +310,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       </header>
 
       <aside className="bp-sidebar sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col lg:flex" aria-label="Application navigation">
-        <div className="px-5 pb-6 pt-6">
+        <div className="px-5 pb-5 pt-6">
           <button type="button" onClick={onNavigateHome} className="bp-brand-button w-full" aria-label="BuildPulse overview">
             <span className="bp-brand-mark"><HardHat className="h-5 w-5" aria-hidden="true" /></span>
             <span className="min-w-0 text-left">
@@ -306,6 +321,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="mt-0.5 block truncate text-[11px] text-bp-muted">Construction Management</span>
             </span>
           </button>
+          {renderCompanyIdentity()}
         </div>
 
         <div className="bp-sidebar-divider mx-5" />

@@ -108,7 +108,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
           {step === 'request' ? (
             <form onSubmit={handleRequestCode} className="space-y-4">
               <p className="text-xs text-bp-muted">
-                Enter your registered <strong>Email Address</strong> or unique <strong>User ID</strong> (e.g., <code className="bg-bp-background px-1.5 py-0.5 rounded border border-bp-border font-mono text-bp-text">CHEN-ADM-01</code>). A secure 6-digit verification code will be generated.
+                Enter your registered <strong>Email Address</strong> or unique <strong>User ID</strong>. A secure 6-digit verification code will be generated.
               </p>
 
               <div>
@@ -120,7 +120,6 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                   <input
                     type="text"
                     required
-                    placeholder="admin@cheninfra.com or CHEN-ADM-01"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     className="w-full pl-9 pr-3.5 py-2.5 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -185,7 +184,6 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                   type="text"
                   required
                   maxLength={6}
-                  placeholder="e.g. 123456"
                   value={resetCode}
                   onChange={(e) => setResetCode(e.target.value.replace(/[^0-9]/g, ''))}
                   className="w-full px-3 py-2 text-center text-base tracking-widest bp-numeric font-bold text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -199,7 +197,6 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                 <input
                   type="password"
                   required
-                  placeholder="Enter new strong password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -213,7 +210,6 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                 <input
                   type="password"
                   required
-                  placeholder="Re-enter new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"

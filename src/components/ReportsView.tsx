@@ -30,6 +30,8 @@ import {
   UnifiedTransaction
 } from '../services/reportService';
 import { getLocalDateString, getLocalDateStringOffset, getLocalMonthStartString, getLocalYearStartString } from '../utils/dateUtils';
+import { useCompanyBranding } from '../contexts/CompanyBrandingContext';
+import { CompanyLogo } from './CompanyLogo';
 
 interface ReportsViewProps {
   initialProjectId?: string;
@@ -44,6 +46,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   onNavigateHome,
   onOpenProject
 }) => {
+  const { companyName, companyLogoUrl } = useCompanyBranding();
   // Mode selection: 1. Date Range Report | 2. Total Report Up To Date
   const [reportMode, setReportMode] = useState<'date_range' | 'up_to_date'>('date_range');
 
@@ -136,7 +139,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     setIsExporting(true);
     try {
       const company = await dataService.getCompany();
-      const compName = company.name || 'CHEN INFRA';
+      const compName = company.name || companyName || 'BuildPulse';
 
       if (reportMode === 'date_range' && dateRangeReport) {
         const csv = reportService.generateDateRangeCsv(dateRangeReport, compName);
@@ -171,8 +174,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-bp-muted">
         {onNavigateHome && (
-          <button onClick={onNavigateHome} className="hover:text-bp-text transition-colors">
-            CHEN INFRA
+          <button onClick={onNavigateHome} className="inline-flex items-center gap-1.5 hover:text-bp-text transition-colors">
+            <CompanyLogo src={companyLogoUrl} companyName={companyName} size={20} />
+            <span>{companyName || 'Company'}</span>
           </button>
         )}
         <ChevronRight className="w-3.5 h-3.5 text-bp-muted" />
@@ -430,7 +434,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               onChange={(e) => setSelectedProjectId(e.target.value)}
               className="w-full px-3 py-2 bg-white text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
             >
-              <option value="all">All Projects (CHEN INFRA Portfolio)</option>
+              <option value="all">All Projects</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} ({p.code})
@@ -467,7 +471,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <Search className="w-3.5 h-3.5 text-bp-muted absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder="e.g., UltraTech, Tata, Sponges, Helmets..."
+                aria-label="Search material, vendor, or document"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-white text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"

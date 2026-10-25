@@ -278,7 +278,6 @@ export const CementPage: React.FC<CementPageProps> = ({
               required
               value={newBrandName}
               onChange={(e) => setNewBrandName(e.target.value)}
-              placeholder="e.g. Shree Cement / Bangur Cement"
               className="w-full text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
             />
             {addBrandError && <p className="text-[11px] text-bp-muted mt-1">{addBrandError}</p>}
@@ -314,9 +313,9 @@ export const CementPage: React.FC<CementPageProps> = ({
               <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-2.5" />
               <input
                 type="text"
+                aria-label="Search cement brands"
                 value={brandSearch}
                 onChange={(e) => setBrandSearch(e.target.value)}
-                placeholder="Filter by brand name (e.g. UltraTech, Dalmia, Ramco)..."
                 className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
               />
             </div>

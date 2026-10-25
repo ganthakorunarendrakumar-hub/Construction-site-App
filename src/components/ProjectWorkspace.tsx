@@ -576,7 +576,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="e.g., HVAC Ducts & Insulation, Solar Equipment"
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan font-medium"
@@ -587,7 +586,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 <label className="block font-semibold text-bp-text uppercase mb-1">Description / Typical Items</label>
                 <textarea
                   rows={2}
-                  placeholder="e.g., Flexible ducts, damping sheets, acoustic insulation foam..."
                   value={newCatDesc}
                   onChange={(e) => setNewCatDesc(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
@@ -599,7 +597,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   <label className="block font-semibold text-bp-text uppercase mb-1">Default Unit</label>
                   <input
                     type="text"
-                    placeholder="Nos, Meters, kg, Sq.Ft"
                     value={newCatUnit}
                     onChange={(e) => setNewCatUnit(e.target.value)}
                     className="w-full px-3.5 py-2.5 border border-bp-border rounded-xl focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan font-medium"

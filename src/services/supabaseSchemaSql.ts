@@ -20,6 +20,12 @@ CREATE TABLE IF NOT EXISTS public.companies (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
+-- Company branding settings are stored on the existing company record.
+ALTER TABLE public.companies
+    ADD COLUMN IF NOT EXISTS watermark_enabled BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS watermark_opacity NUMERIC(4,2) NOT NULL DEFAULT 6,
+    ADD COLUMN IF NOT EXISTS watermark_size INTEGER NOT NULL DEFAULT 280;
+
 -- 3. User Profiles table (Linked to auth.users in Supabase)
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -158,6 +164,23 @@ ALTER TABLE public.material_locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.material_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
+CREATE POLICY "Users can view their own profile"
+    ON public.profiles FOR SELECT TO authenticated
+    USING (id = auth.uid());
+
+-- Company members can read their company branding; only company admins can edit it.
+DROP POLICY IF EXISTS "Company members can view company settings" ON public.companies;
+CREATE POLICY "Company members can view company settings"
+    ON public.companies FOR SELECT TO authenticated
+    USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "Company admins can update company settings" ON public.companies;
+CREATE POLICY "Company admins can update company settings"
+    ON public.companies FOR UPDATE TO authenticated
+    USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
+    WITH CHECK (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+
 -- Helper function to fetch current authenticated user profile
 CREATE OR REPLACE FUNCTION public.current_user_profile()
 RETURNS public.profiles AS $$
@@ -235,4 +258,83 @@ CREATE POLICY "Only admins can mark transaction reversals"
 -- CREATE POLICY "Allow authenticated upload on construction-docs"
 -- ON storage.objects FOR INSERT TO authenticated
 -- WITH CHECK (bucket_id = 'construction-docs');
+
+-- Company logos use a private, company-scoped bucket. Object paths begin with company_id.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('company-branding', 'company-branding', false)
+ON CONFLICT (id) DO UPDATE SET public = false;
+
+DROP POLICY IF EXISTS "Company members can read their company branding" ON storage.objects;
+CREATE POLICY "Company members can read their company branding"
+    ON storage.objects FOR SELECT TO authenticated
+    USING (
+        bucket_id = 'company-branding'
+        AND (storage.foldername(name))[1] IN (
+            SELECT company_id::text FROM public.profiles WHERE id = auth.uid()
+        )
+    );
+
+DROP POLICY IF EXISTS "Company admins can upload their company branding" ON storage.objects;
+CREATE POLICY "Company admins can upload their company branding"
+    ON storage.objects FOR INSERT TO authenticated
+    WITH CHECK (
+        bucket_id = 'company-branding'
+        AND (storage.foldername(name))[1] IN (
+            SELECT company_id::text FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+`;
+
+/**
+ * Additive, rerunnable migration for an existing Supabase installation.
+ * It changes only company branding columns, policies, and the private logo bucket.
+ */
+export const COMPANY_BRANDING_MIGRATION_SQL = `
+ALTER TABLE public.companies
+    ADD COLUMN IF NOT EXISTS watermark_enabled BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS watermark_opacity NUMERIC(4,2) NOT NULL DEFAULT 6,
+    ADD COLUMN IF NOT EXISTS watermark_size INTEGER NOT NULL DEFAULT 280;
+
+ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
+CREATE POLICY "Users can view their own profile"
+    ON public.profiles FOR SELECT TO authenticated
+    USING (id = auth.uid());
+
+DROP POLICY IF EXISTS "Company members can view company settings" ON public.companies;
+CREATE POLICY "Company members can view company settings"
+    ON public.companies FOR SELECT TO authenticated
+    USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "Company admins can update company settings" ON public.companies;
+CREATE POLICY "Company admins can update company settings"
+    ON public.companies FOR UPDATE TO authenticated
+    USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
+    WITH CHECK (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('company-branding', 'company-branding', false)
+ON CONFLICT (id) DO UPDATE SET public = false;
+
+DROP POLICY IF EXISTS "Company members can read their company branding" ON storage.objects;
+CREATE POLICY "Company members can read their company branding"
+    ON storage.objects FOR SELECT TO authenticated
+    USING (
+        bucket_id = 'company-branding'
+        AND (storage.foldername(name))[1] IN (
+            SELECT company_id::text FROM public.profiles WHERE id = auth.uid()
+        )
+    );
+
+DROP POLICY IF EXISTS "Company admins can upload their company branding" ON storage.objects;
+CREATE POLICY "Company admins can upload their company branding"
+    ON storage.objects FOR INSERT TO authenticated
+    WITH CHECK (
+        bucket_id = 'company-branding'
+        AND (storage.foldername(name))[1] IN (
+            SELECT company_id::text FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
 `;

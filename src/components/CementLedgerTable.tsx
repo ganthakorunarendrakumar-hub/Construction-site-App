@@ -153,9 +153,9 @@ export const CementLedgerTable: React.FC<CementLedgerTableProps> = ({
             <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-3" />
             <input
               type="text"
+              aria-label="Search cement ledger"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by brand, invoice #, challan, supplier, or supervisor..."
               className="w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
             />
           </div>
@@ -492,7 +492,6 @@ export const CementLedgerTable: React.FC<CementLedgerTableProps> = ({
                   rows={3}
                   value={reversalReason}
                   onChange={(e) => setReversalReason(e.target.value)}
-                  placeholder="e.g. Data entry error: 100 bags recorded instead of 10 bags."
                   className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
                 />
               </div>

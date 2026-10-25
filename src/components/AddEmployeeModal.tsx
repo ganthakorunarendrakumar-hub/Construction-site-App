@@ -460,7 +460,6 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               <input
                 type="text"
                 required
-                placeholder="e.g., Rameshwar Soren"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full px-3.5 py-2 text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -473,7 +472,6 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               </label>
               <input
                 type="tel"
-                placeholder="+91 98450 00000"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full px-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -556,7 +554,6 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               </label>
               <input
                 type="text"
-                placeholder="e.g., Worker Shed #4, Skyline Project Site"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 className="w-full px-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -653,7 +650,6 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
             </label>
             <input
               type="text"
-              placeholder="e.g., Specializes in beam staging, safety certified, 8 years experience"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               className="w-full px-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"

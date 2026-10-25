@@ -128,7 +128,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       return;
     }
     if (!code.trim()) {
-      setErrorMessage('Unique project code is required (e.g. PRJ-2026-005).');
+      setErrorMessage('Unique project code is required.');
       return;
     }
     if (!clientName.trim()) {
@@ -304,8 +304,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Skyline Commercial Tower - Phase 1"
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text placeholder-[#64748B] focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                 />
               </div>
 
@@ -321,7 +320,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                     required
                     value={code}
                     onChange={(e) => setCode(e.target.value.toUpperCase())}
-                    placeholder="PRJ-2026-004"
                     className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text font-mono focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                   />
                 </div>
@@ -337,7 +335,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   required
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  placeholder="e.g. Brigade Realty Infrastructure"
                   className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                 />
               </div>
@@ -354,7 +351,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                     required
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g. Hyderabad, Telangana"
                     className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                   />
                 </div>
@@ -427,7 +423,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Plot / Survey No., Landmark, Zone"
                   className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                 />
               </div>
@@ -441,7 +436,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Scope of work, structural details, concrete grades..."
                   className="w-full text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
                 />
               </div>

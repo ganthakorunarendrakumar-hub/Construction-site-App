@@ -477,7 +477,6 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
             type="text"
             value={newSizeInput}
             onChange={(e) => setNewSizeInput(e.target.value)}
-            placeholder="e.g. 6 mm GSB / 50 mm ballast"
             className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
           />
           <button
@@ -500,9 +499,9 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
               <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-2.5" />
               <input
                 type="text"
+                aria-label="Search aggregate sizes"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search aggregate size..."
                 className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
               />
             </div>
@@ -756,7 +755,6 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
                     {txSize === 'Other' && (
                       <input
                         type="text"
-                        placeholder="e.g. 50 mm ballast"
                         value={customSize}
                         onChange={(e) => setCustomSize(e.target.value)}
                         className="mt-1.5 w-full py-2 px-3 rounded-xl border border-bp-border"
@@ -775,7 +773,6 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
                         required
                         value={txQty}
                         onChange={(e) => setTxQty(e.target.value)}
-                        placeholder="e.g. 20"
                         className="w-full py-2 px-3 rounded-xl border border-bp-border font-mono"
                       />
                       <select
@@ -908,7 +905,6 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
                       type="text"
                       value={supplierName}
                       onChange={(e) => setSupplierName(e.target.value)}
-                      placeholder="e.g. Hills Stone Crusher Hub"
                       className="w-full py-2 px-3 rounded-xl border border-bp-border"
                     />
                   </div>
@@ -921,7 +917,6 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
                       type="text"
                       value={invoiceNumber}
                       onChange={(e) => setInvoiceNumber(e.target.value)}
-                      placeholder="e.g. INV-AGG-88"
                       className="w-full py-2 px-3 rounded-xl border border-bp-border font-mono"
                     />
                   </div>
@@ -931,7 +926,6 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
                       type="text"
                       value={challanNumber}
                       onChange={(e) => setChallanNumber(e.target.value)}
-                      placeholder="e.g. WB-4491"
                       className="w-full py-2 px-3 rounded-xl border border-bp-border font-mono"
                     />
                   </div>
@@ -943,7 +937,6 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
                     type="text"
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="e.g. Blue granite 20mm for slab mix"
                     className="w-full py-2 px-3 rounded-xl border border-bp-border"
                   />
                 </div>
@@ -981,7 +974,6 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
                   rows={3}
                   value={reversalReason}
                   onChange={(e) => setReversalReason(e.target.value)}
-                  placeholder="e.g. Weighbridge gross tare difference corrected."
                   className="w-full p-2.5 border border-bp-border rounded-xl"
                 />
               </div>

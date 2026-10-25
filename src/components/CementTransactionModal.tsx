@@ -417,7 +417,6 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                       required
                       value={customBrandName}
                       onChange={(e) => setCustomBrandName(e.target.value)}
-                      placeholder="Specify custom manufacturer/brand name"
                       className="w-full text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
                     />
                   </div>
@@ -487,7 +486,6 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                     required
                     value={quantityBags}
                     onChange={(e) => setQuantityBags(e.target.value)}
-                    placeholder="e.g. 100"
                     className="w-full text-sm font-mono font-bold px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
                   />
                   <span className="absolute right-3.5 top-2.5 text-xs text-bp-muted font-normal">
@@ -513,7 +511,6 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                     type="text"
                     value={supplierName}
                     onChange={(e) => setSupplierName(e.target.value)}
-                    placeholder="e.g. Sri Balaji Materials"
                     className="w-full text-xs px-3 py-2 rounded-xl border border-bp-border bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
@@ -526,7 +523,6 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                     type="text"
                     value={invoiceNumber}
                     onChange={(e) => setInvoiceNumber(e.target.value)}
-                    placeholder="INV-2026-901"
                     className="w-full text-xs px-3 py-2 rounded-xl border border-bp-border bg-white text-bp-text font-mono focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
@@ -539,7 +535,6 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                     type="text"
                     value={challanNumber}
                     onChange={(e) => setChallanNumber(e.target.value)}
-                    placeholder="DC-BLR-4019"
                     className="w-full text-xs px-3 py-2 rounded-xl border border-bp-border bg-white text-bp-text font-mono focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
@@ -553,7 +548,6 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                   type="text"
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="e.g. 53-grade OPC cement batch. Poured on 4th floor slab."
                   className="w-full text-xs px-3 py-2 rounded-xl border border-bp-border bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
                 />
               </div>

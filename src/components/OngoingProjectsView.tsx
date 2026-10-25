@@ -135,10 +135,10 @@ export const OngoingProjectsView: React.FC<OngoingProjectsViewProps> = ({
           <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-3" />
           <input
             type="text"
+            aria-label="Search ongoing projects"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search projects, client, code, manager..."
-            className="w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text placeholder-[#64748B] focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
+            className="w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
           />
         </div>
 

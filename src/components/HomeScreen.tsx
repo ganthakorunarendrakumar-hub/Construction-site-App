@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Plus,
   CheckCircle2,
@@ -11,16 +11,25 @@ import {
   User,
   FileSpreadsheet,
   Users,
-  ShieldCheck
+  ShieldCheck,
+  Settings2,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Company, Project, UserProfile } from '../types';
+import { CompanyLogo } from './CompanyLogo';
 
 interface HomeScreenProps {
   company: Company;
+  companyLogoDisplayUrl?: string;
   ongoingProjects: Project[];
   completedProjects: Project[];
   currentUser: UserProfile;
   onUpdateCompanyName: (newName: string) => Promise<void>;
+  onSaveCompanyBranding: (
+    settings: { watermark_enabled: boolean; watermark_opacity: number; watermark_size: number },
+    logoFile?: File
+  ) => Promise<void>;
   onNavigateCreateProject: () => void;
   onNavigateOngoing: () => void;
   onNavigateCompleted: () => void;
@@ -32,10 +41,12 @@ interface HomeScreenProps {
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   company,
+  companyLogoDisplayUrl,
   ongoingProjects,
   completedProjects,
   currentUser,
   onUpdateCompanyName,
+  onSaveCompanyBranding,
   onNavigateCreateProject,
   onNavigateOngoing,
   onNavigateCompleted,
@@ -48,9 +59,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [editNameValue, setEditNameValue] = useState(company.name);
   const [isSavingName, setIsSavingName] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [isBrandingSettingsOpen, setIsBrandingSettingsOpen] = useState(false);
+  const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | undefined>(companyLogoDisplayUrl);
+  const [brandingError, setBrandingError] = useState<string | null>(null);
+  const [brandingNotice, setBrandingNotice] = useState<string | null>(null);
+  const [isSavingBranding, setIsSavingBranding] = useState(false);
+  const [watermarkEnabled, setWatermarkEnabled] = useState(company.watermark_enabled === true);
+  const [watermarkOpacity, setWatermarkOpacity] = useState(company.watermark_opacity ?? 6);
+  const [watermarkSize, setWatermarkSize] = useState(company.watermark_size ?? 280);
 
   const canEditCompany = currentUser.role === 'admin';
   const canCreateProject = currentUser.role === 'admin' || currentUser.role === 'project_manager';
+  const companyNameConfigured = Boolean(company.name.trim());
+
+  useEffect(() => {
+    let previewUrl: string | undefined;
+    if (selectedLogoFile) {
+      previewUrl = URL.createObjectURL(selectedLogoFile);
+      setLogoPreview(previewUrl);
+    } else {
+      setLogoPreview(companyLogoDisplayUrl);
+    }
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [selectedLogoFile, companyLogoDisplayUrl]);
+
+  useEffect(() => {
+    setEditNameValue(company.name);
+    setWatermarkEnabled(company.watermark_enabled === true);
+    setWatermarkOpacity(company.watermark_opacity ?? 6);
+    setWatermarkSize(company.watermark_size ?? 280);
+  }, [company.name, company.watermark_enabled, company.watermark_opacity, company.watermark_size]);
 
   const handleSaveCompanyName = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +111,62 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   };
 
+  const handleLogoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = '';
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setBrandingError('Choose a PNG, JPG, or WebP image.');
+      return;
+    }
+    if (file.size <= 0 || file.size > 512 * 1024) {
+      setBrandingError('Company logos must be 512 KB or smaller.');
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    const preview = new Image();
+    preview.onload = () => {
+      URL.revokeObjectURL(previewUrl);
+      setBrandingError(null);
+      setBrandingNotice(null);
+      setSelectedLogoFile(file);
+    };
+    preview.onerror = () => {
+      URL.revokeObjectURL(previewUrl);
+      setBrandingError('The selected file is not a readable image. Your current logo is unchanged.');
+    };
+    preview.src = previewUrl;
+  };
+
+  const resetBrandingDraft = () => {
+    setSelectedLogoFile(null);
+    setWatermarkEnabled(company.watermark_enabled === true);
+    setWatermarkOpacity(company.watermark_opacity ?? 6);
+    setWatermarkSize(company.watermark_size ?? 280);
+    setBrandingError(null);
+    setBrandingNotice(null);
+  };
+
+  const handleSaveBranding = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBrandingError(null);
+    setBrandingNotice(null);
+    setIsSavingBranding(true);
+    try {
+      await onSaveCompanyBranding({
+        watermark_enabled: watermarkEnabled,
+        watermark_opacity: Number(watermarkOpacity),
+        watermark_size: Number(watermarkSize)
+      }, selectedLogoFile || undefined);
+      setSelectedLogoFile(null);
+      setBrandingNotice('Company branding settings saved.');
+    } catch (error) {
+      setBrandingError(error instanceof Error ? error.message : 'Company branding could not be saved.');
+    } finally {
+      setIsSavingBranding(false);
+    }
+  };
+
   return (
     <div className="space-y-5 animate-in fade-in duration-150">
       
@@ -81,14 +178,49 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               Company overview
             </h1>
 
-            {/* Editable Company Name */}
-            {isEditingName ? (
+            {/* Company identity and setup */}
+            {!companyNameConfigured && canEditCompany ? (
+              <form onSubmit={handleSaveCompanyName} className="max-w-xl space-y-2 pt-2">
+                <h2 className="text-sm font-semibold text-white">Set Up Your Company</h2>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <CompanyLogo src={companyLogoDisplayUrl} companyName={company.name} size={36} className="border border-white/20 bg-white" />
+                  <label className="sr-only" htmlFor="company-name-setup">Company Name</label>
+                  <input
+                    id="company-name-setup"
+                    type="text"
+                    value={editNameValue}
+                    onChange={event => setEditNameValue(event.target.value)}
+                    autoComplete="organization"
+                    maxLength={255}
+                    required
+                    className="min-h-10 w-full rounded-xl border border-bp-cyan bg-white px-3 py-2 text-sm font-semibold text-bp-text focus:outline-none focus:ring-2 focus:ring-bp-cyan sm:max-w-sm"
+                    aria-label="Company Name"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSavingName || !editNameValue.trim()}
+                    className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-bp-cyan px-4 py-2 text-xs font-semibold text-bp-navy transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Check className="h-4 w-4" />
+                    Save Company Name
+                  </button>
+                </div>
+                {editError && <p role="alert" className="text-xs text-rose-200">{editError}</p>}
+              </form>
+            ) : !companyNameConfigured ? (
+              <p className="pt-1 text-sm text-white/75">Company name has not been configured.</p>
+            ) : isEditingName ? (
               <form onSubmit={handleSaveCompanyName} className="flex flex-wrap items-center gap-2 pt-1">
+                <CompanyLogo src={companyLogoDisplayUrl} companyName={company.name} size={32} className="border border-white/20 bg-white" />
                 <input
                   type="text"
+                  aria-label="Company Name"
+                  autoComplete="organization"
+                  maxLength={255}
+                  required
                   value={editNameValue}
                   onChange={(e) => setEditNameValue(e.target.value)}
-                  className="bg-bp-background text-bp-text font-semibold text-lg px-3 py-1.5 rounded-xl border border-bp-cyan focus:outline-none focus:ring-1 focus:ring-bp-cyan w-full sm:w-80"
+                  className="w-full rounded-xl border border-bp-cyan bg-bp-background px-3 py-1.5 text-lg font-semibold text-bp-text focus:outline-none focus:ring-1 focus:ring-bp-cyan sm:w-80"
                   autoFocus
                 />
                 <button
@@ -114,17 +246,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {editError && <p className="w-full text-xs text-rose-200">{editError}</p>}
               </form>
             ) : (
-              <div className="flex items-center gap-2 pt-0.5">
-                <span className="text-sm font-semibold text-bp-border sm:text-base">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 pt-0.5">
+                <CompanyLogo src={companyLogoDisplayUrl} companyName={company.name} size={34} className="border border-white/20 bg-white" />
+                <span className="max-w-full break-words text-sm font-semibold text-white/85 sm:text-base">
                   {company.name}
                 </span>
                 {canEditCompany && (
                   <button
-                    onClick={() => setIsEditingName(true)}
+                    type="button"
+                    onClick={() => { setEditNameValue(company.name); setEditError(null); setIsEditingName(true); }}
                     className="rounded-lg p-1 text-bp-border-strong transition-colors hover:bg-white/10 hover:text-white"
                     title="Edit company name"
+                    aria-label="Edit company name"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {canEditCompany && (
+                  <button
+                    type="button"
+                    onClick={() => { setBrandingError(null); setBrandingNotice(null); setIsBrandingSettingsOpen(value => !value); }}
+                    className="ml-1 inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-white/20"
+                    aria-expanded={isBrandingSettingsOpen}
+                  >
+                    <Settings2 className="h-3.5 w-3.5" />
+                    Company branding
                   </button>
                 )}
               </div>
@@ -142,6 +288,92 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
         </div>
       </section>
+
+      {isBrandingSettingsOpen && canEditCompany && companyNameConfigured && (
+        <section className="rounded-2xl border border-bp-border bg-white p-4 shadow-xs sm:p-5" aria-labelledby="company-branding-heading">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 id="company-branding-heading" className="text-base font-semibold text-bp-text">Company Logo Watermark</h2>
+              <p className="mt-0.5 text-xs text-bp-muted">Manage the company logo and optional background watermark.</p>
+            </div>
+            <button type="button" onClick={() => setIsBrandingSettingsOpen(false)} className="rounded-lg p-2 text-bp-muted hover:bg-bp-background" aria-label="Close company branding settings">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSaveBranding} className="space-y-4">
+            {brandingError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{brandingError}</p>}
+            {brandingNotice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{brandingNotice}</p>}
+
+            <div className="flex flex-col gap-4 rounded-xl border border-bp-border bg-bp-background p-3 sm:flex-row sm:items-center">
+              <CompanyLogo src={logoPreview} companyName={company.name} size={68} className="border border-bp-border bg-white p-2" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-bp-text">Company Logo</p>
+                <p className="mt-0.5 text-xs text-bp-muted">PNG, JPG, or WebP; maximum 512 KB. The BuildPulse mark is shown when no company logo is saved.</p>
+                <label className="mt-2 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-bp-border-strong bg-white px-3 py-2 text-xs font-semibold text-bp-navy hover:border-bp-cyan">
+                  <Upload className="h-4 w-4" />
+                  {selectedLogoFile ? 'Choose a different logo' : 'Upload or select logo'}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoFileChange} className="sr-only" aria-label="Upload company logo" />
+                </label>
+                {!logoPreview && <span className="ml-2 inline-flex items-center gap-1 text-xs text-bp-muted"><ImageIcon className="h-3.5 w-3.5" /> No logo selected</span>}
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
+              <div className="space-y-3 rounded-xl border border-bp-border p-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <label htmlFor="company-watermark-toggle" className="text-sm font-semibold text-bp-text">Enable Watermark</label>
+                    <p className="mt-0.5 text-xs text-bp-muted">Show the company logo behind application pages.</p>
+                  </div>
+                  <input
+                    id="company-watermark-toggle"
+                    type="checkbox"
+                    checked={watermarkEnabled}
+                    disabled={!company.logo_url && !selectedLogoFile}
+                    onChange={event => setWatermarkEnabled(event.target.checked)}
+                    className="h-5 w-5 accent-bp-blue disabled:cursor-not-allowed"
+                    aria-label="Enable company logo watermark"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4 border-t border-bp-border pt-3">
+                  <span className="text-sm font-semibold text-bp-text">Disable Watermark</span>
+                  <button type="button" onClick={() => setWatermarkEnabled(false)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${!watermarkEnabled ? 'bg-bp-navy text-white' : 'border border-bp-border text-bp-muted hover:bg-bp-background'}`}>
+                    Disable
+                  </button>
+                </div>
+                <label className="block text-xs font-medium text-bp-text">
+                  Watermark opacity: {watermarkOpacity}%
+                  <input type="range" min="1" max="20" value={watermarkOpacity} onChange={event => setWatermarkOpacity(Number(event.target.value))} disabled={!watermarkEnabled} className="mt-2 block w-full accent-bp-blue disabled:opacity-50" />
+                </label>
+                <label className="block text-xs font-medium text-bp-text">
+                  Watermark size: {watermarkSize}px
+                  <input type="range" min="120" max="360" step="10" value={watermarkSize} onChange={event => setWatermarkSize(Number(event.target.value))} disabled={!watermarkEnabled} className="mt-2 block w-full accent-bp-blue disabled:opacity-50" />
+                </label>
+              </div>
+
+              <div className="flex min-h-48 items-center justify-center overflow-hidden rounded-xl border border-bp-border bg-bp-background p-4" aria-label="Watermark preview">
+                {watermarkEnabled && logoPreview ? (
+                  <img src={logoPreview} alt="Watermark preview" className="max-h-full max-w-full object-contain" style={{ width: Math.min(watermarkSize, 320), opacity: watermarkOpacity / 100 }} />
+                ) : (
+                  <div className="text-center text-bp-muted">
+                    <CompanyLogo src={logoPreview} companyName={company.name} size={48} className="mx-auto mb-2 bg-white" />
+                    <p className="text-xs">Watermark is disabled.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-bp-border pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <button type="button" onClick={() => { resetBrandingDraft(); setIsBrandingSettingsOpen(false); }} disabled={isSavingBranding} className="min-h-10 rounded-xl px-3 text-xs font-semibold text-bp-muted hover:bg-bp-background disabled:opacity-50">Cancel</button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button type="button" onClick={() => { setWatermarkEnabled(false); setWatermarkOpacity(6); setWatermarkSize(280); }} disabled={isSavingBranding} className="min-h-10 rounded-xl border border-bp-border px-3 text-xs font-semibold text-bp-muted hover:bg-bp-background disabled:opacity-50">Reset to Default</button>
+                <button type="submit" disabled={isSavingBranding} className="min-h-10 rounded-xl bg-bp-navy px-4 text-xs font-semibold text-white hover:bg-bp-blue disabled:opacity-50">{isSavingBranding ? 'Saving…' : 'Save Settings'}</button>
+              </div>
+            </div>
+          </form>
+        </section>
+      )}
 
       {/* SECTION 4: REDESIGNED THREE MAIN OPERATION CARDS */}
       <section className="space-y-3">

@@ -106,10 +106,10 @@ export const CompletedProjectsView: React.FC<CompletedProjectsViewProps> = ({
           <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-3" />
           <input
             type="text"
+            aria-label="Search completed projects"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search completed projects by name, code, client, location..."
-            className="w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text placeholder-[#64748B] focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
+            className="w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan transition-colors"
           />
         </div>
       </div>
@@ -236,7 +236,6 @@ export const CompletedProjectsView: React.FC<CompletedProjectsViewProps> = ({
                   rows={3}
                   value={reopenReason}
                   onChange={(e) => setReopenReason(e.target.value)}
-                  placeholder="e.g. Additional punch-list finishing works approved; additional 50 bags cement requisitioned."
                   className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
                 />
               </div>

@@ -34,6 +34,7 @@ import { UserSession } from './types';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { CloudSetupModal } from './components/CloudSetupModal';
 import { ModalDismissalManager } from './components/ModalDismissalManager';
+import { CompanyBrandingContext } from './contexts/CompanyBrandingContext';
 
 type ViewMode = 
   | 'home' 
@@ -64,13 +65,17 @@ export default function App() {
   const [isCloudSetupOpen, setIsCloudSetupOpen] = useState(false);
 
   // Core Data state
-  const [company, setCompany] = useState<Company>({
-    id: 'comp-apex-01',
-    name: 'CHEN INFRA',
-    code: 'CHEN',
+  const [company, setCompany] = useState<Company>(() => ({
+    id: authService.getCurrentUser().company_id || 'comp-apex-01',
+    name: '',
+    code: '',
+    watermark_enabled: false,
+    watermark_opacity: 6,
+    watermark_size: 280,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
-  });
+  }));
+  const [companyLogoDisplayUrl, setCompanyLogoDisplayUrl] = useState<string | undefined>();
 
   const [session, setSession] = useState<UserSession | null>(() => authService.getSession());
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => authService.getCurrentUser());
@@ -131,6 +136,11 @@ export default function App() {
       ]);
 
       setCompany(comp);
+      try {
+        setCompanyLogoDisplayUrl(await dataService.resolveCompanyLogoUrl(comp.logo_url));
+      } catch {
+        setCompanyLogoDisplayUrl(undefined);
+      }
       setProjects(allProjects);
       setBrands(allBrands);
       setSupabaseConfig(dataService.getConfig());
@@ -151,7 +161,7 @@ export default function App() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [selectedProject]);
+  }, [selectedProject, currentUser.company_id]);
 
   const handleRefreshData = useCallback(async () => {
     await dataService.syncCloudState();
@@ -198,6 +208,23 @@ export default function App() {
   const handleUpdateCompanyName = async (newName: string) => {
     const updated = await dataService.updateCompanyName(newName);
     setCompany(updated);
+  };
+
+  const handleSaveCompanyBranding = async (
+    settings: { watermark_enabled: boolean; watermark_opacity: number; watermark_size: number },
+    logoFile?: File
+  ) => {
+    const logoUrl = logoFile ? await dataService.uploadCompanyLogo(logoFile) : company.logo_url;
+    const updated = await dataService.updateCompanySettings({
+      ...settings,
+      ...(logoUrl ? { logo_url: logoUrl } : {})
+    });
+    setCompany(updated);
+    try {
+      setCompanyLogoDisplayUrl(await dataService.resolveCompanyLogoUrl(updated.logo_url));
+    } catch {
+      setCompanyLogoDisplayUrl(undefined);
+    }
   };
 
   const handleCreateProject = async (projectData: any) => {
@@ -297,10 +324,12 @@ export default function App() {
   }
 
   return (
+    <CompanyBrandingContext.Provider value={{ companyName: company.name.trim(), companyLogoUrl: companyLogoDisplayUrl }}>
     <div className="bp-app-shell min-h-screen flex flex-col font-sans lg:flex-row">
       <Navbar
         currentUser={currentUser}
         companyName={company.name}
+        companyLogoUrl={companyLogoDisplayUrl}
         activeView={currentView}
         onOpenCloudSetup={() => setIsCloudSetupOpen(true)}
         onNavigateHome={() => setCurrentView('home')}
@@ -319,7 +348,22 @@ export default function App() {
       />
 
       {/* Main Content Viewport */}
-      <main className="bp-main-content min-w-0 w-full max-w-[1680px] flex-1 px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+      <div className="bp-main-viewport relative min-h-[calc(100vh-68px)] min-w-0 flex-1 lg:min-h-screen">
+      {company.watermark_enabled && companyLogoDisplayUrl && (
+        <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden" aria-hidden="true">
+          <img
+            src={companyLogoDisplayUrl}
+            alt=""
+            className="h-auto max-w-[78vw] object-contain"
+            style={{
+              width: company.watermark_size ?? 280,
+              maxWidth: 'min(78vw, 320px)',
+              opacity: (company.watermark_opacity ?? 6) / 100
+            }}
+          />
+        </div>
+      )}
+      <main className="bp-main-content relative min-w-0 w-full max-w-[1680px] flex-1 px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
         
         {/* ROLE-RESTRICTED VIEW: WORKER PORTAL (Restricted only to own records) */}
         {currentUser.role === 'worker' ? (
@@ -330,10 +374,12 @@ export default function App() {
             {currentView === 'home' && (
               <HomeScreen
                 company={company}
+                companyLogoDisplayUrl={companyLogoDisplayUrl}
                 ongoingProjects={ongoingProjects}
                 completedProjects={completedProjects}
                 currentUser={currentUser}
                 onUpdateCompanyName={handleUpdateCompanyName}
+                onSaveCompanyBranding={handleSaveCompanyBranding}
                 onNavigateCreateProject={() => setIsCreateProjectOpen(true)}
                 onNavigateOngoing={() => setCurrentView('ongoing_projects')}
                 onNavigateCompleted={() => setCurrentView('completed_projects')}
@@ -508,6 +554,7 @@ export default function App() {
         )}
 
       </main>
+      </div>
 
       {/* CREATE PROJECT MODAL */}
       <CreateProjectModal
@@ -537,5 +584,6 @@ export default function App() {
       <ModalDismissalManager />
 
     </div>
+    </CompanyBrandingContext.Provider>
   );
 }

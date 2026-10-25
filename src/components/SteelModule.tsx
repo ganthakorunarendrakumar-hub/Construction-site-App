@@ -544,7 +544,6 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
             type="text"
             value={newBrandInput}
             onChange={(e) => setNewBrandInput(e.target.value)}
-            placeholder="Enter custom steel brand (e.g. Jindal Panther, Rathi TMT)"
             className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
           />
           <button
@@ -565,7 +564,6 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
             type="text"
             value={newSizeInput}
             onChange={(e) => setNewSizeInput(e.target.value)}
-            placeholder="Enter diameter (e.g. 36 mm, 40 mm)"
             className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
           />
           <button
@@ -588,9 +586,9 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
               <Search className="w-4 h-4 text-bp-muted absolute left-3.5 top-2.5" />
               <input
                 type="text"
+                aria-label="Search steel brands and diameters"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search steel brand or diameter..."
                 className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan"
               />
             </div>
@@ -840,7 +838,6 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                     {txBrand === 'Other' && (
                       <input
                         type="text"
-                        placeholder="Enter brand name"
                         value={customBrandName}
                         onChange={(e) => setCustomBrandName(e.target.value)}
                         className="mt-1.5 w-full py-2 px-3 rounded-xl border border-bp-border"
@@ -862,7 +859,6 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                     {txDiameter === 'Other' && (
                       <input
                         type="text"
-                        placeholder="e.g. 36 mm"
                         value={customDiameter}
                         onChange={(e) => setCustomDiameter(e.target.value)}
                         className="mt-1.5 w-full py-2 px-3 rounded-xl border border-bp-border"
@@ -881,7 +877,6 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                         required
                         value={txQty}
                         onChange={(e) => setTxQty(e.target.value)}
-                        placeholder="e.g. 5000"
                         className="w-full py-2 px-3 rounded-xl border border-bp-border font-mono"
                       />
                       <select
@@ -914,7 +909,6 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                       type="text"
                       value={supplierName}
                       onChange={(e) => setSupplierName(e.target.value)}
-                      placeholder="e.g. Tata Steel Stockyard"
                       className="w-full py-2 px-3 rounded-xl border border-bp-border"
                     />
                   </div>
@@ -924,7 +918,6 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                       type="text"
                       value={invoiceNumber}
                       onChange={(e) => setInvoiceNumber(e.target.value)}
-                      placeholder="e.g. INV-ST-991"
                       className="w-full py-2 px-3 rounded-xl border border-bp-border font-mono"
                     />
                   </div>
@@ -936,7 +929,6 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                     type="text"
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="e.g. Fe 550D TMT Grade batch for slab beams"
                     className="w-full py-2 px-3 rounded-xl border border-bp-border"
                   />
                 </div>
@@ -985,7 +977,6 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                   rows={3}
                   value={reversalReason}
                   onChange={(e) => setReversalReason(e.target.value)}
-                  placeholder="e.g. Wrong diameter selected during delivery logging."
                   className="w-full p-2.5 border border-bp-border rounded-xl"
                 />
               </div>

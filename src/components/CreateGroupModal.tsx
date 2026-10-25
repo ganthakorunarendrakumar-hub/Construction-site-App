@@ -122,9 +122,6 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               <h2 className="text-base font-bold text-white">
                 {editingGroup ? 'Edit Worker Group' : 'Create New Worker Group'}
               </h2>
-              <p className="text-[11px] text-bp-muted">
-                Group-based workforce and gang management for CHEN INFRA
-              </p>
             </div>
           </div>
           <button
@@ -155,7 +152,6 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               <input
                 type="text"
                 required
-                placeholder="e.g., Dan Group, Ram Group, Tile Masons..."
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-3.5 py-2 text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
@@ -187,7 +183,6 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               <input
                 type="text"
                 required
-                placeholder="e.g., Daniel Murmu"
                 value={leaderName}
                 onChange={(e) => setLeaderName(e.target.value)}
                 className="w-full px-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -201,7 +196,6 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               </label>
               <input
                 type="tel"
-                placeholder="+91 98450 00000"
                 value={leaderPhone}
                 onChange={(e) => setLeaderPhone(e.target.value)}
                 className="w-full px-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -277,7 +271,6 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             </label>
             <textarea
               rows={2}
-              placeholder="e.g., Specialized in RCC casting, brickwork, floor slab bar bending..."
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               className="w-full px-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
