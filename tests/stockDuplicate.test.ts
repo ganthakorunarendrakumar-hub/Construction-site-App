@@ -15,6 +15,7 @@ const currentEntry = (overrides: Partial<StockEntryDuplicateIdentity> = {}): Sto
   itemName: 'UltraTech Cement',
   quantity: 50,
   unit: 'bags',
+  transactionType: 'receipt',
   createdBy: 'user-2',
   ...overrides
 });
@@ -26,6 +27,7 @@ const previousEntry = (overrides: Partial<PreviousStockEntryDuplicateData> = {})
   itemName: 'UltraTech Cement',
   quantity: 50,
   unit: 'Bags',
+  transactionType: 'receipt',
   createdBy: 'user-1',
   createdAt: new Date(now - 60 * 60 * 1000).toISOString(),
   createdByName: 'Previous User',
@@ -36,13 +38,17 @@ test('A: different user, same site, item, quantity and unit within 24 hours warn
   assert.equal(isPotentialDuplicateStockEntry(currentEntry(), previousEntry(), now), true);
 });
 
-test('B: a matching entry from the same user is not warned', () => {
-  assert.equal(isPotentialDuplicateStockEntry(currentEntry(), previousEntry({ createdBy: 'user-2' }), now), false);
+test('A: a matching entry from the same user still warns', () => {
+  assert.equal(isPotentialDuplicateStockEntry(currentEntry(), previousEntry({ createdBy: 'user-2' }), now), true);
 });
 
-test('a missing creator identity cannot be treated as a different user', () => {
-  assert.equal(isPotentialDuplicateStockEntry(currentEntry(), previousEntry({ createdBy: undefined }), now), false);
-  assert.equal(isPotentialDuplicateStockEntry(currentEntry({ createdBy: undefined }), previousEntry(), now), false);
+test('A: matching entries from different users warn', () => {
+  assert.equal(isPotentialDuplicateStockEntry(currentEntry(), previousEntry({ createdBy: 'user-3' }), now), true);
+});
+
+test('creator identity is optional for duplicate matching', () => {
+  assert.equal(isPotentialDuplicateStockEntry(currentEntry(), previousEntry({ createdBy: undefined }), now), true);
+  assert.equal(isPotentialDuplicateStockEntry(currentEntry({ createdBy: undefined }), previousEntry(), now), true);
 });
 
 test('C: a different quantity is not a duplicate', () => {
@@ -51,6 +57,10 @@ test('C: a different quantity is not a duplicate', () => {
 
 test('a different unit is not a duplicate', () => {
   assert.equal(isPotentialDuplicateStockEntry(currentEntry(), previousEntry({ unit: 'tonnes' }), now), false);
+});
+
+test('a different transaction type is not a duplicate', () => {
+  assert.equal(isPotentialDuplicateStockEntry(currentEntry(), previousEntry({ transactionType: 'usage' }), now), false);
 });
 
 test('D: a different project/site is not a duplicate', () => {

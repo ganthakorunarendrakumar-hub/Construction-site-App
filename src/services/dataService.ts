@@ -48,6 +48,19 @@ export class PossibleDuplicateStockEntryError extends Error {
   }
 }
 
+interface GenericDuplicateCheckInput {
+  projectId: string;
+  projectName?: string;
+  category: StandardCategoryKey;
+  transactionType: ExtendedTransactionType;
+  itemId?: string;
+  itemName: string;
+  brandName?: string;
+  diameterOrSize?: string;
+  unit: string;
+  quantity: number;
+}
+
 const generateUuid = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -2456,6 +2469,7 @@ class DataService {
     brandId: string;
     brandName: string;
     quantityBags: number;
+    transactionType: TransactionType;
   }): Promise<DuplicateStockEntryDetails | null> {
     const userId = this.currentUser.id;
     if (!userId) throw new StockEntryDuplicateCheckError();
@@ -2482,6 +2496,7 @@ class DataService {
         .eq('project_id', txInput.projectId)
         .eq('brand_id', txInput.brandId)
         .eq('quantity_bags', txInput.quantityBags)
+        .eq('transaction_type', txInput.transactionType)
         .gte('created_at', new Date(now - 24 * 60 * 60 * 1000).toISOString());
       if (error) throw error;
       return (data || []) as MaterialTransaction[];
@@ -2494,6 +2509,7 @@ class DataService {
       itemName: txInput.brandName,
       quantity: txInput.quantityBags,
       unit: 'bags',
+      transactionType: txInput.transactionType,
       createdBy: userId
     };
     const match = candidates
@@ -2504,6 +2520,7 @@ class DataService {
         itemName: record.brand_name,
         quantity: record.quantity_bags,
         unit: 'bags',
+        transactionType: record.transaction_type,
         createdBy: record.created_by,
         createdAt: record.created_at,
         createdByName: record.created_by_name,
@@ -2520,6 +2537,30 @@ class DataService {
       createdAt: match.created_at,
       createdByName: match.created_by_name || undefined
     };
+  }
+
+  public async checkCementTransactionDuplicate(txInput: {
+    projectId: string;
+    projectName?: string;
+    brandId: string;
+    brandName: string;
+    quantityBags: number;
+    transactionType: TransactionType;
+  }): Promise<DuplicateStockEntryDetails | null> {
+    const role = this.currentUser.role;
+    if (role === 'management_viewer') {
+      throw new Error('Access Denied: Management Viewers have read-only permissions and cannot submit material transactions.');
+    }
+    if (role === 'site_engineer' && (txInput.transactionType === 'receipt' || txInput.transactionType === 'opening_stock')) {
+      throw new Error('Access Denied: Site Engineers / Supervisors are permitted to record usage and damage, not material receipts.');
+    }
+    const project = await this.getProjectById(txInput.projectId);
+    if (!project) throw new Error('Project does not exist.');
+    if (project.status === 'completed' && role !== 'admin') {
+      throw new Error('This project is completed and locked. Only Company Administrators can record audited corrections on completed projects.');
+    }
+    const projectName = txInput.projectName || (await this.getProjectById(txInput.projectId))?.name || '';
+    return this.findRecentCementDuplicate({ ...txInput, projectName });
   }
 
   public async recordCementTransaction(txInput: {
@@ -2590,12 +2631,13 @@ class DataService {
       }
     }
 
-    const duplicate = await this.findRecentCementDuplicate({
+    const duplicate = await this.checkCementTransactionDuplicate({
       projectId: txInput.projectId,
       projectName: txInput.projectName || project.name,
       brandId: txInput.brandId,
       brandName: txInput.brandName,
-      quantityBags: qty
+      quantityBags: qty,
+      transactionType: txInput.transactionType
     });
     if (duplicate && !txInput.allowPossibleDuplicate) {
       throw new PossibleDuplicateStockEntryError(duplicate);
@@ -3409,6 +3451,79 @@ class DataService {
     };
   }
 
+  private async findRecentGenericDuplicate(
+    txInput: GenericDuplicateCheckInput,
+    candidates: GenericMaterialTransaction[]
+  ): Promise<DuplicateStockEntryDetails | null> {
+    if (!this.currentUser.id) throw new StockEntryDuplicateCheckError();
+
+    const catItems = await this.getCategoryItems(txInput.category);
+    const matchedItem = catItems.find(item => item.name.toLowerCase() === txInput.itemName.trim().toLowerCase());
+    const currentIdentity = {
+      projectId: txInput.projectId,
+      category: txInput.category,
+      itemId: txInput.itemId || matchedItem?.id,
+      itemName: txInput.itemName.trim(),
+      brandName: txInput.brandName?.trim(),
+      diameterOrSize: txInput.diameterOrSize?.trim(),
+      quantity: Number(txInput.quantity),
+      unit: txInput.unit.trim(),
+      transactionType: txInput.transactionType,
+      createdBy: this.currentUser.id
+    };
+    const duplicateRecord = candidates
+      .filter(record => isPotentialDuplicateStockEntry(currentIdentity, {
+        projectId: record.project_id,
+        category: record.category,
+        itemId: record.item_id,
+        itemName: record.item_name,
+        brandName: record.brand_name,
+        diameterOrSize: record.diameter_or_size,
+        quantity: record.quantity,
+        unit: record.unit,
+        transactionType: record.transaction_type,
+        createdBy: record.created_by,
+        createdAt: record.created_at,
+        createdByName: record.created_by_name,
+        isReversal: record.is_reversal
+      }))
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+
+    if (!duplicateRecord) return null;
+
+    const duplicateNameParts = [duplicateRecord.item_name].filter(Boolean);
+    for (const descriptor of [duplicateRecord.brand_name, duplicateRecord.diameter_or_size]) {
+      if (descriptor && !duplicateNameParts.some(part => part.toLowerCase() === descriptor.toLowerCase())) {
+        duplicateNameParts.push(descriptor);
+      }
+    }
+    return {
+      itemName: duplicateNameParts.join(' · ') || txInput.itemName.trim(),
+      quantity: duplicateRecord.quantity,
+      unit: duplicateRecord.unit,
+      projectName: txInput.projectName || (await this.getProjectById(txInput.projectId))?.name || '',
+      createdAt: duplicateRecord.created_at,
+      createdByName: duplicateRecord.created_by_name || undefined
+    };
+  }
+
+  public async checkGenericTransactionDuplicate(txInput: GenericDuplicateCheckInput): Promise<DuplicateStockEntryDetails | null> {
+    const role = this.currentUser.role;
+    if (role === 'management_viewer') {
+      throw new Error('Access Denied: Management Viewers have read-only permissions and cannot submit material transactions.');
+    }
+    if (role === 'site_engineer' && (txInput.transactionType === 'receipt' || txInput.transactionType === 'opening_stock')) {
+      throw new Error('Access Denied: Site Engineers / Supervisors are permitted to record usage, issues, and damages, not new stock receipts.');
+    }
+    const project = await this.getProjectById(txInput.projectId);
+    if (!project) throw new Error('Project not found.');
+    if (project.status === 'completed' && role !== 'admin') {
+      throw new Error('This project is completed and locked. Only Company Administrators can record audited corrections.');
+    }
+    const candidates = await this.getLatestGenericTransactions();
+    return this.findRecentGenericDuplicate(txInput, candidates);
+  }
+
   public async recordGenericTransaction(txInput: {
     projectId: string;
     projectName?: string;
@@ -3520,55 +3635,27 @@ class DataService {
       }
     }
 
+    const duplicate = await this.findRecentGenericDuplicate({
+      projectId: txInput.projectId,
+      projectName: txInput.projectName || project.name,
+      category: txInput.category,
+      transactionType: txInput.transactionType,
+      itemId: txInput.itemId,
+      itemName: txInput.itemName,
+      brandName: txInput.brandName,
+      diameterOrSize: txInput.diameterOrSize,
+      unit: txInput.unit,
+      quantity: qty
+    }, all);
+    if (duplicate && !txInput.allowPossibleDuplicate) {
+      throw new PossibleDuplicateStockEntryError(duplicate);
+    }
+
     const company = await this.getCompany();
     const catItemsForSub = await this.getCategoryItems(txInput.category);
     const matchedItem = catItemsForSub.find(i => i.name.toLowerCase() === txInput.itemName.trim().toLowerCase());
     const subcategory = txInput.subcategory || matchedItem?.subcategory;
     const itemId = txInput.itemId || matchedItem?.id;
-    const currentIdentity = {
-      projectId: txInput.projectId,
-      category: txInput.category,
-      itemId,
-      itemName: txInput.itemName.trim(),
-      brandName: txInput.brandName?.trim(),
-      diameterOrSize: txInput.diameterOrSize?.trim(),
-      quantity: qty,
-      unit: txInput.unit.trim(),
-      createdBy: this.currentUser.id
-    };
-    const duplicateRecord = all
-      .filter(record => isPotentialDuplicateStockEntry(currentIdentity, {
-        projectId: record.project_id,
-        category: record.category,
-        itemId: record.item_id,
-        itemName: record.item_name,
-        brandName: record.brand_name,
-        diameterOrSize: record.diameter_or_size,
-        quantity: record.quantity,
-        unit: record.unit,
-        createdBy: record.created_by,
-        createdAt: record.created_at,
-        createdByName: record.created_by_name,
-        isReversal: record.is_reversal
-      }))
-      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
-
-    if (duplicateRecord && !txInput.allowPossibleDuplicate) {
-      const duplicateNameParts = [duplicateRecord.item_name].filter(Boolean);
-      for (const descriptor of [duplicateRecord.brand_name, duplicateRecord.diameter_or_size]) {
-        if (descriptor && !duplicateNameParts.some(part => part.toLowerCase() === descriptor.toLowerCase())) {
-          duplicateNameParts.push(descriptor);
-        }
-      }
-      throw new PossibleDuplicateStockEntryError({
-        itemName: duplicateNameParts.join(' · ') || txInput.itemName.trim(),
-        quantity: duplicateRecord.quantity,
-        unit: duplicateRecord.unit,
-        projectName: txInput.projectName || project.name,
-        createdAt: duplicateRecord.created_at,
-        createdByName: duplicateRecord.created_by_name || undefined
-      });
-    }
 
     const newTx: GenericMaterialTransaction = {
       id: 'gtx-' + Math.random().toString(36).substring(2, 9) + '-' + Date.now().toString(36),

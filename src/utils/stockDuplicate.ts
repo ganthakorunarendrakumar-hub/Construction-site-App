@@ -7,6 +7,7 @@ export interface StockEntryDuplicateIdentity {
   diameterOrSize?: string;
   quantity: number;
   unit: string;
+  transactionType?: string;
   createdBy?: string;
 }
 
@@ -99,9 +100,9 @@ export const isPotentialDuplicateStockEntry = (
   previous: PreviousStockEntryDuplicateData,
   now = Date.now()
 ): boolean => {
-  if (!current.createdBy || !previous.createdBy || current.createdBy === previous.createdBy) return false;
   if (!current.projectId || current.projectId !== previous.projectId) return false;
   if (current.category !== previous.category) return false;
+  if (!current.transactionType || !previous.transactionType || current.transactionType !== previous.transactionType) return false;
   if (normalize(current.unit) !== normalize(previous.unit)) return false;
 
   const currentQuantity = Number(current.quantity);

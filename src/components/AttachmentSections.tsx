@@ -131,7 +131,7 @@ export const AttachmentSections: React.FC<AttachmentSectionsProps> = ({
   );
 
   return (
-    <div className="space-y-3 rounded-xl border border-bp-border bg-white p-3">
+    <div aria-busy={uploading !== null} className="space-y-3 rounded-xl border border-bp-border bg-white p-3">
       <div className="text-[11px] font-bold uppercase tracking-wider text-bp-text">Attachments</div>
       {error && <div className="rounded-lg bg-red-50 p-2 text-xs text-red-700">{error}</div>}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

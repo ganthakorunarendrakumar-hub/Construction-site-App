@@ -115,10 +115,21 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
   });
 
   // Handle open create modal
-  const handleCloseCreate = () => {
+  const handleCloseCreate = (force = false) => {
+    if (isSubmitting && !force) return;
     setIsCreateModalOpen(false);
+    setCreateFullName('');
+    setCreateUserId('');
+    setCreateRole('site_supervisor');
+    setCreateEmail('');
+    setCreatePhone('');
+    setCreateAssignedProjects([]);
+    setCreateEmployeeId('');
     setCreatePassword('');
     setShowCreatePassword(false);
+    setCreateRequireChange(true);
+    setCreateStatus('active');
+    setErrorMessage(null);
   };
 
   const handleOpenCreate = () => {
@@ -173,7 +184,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       });
 
       await loadData();
-      handleCloseCreate();
+      handleCloseCreate(true);
       setNoticeMessage(`Account created successfully for ${created.full_name} with User ID "${created.user_id}".`);
       setTimeout(() => setNoticeMessage(null), 6000);
     } catch (err: any) {
@@ -214,7 +225,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       });
 
       await loadData();
-      setEditingAccount(null);
+      handleCloseEdit(true);
       setNoticeMessage(`User profile for ${editFullName} updated successfully.`);
       setTimeout(() => setNoticeMessage(null), 6000);
     } catch (err: any) {
@@ -222,6 +233,19 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCloseEdit = (force = false) => {
+    if (isSubmitting && !force) return;
+    setEditingAccount(null);
+    setEditFullName('');
+    setEditEmail('');
+    setEditPhone('');
+    setEditRole('site_supervisor');
+    setEditAssignedProjects([]);
+    setEditEmployeeId('');
+    setEditStatus('active');
+    setErrorMessage(null);
   };
 
   // Toggle active status
@@ -246,7 +270,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
 
     try {
       await authService.adminResetUserPassword(resettingPasswordAccount.auth_uid, adminNewPassword);
-      handleClosePasswordReset();
+      handleClosePasswordReset(true);
       setNoticeMessage(`Password for ${resettingPasswordAccount.full_name} has been reset.`);
       setTimeout(() => setNoticeMessage(null), 5000);
     } catch (err: any) {
@@ -256,10 +280,12 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
     }
   };
 
-  const handleClosePasswordReset = () => {
+  const handleClosePasswordReset = (force = false) => {
+    if (isSubmitting && !force) return;
     setResettingPasswordAccount(null);
     setAdminNewPassword('');
     setShowAdminNewPassword(false);
+    setErrorMessage(null);
   };
 
   // Delete account
@@ -636,7 +662,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                 <h3 className="font-bold text-sm text-white">Register New User Account</h3>
               </div>
               <button
-                onClick={handleCloseCreate}
+                onClick={() => handleCloseCreate()}
+                disabled={isSubmitting}
                 className="text-bp-muted hover:text-white p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -824,7 +851,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
               <div className="pt-2 flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={handleCloseCreate}
+                  onClick={() => handleCloseCreate()}
+                  disabled={isSubmitting}
                   className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl"
                 >
                   Cancel
@@ -864,7 +892,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                 <Edit2 className="w-4 h-4 text-bp-cyan" />
                 <h3 className="font-bold text-sm text-white">Edit User: {editingAccount.user_id}</h3>
               </div>
-              <button onClick={() => setEditingAccount(null)} className="text-bp-muted hover:text-white p-1">
+              <button type="button" onClick={() => handleCloseEdit()} disabled={isSubmitting} className="text-bp-muted hover:text-white p-1 disabled:opacity-50">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -924,7 +952,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setEditingAccount(null)}
+                  onClick={() => handleCloseEdit()}
+                  disabled={isSubmitting}
                   className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl"
                 >
                   Cancel
@@ -953,7 +982,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                 <KeyRound className="w-4 h-4 text-bp-cyan" />
                 <h3 className="font-bold text-sm text-white">Reset Password: {resettingPasswordAccount.full_name}</h3>
               </div>
-              <button onClick={handleClosePasswordReset} className="text-bp-muted hover:text-white p-1">
+              <button type="button" onClick={() => handleClosePasswordReset()} disabled={isSubmitting} className="text-bp-muted hover:text-white p-1 disabled:opacity-50">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -991,7 +1020,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={handleClosePasswordReset}
+                  onClick={() => handleClosePasswordReset()}
+                  disabled={isSubmitting}
                   className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl"
                 >
                   Cancel

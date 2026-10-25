@@ -62,6 +62,16 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
     setTimeout(() => setCopiedSql(false), 2500);
   };
 
+  const handleClose = () => {
+    if (isTesting) return;
+    setUrl(config.url || '');
+    setAnonKey(config.anonKey || '');
+    setActiveTab('credentials');
+    setTestResult(null);
+    setCopiedSql(false);
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="relative bg-white rounded-2xl shadow-xl border border-bp-border w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -78,7 +88,8 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
+            disabled={isTesting}
             className="text-bp-border-strong hover:text-white p-1 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
@@ -352,7 +363,8 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
         {/* Modal Footer */}
         <div className="bg-bp-background px-6 py-3 border-t border-bp-border flex justify-end">
           <button
-            onClick={onClose}
+            onClick={handleClose}
+            disabled={isTesting}
             className="px-4 py-2 bg-bp-navy text-white font-semibold text-xs rounded-xl hover:bg-bp-navy-deep transition-colors"
           >
             Close

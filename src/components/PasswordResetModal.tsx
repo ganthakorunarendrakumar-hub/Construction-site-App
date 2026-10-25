@@ -86,7 +86,9 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={() => { if (!isLoading) onClose(); }}
+            disabled={isLoading}
             className="text-bp-muted hover:text-white p-1 rounded-lg hover:bg-bp-navy-light transition-colors"
           >
             <X className="w-5 h-5" />
@@ -129,7 +131,8 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={() => { if (!isLoading) onClose(); }}
+                  disabled={isLoading}
                   className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl transition-colors"
                 >
                   Cancel

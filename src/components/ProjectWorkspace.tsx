@@ -113,6 +113,25 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     loadCategoriesAndStats();
   }, [project.id]);
 
+  const openAddCategory = () => {
+    setNewCatName('');
+    setNewCatDesc('');
+    setNewCatUnit('Nos');
+    setNewCatReusable(false);
+    setCatError(null);
+    setIsAddCatModalOpen(true);
+  };
+
+  const closeAddCategory = () => {
+    if (catSaving) return;
+    setIsAddCatModalOpen(false);
+    setNewCatName('');
+    setNewCatDesc('');
+    setNewCatUnit('Nos');
+    setNewCatReusable(false);
+    setCatError(null);
+  };
+
   const handleAddCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCatError(null);
@@ -131,6 +150,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       });
       setNewCatName('');
       setNewCatDesc('');
+      setNewCatUnit('Nos');
+      setNewCatReusable(false);
       setIsAddCatModalOpen(false);
       await loadCategoriesAndStats();
     } catch (err: any) {
@@ -453,7 +474,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
               {isAdmin && (
                 <button
-                  onClick={() => setIsAddCatModalOpen(true)}
+                  onClick={openAddCategory}
                   className="px-3.5 py-1.5 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs self-start sm:self-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -537,7 +558,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 <SlidersHorizontal className="w-4 h-4 text-bp-text" />
                 Add Material Category
               </h3>
-              <button onClick={() => setIsAddCatModalOpen(false)} className="text-bp-muted hover:text-bp-text">
+              <button type="button" onClick={closeAddCategory} disabled={catSaving} className="text-bp-muted hover:text-bp-text disabled:opacity-50">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -600,7 +621,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               <div className="pt-3 border-t border-bp-border flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddCatModalOpen(false)}
+                  onClick={closeAddCategory}
+                  disabled={catSaving}
                   className="px-4 py-2 text-xs font-medium text-bp-muted hover:bg-bp-background rounded-xl transition-colors"
                 >
                   Cancel

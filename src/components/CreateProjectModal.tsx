@@ -218,6 +218,11 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     onClose();
   };
 
+  const handleUserClose = () => {
+    if (isSubmitting) return;
+    resetAndClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="relative bg-white rounded-2xl shadow-xl border border-bp-border w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -234,7 +239,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             </div>
           </div>
           <button
-            onClick={resetAndClose}
+            onClick={handleUserClose}
             className="text-bp-border-strong hover:text-white p-1 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
@@ -261,7 +266,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             <div className="pt-4 flex justify-center">
               <button
                 type="button"
-                onClick={resetAndClose}
+                onClick={handleUserClose}
                 className="px-6 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-bold rounded-xl transition-colors shadow-xs"
               >
                 Done & Return to Projects
@@ -463,7 +468,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             <div className="pt-4 border-t border-bp-border flex items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={resetAndClose}
+                onClick={handleUserClose}
                 className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl transition-colors"
               >
                 Cancel

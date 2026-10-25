@@ -21,7 +21,7 @@ export const DuplicateStockEntryDialog: React.FC<DuplicateStockEntryDialogProps>
     : createdAt.toLocaleString();
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-bp-navy-deep/70 p-4" role="alertdialog" aria-modal="true" aria-labelledby="duplicate-stock-title" aria-describedby="duplicate-stock-description">
+    <div data-bp-explicit-dismiss-only="true" className="fixed inset-0 z-[90] flex items-center justify-center bg-bp-navy-deep/70 p-4" role="alertdialog" aria-modal="true" aria-labelledby="duplicate-stock-title" aria-describedby="duplicate-stock-description">
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-bp-border bg-white shadow-2xl">
         <div className="flex items-start gap-3 border-b border-bp-border bg-amber-50/70 px-5 py-4 sm:px-6">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">

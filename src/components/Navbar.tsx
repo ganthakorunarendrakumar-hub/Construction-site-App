@@ -65,6 +65,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [editedName, setEditedName] = useState(currentUser.full_name);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const mobileHeaderRef = useRef<HTMLElement>(null);
+  const mobileMenuToggleRef = useRef<HTMLButtonElement>(null);
   const desktopProfileAreaRef = useRef<HTMLDivElement>(null);
   const mobileProfileAreaRef = useRef<HTMLDivElement>(null);
   const desktopProfileTriggerRef = useRef<HTMLButtonElement>(null);
@@ -76,20 +78,28 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, [currentUser.full_name]);
 
   useEffect(() => {
-    if (!showProfileMenu) return;
+    if (!showProfileMenu && !showMobileMenu) return;
 
     const closeOnOutsidePointer = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!desktopProfileAreaRef.current?.contains(target) && !mobileProfileAreaRef.current?.contains(target)) {
+      if (showProfileMenu && !desktopProfileAreaRef.current?.contains(target) && !mobileProfileAreaRef.current?.contains(target)) {
         setShowProfileMenu(false);
       }
+      if (showMobileMenu && !mobileHeaderRef.current?.contains(target)) setShowMobileMenu(false);
     };
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setShowProfileMenu(false);
-      const trigger = showMobileMenu ? mobileProfileTriggerRef.current : desktopProfileTriggerRef.current;
-      trigger?.focus();
+      if (showProfileMenu) {
+        setShowProfileMenu(false);
+        const trigger = showMobileMenu ? mobileProfileTriggerRef.current : desktopProfileTriggerRef.current;
+        trigger?.focus();
+        return;
+      }
+      if (showMobileMenu) {
+        setShowMobileMenu(false);
+        mobileMenuToggleRef.current?.focus();
+      }
     };
 
     document.addEventListener('pointerdown', closeOnOutsidePointer);
@@ -99,19 +109,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [showProfileMenu, showMobileMenu]);
-
-  useEffect(() => {
-    if (!showProfileDialog && !showEditProfileDialog) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setShowProfileDialog(false);
-        setShowEditProfileDialog(false);
-        setProfileError(null);
-      }
-    };
-    document.addEventListener('keydown', closeOnEscape);
-    return () => document.removeEventListener('keydown', closeOnEscape);
-  }, [showProfileDialog, showEditProfileDialog]);
 
   const projectsActive = [
     'ongoing_projects', 'completed_projects', 'project_workspace', 'cement_module',
@@ -153,6 +150,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const closeProfileDialogs = () => {
     setShowProfileDialog(false);
     setShowEditProfileDialog(false);
+    setEditedName(currentUser.full_name);
     setProfileError(null);
   };
 
@@ -230,7 +228,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      <header className="bp-mobile-header sticky top-0 z-40 lg:hidden">
+      <header ref={mobileHeaderRef} className="bp-mobile-header sticky top-0 z-40 lg:hidden">
         <div className="flex min-h-[68px] items-center justify-between gap-3 px-4 sm:px-6">
           <button type="button" onClick={onNavigateHome} className="bp-brand-button min-w-0" aria-label="BuildPulse overview">
             <span className="bp-brand-mark"><HardHat className="h-5 w-5" aria-hidden="true" /></span>
@@ -243,6 +241,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </span>
           </button>
           <button
+            ref={mobileMenuToggleRef}
             type="button"
             onClick={() => setShowMobileMenu(value => !value)}
             className="bp-menu-toggle"
@@ -358,7 +357,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       {(showProfileDialog || showEditProfileDialog) && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-bp-navy-deep/60 p-4 backdrop-blur-sm"
-          onMouseDown={event => { if (event.target === event.currentTarget) closeProfileDialogs(); }}
         >
           <section
             role="dialog"
@@ -378,7 +376,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <p className="text-xs text-white/75">{currentUser.role_title}</p>
                 </div>
               </div>
-              <button type="button" onClick={closeProfileDialogs} className="bp-profile-dialog-close" aria-label="Close profile dialog">
+              <button type="button" onClick={closeProfileDialogs} disabled={isSavingProfile} className="bp-profile-dialog-close disabled:opacity-50" aria-label="Close profile dialog">
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </header>
@@ -431,7 +429,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <p className="mt-2 text-xs text-bp-muted">Role, company, and access permissions can’t be changed here.</p>
                 </div>
                 <div className="flex flex-col-reverse gap-2 border-t border-bp-border pt-4 sm:flex-row sm:justify-end">
-                  <button type="button" onClick={closeProfileDialogs} className="bp-profile-secondary-button">Cancel</button>
+                  <button type="button" onClick={closeProfileDialogs} disabled={isSavingProfile} className="bp-profile-secondary-button disabled:opacity-50">Cancel</button>
                   <button type="submit" disabled={isSavingProfile || !editedName.trim()} className="bp-profile-primary-button disabled:cursor-not-allowed disabled:opacity-50">
                     {isSavingProfile ? 'Saving…' : 'Save changes'}
                   </button>

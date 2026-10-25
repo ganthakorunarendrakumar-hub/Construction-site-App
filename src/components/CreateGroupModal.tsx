@@ -128,7 +128,9 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
+            disabled={isSubmitting || uploadingPhoto}
             className="text-bp-muted hover:text-white p-1 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
@@ -287,7 +289,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
+              disabled={isSubmitting || uploadingPhoto}
               className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl transition-colors"
             >
               Cancel

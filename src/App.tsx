@@ -33,6 +33,7 @@ import { authService } from './services/authService';
 import { UserSession } from './types';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { CloudSetupModal } from './components/CloudSetupModal';
+import { ModalDismissalManager } from './components/ModalDismissalManager';
 
 type ViewMode = 
   | 'home' 
@@ -287,7 +288,12 @@ export default function App() {
 
   // Authentication Gate: Render secure individual login page if unauthenticated
   if (!session) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+    return (
+      <>
+        <LoginPage onLoginSuccess={handleLoginSuccess} />
+        <ModalDismissalManager />
+      </>
+    );
   }
 
   return (
@@ -527,6 +533,8 @@ export default function App() {
         onSaveConfig={handleSaveSupabaseConfig}
         onTestConnection={handleTestSupabaseConnection}
       />
+
+      <ModalDismissalManager />
 
     </div>
   );

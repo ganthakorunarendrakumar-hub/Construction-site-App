@@ -96,6 +96,7 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
   // Admin Add Custom Size
   const [isAddingSize, setIsAddingSize] = useState(false);
   const [newSizeInput, setNewSizeInput] = useState('');
+  const [isSavingSize, setIsSavingSize] = useState(false);
 
   // Reversal State
   const [reversalTarget, setReversalTarget] = useState<GenericMaterialTransaction | null>(null);
@@ -152,8 +153,6 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
     }
 
     const loc = locations.find(l => l.id === txLocationId);
-    if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
-
     const transactionInput: Parameters<typeof dataService.recordGenericTransaction>[0] = {
       projectId: project.id,
       projectName: project.name,
@@ -178,6 +177,15 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
 
     try {
       setIsSubmitting(true);
+      const duplicate = await dataService.checkGenericTransactionDuplicate(transactionInput);
+      if (duplicate) {
+        duplicateConfirmation.current.setPending(transactionInput);
+        setPendingDuplicateTransaction(transactionInput);
+        setDuplicateEntry(duplicate);
+        return;
+      }
+      if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
+
       const saved = await dataService.recordGenericTransaction(transactionInput);
 
       setSuccessSaved(saved);
@@ -200,6 +208,7 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
     setIsContinuingDuplicate(true);
     setIsSubmitting(true);
     try {
+      if (!hasTransactionAttachments(pendingDuplicateTransaction.attachments ?? emptyTransactionAttachments()) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
       const saved = await duplicateConfirmation.current.continue(input => dataService.recordGenericTransaction(input));
       if (!saved) return;
       setDuplicateEntry(null);
@@ -220,6 +229,57 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
     duplicateConfirmation.current.cancel();
     setDuplicateEntry(null);
     setPendingDuplicateTransaction(null);
+  };
+
+  const handleCloseTransactionModal = () => {
+    if (isSubmitting || isContinuingDuplicate || isUploading) return;
+    setIsModalOpen(false);
+    setTxSize('20 mm');
+    setCustomSize('');
+    setTxLocationId(locations[0]?.id || 'main-site');
+    setTxDate(getLocalDateString());
+    setTxType('receipt');
+    setTxQty('');
+    setTxUnit('tonnes');
+    setSupplierName('');
+    setInvoiceNumber('');
+    setChallanNumber('');
+    setRemarks('');
+    setAttachment(null);
+    setAttachments(emptyTransactionAttachments());
+    setFormError(null);
+    setSuccessSaved(null);
+    setShowDensityCalculator(false);
+    setConfiguredDensity('1.55');
+    setConvertInputQty('10');
+    setConvertFromUnit('tonnes');
+    setConvertToUnit('m3');
+    handleCancelDuplicate();
+  };
+
+  const handleCloseReversal = () => {
+    if (isReversing) return;
+    setReversalTarget(null);
+    setReversalReason('');
+  };
+
+  const closeAddSize = () => {
+    if (isSavingSize) return;
+    setIsAddingSize(false);
+    setNewSizeInput('');
+  };
+
+  const saveNewSize = async () => {
+    if (!newSizeInput.trim() || isSavingSize) return;
+    setIsSavingSize(true);
+    try {
+      await dataService.addAggregateSize(newSizeInput.trim());
+      setNewSizeInput('');
+      setIsAddingSize(false);
+      await loadModuleData();
+    } finally {
+      setIsSavingSize(false);
+    }
   };
 
   const handleReversalSubmit = async (e: React.FormEvent) => {
@@ -401,6 +461,7 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
 
         {isAdmin && activeTab === 'stock_overview' && (
           <button
+            data-bp-panel-trigger="aggregate-size"
             onClick={() => setIsAddingSize(!isAddingSize)}
             className="text-bp-text hover:underline font-semibold text-xs flex items-center gap-1 pb-2"
           >
@@ -411,7 +472,7 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
       </div>
 
       {isAddingSize && (
-        <div className="bg-white p-4 rounded-2xl border border-bp-border flex items-center gap-3 shadow-xs animate-in fade-in">
+        <div data-bp-dismissable-panel="aggregate-size" aria-busy={isSavingSize} className="bg-white p-4 rounded-2xl border border-bp-border flex items-center gap-3 shadow-xs animate-in fade-in">
           <input
             type="text"
             value={newSizeInput}
@@ -420,18 +481,14 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
             className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
           />
           <button
-            onClick={async () => {
-              if (!newSizeInput.trim()) return;
-              await dataService.addAggregateSize(newSizeInput.trim());
-              setNewSizeInput('');
-              setIsAddingSize(false);
-              await loadModuleData();
-            }}
+            type="button"
+            onClick={saveNewSize}
+            disabled={isSavingSize}
             className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold text-xs rounded-xl shadow-xs"
           >
-            Save Size
+            {isSavingSize ? 'Saving…' : 'Save Size'}
           </button>
-          <button onClick={() => setIsAddingSize(false)} className="text-xs text-bp-muted">Cancel</button>
+          <button type="button" data-bp-dismiss onClick={closeAddSize} disabled={isSavingSize} className="text-xs text-bp-muted disabled:opacity-50">Cancel</button>
         </div>
       )}
 
@@ -621,7 +678,7 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
                 <Gem className="w-5 h-5 text-bp-text" />
                 Record Aggregate Transaction
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-bp-muted hover:text-bp-text">
+              <button type="button" onClick={handleCloseTransactionModal} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -635,8 +692,7 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
                 </p>
                 <button
                   onClick={() => {
-                    setIsModalOpen(false);
-                    setSuccessSaved(null);
+                    handleCloseTransactionModal();
                   }}
                   className="px-5 py-2 bg-bp-cyan text-bp-text font-semibold text-xs rounded-xl shadow-xs"
                 >
@@ -895,7 +951,7 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
                 <AttachmentSections value={attachments} onChange={setAttachments} onUploadFile={onUploadFile} />
 
                 <div className="pt-3 border-t border-bp-border flex justify-end gap-2">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-xl text-bp-muted hover:bg-bp-background">Cancel</button>
+                  <button type="button" onClick={handleCloseTransactionModal} className="px-4 py-2 rounded-xl text-bp-muted hover:bg-bp-background">Cancel</button>
                   <button type="submit" disabled={isSubmitting} className="px-5 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold rounded-xl shadow-xs">
                     {isSubmitting ? 'Recording...' : 'Commit to Stock Ledger'}
                   </button>
@@ -930,7 +986,7 @@ export const AggregateModule: React.FC<AggregateModuleProps> = ({
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setReversalTarget(null)} className="px-3 py-1.5 rounded-xl text-bp-muted">Cancel</button>
+                <button type="button" onClick={handleCloseReversal} className="px-3 py-1.5 rounded-xl text-bp-muted">Cancel</button>
                 <button type="submit" disabled={isReversing} className="px-4 py-1.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold rounded-xl">
                   {isReversing ? 'Reversing...' : 'Commit Reversal'}
                 </button>

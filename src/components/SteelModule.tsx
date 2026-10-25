@@ -92,8 +92,10 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
   // Admin Add Custom Brand / Size
   const [isAddingBrand, setIsAddingBrand] = useState(false);
   const [newBrandInput, setNewBrandInput] = useState('');
+  const [isSavingBrand, setIsSavingBrand] = useState(false);
   const [isAddingSize, setIsAddingSize] = useState(false);
   const [newSizeInput, setNewSizeInput] = useState('');
+  const [isSavingSize, setIsSavingSize] = useState(false);
 
   // Reversal State
   const [reversalTarget, setReversalTarget] = useState<GenericMaterialTransaction | null>(null);
@@ -160,8 +162,6 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
     const qtyInKg = txUnit === 'tonnes' ? qty * 1000 : qty;
     const loc = locations.find(l => l.id === txLocationId);
-    if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
-
     const transactionInput: Parameters<typeof dataService.recordGenericTransaction>[0] = {
       projectId: project.id,
       projectName: project.name,
@@ -187,6 +187,15 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
     try {
       setIsSubmitting(true);
+      const duplicate = await dataService.checkGenericTransactionDuplicate(transactionInput);
+      if (duplicate) {
+        duplicateConfirmation.current.setPending(transactionInput);
+        setPendingDuplicateTransaction(transactionInput);
+        setDuplicateEntry(duplicate);
+        return;
+      }
+      if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
+
       const saved = await dataService.recordGenericTransaction(transactionInput);
 
       setSuccessSaved(saved);
@@ -209,6 +218,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
     setIsContinuingDuplicate(true);
     setIsSubmitting(true);
     try {
+      if (!hasTransactionAttachments(pendingDuplicateTransaction.attachments ?? emptyTransactionAttachments()) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
       const saved = await duplicateConfirmation.current.continue(input => dataService.recordGenericTransaction(input));
       if (!saved) return;
       setDuplicateEntry(null);
@@ -229,6 +239,74 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
     duplicateConfirmation.current.cancel();
     setDuplicateEntry(null);
     setPendingDuplicateTransaction(null);
+  };
+
+  const handleCloseTransactionModal = () => {
+    if (isSubmitting || isContinuingDuplicate || isUploading) return;
+    setIsModalOpen(false);
+    setTxBrand(brands[0]?.name || '');
+    setCustomBrandName('');
+    setTxDiameter('12 mm');
+    setCustomDiameter('');
+    setTxLocationId(locations[0]?.id || 'main-site');
+    setTxDate(getLocalDateString());
+    setTxType('receipt');
+    setTxQty('');
+    setTxUnit('kg');
+    setSupplierName('');
+    setInvoiceNumber('');
+    setChallanNumber('');
+    setRemarks('');
+    setAttachment(null);
+    setAttachments(emptyTransactionAttachments());
+    setFormError(null);
+    setSuccessSaved(null);
+    handleCancelDuplicate();
+  };
+
+  const handleCloseReversal = () => {
+    if (isReversing) return;
+    setReversalTarget(null);
+    setReversalReason('');
+    setReversalError(null);
+  };
+
+  const closeAddBrand = () => {
+    if (isSavingBrand) return;
+    setIsAddingBrand(false);
+    setNewBrandInput('');
+  };
+
+  const saveNewBrand = async () => {
+    if (!newBrandInput.trim() || isSavingBrand) return;
+    setIsSavingBrand(true);
+    try {
+      await dataService.addSteelBrand(newBrandInput.trim());
+      setNewBrandInput('');
+      setIsAddingBrand(false);
+      await loadModuleData();
+    } finally {
+      setIsSavingBrand(false);
+    }
+  };
+
+  const closeAddSize = () => {
+    if (isSavingSize) return;
+    setIsAddingSize(false);
+    setNewSizeInput('');
+  };
+
+  const saveNewSize = async () => {
+    if (!newSizeInput.trim() || isSavingSize) return;
+    setIsSavingSize(true);
+    try {
+      await dataService.addSteelSize(newSizeInput.trim());
+      setNewSizeInput('');
+      setIsAddingSize(false);
+      await loadModuleData();
+    } finally {
+      setIsSavingSize(false);
+    }
   };
 
   const handleReversalSubmit = async (e: React.FormEvent) => {
@@ -440,6 +518,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
         {isAdmin && activeTab === 'stock_overview' && (
           <div className="flex items-center gap-3 pb-2 text-xs">
             <button
+              data-bp-panel-trigger="steel-brand"
               onClick={() => setIsAddingBrand(!isAddingBrand)}
               className="text-bp-text hover:underline font-semibold flex items-center gap-1"
             >
@@ -447,6 +526,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
               Add Brand
             </button>
             <button
+              data-bp-panel-trigger="steel-size"
               onClick={() => setIsAddingSize(!isAddingSize)}
               className="text-bp-text hover:underline font-semibold flex items-center gap-1"
             >
@@ -459,7 +539,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
       {/* Admin Quick Add Drawers */}
       {isAddingBrand && (
-        <div className="bg-white p-4 rounded-2xl border border-bp-border flex items-center gap-3 shadow-xs animate-in fade-in">
+        <div data-bp-dismissable-panel="steel-brand" aria-busy={isSavingBrand} className="bg-white p-4 rounded-2xl border border-bp-border flex items-center gap-3 shadow-xs animate-in fade-in">
           <input
             type="text"
             value={newBrandInput}
@@ -468,23 +548,19 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
             className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
           />
           <button
-            onClick={async () => {
-              if (!newBrandInput.trim()) return;
-              await dataService.addSteelBrand(newBrandInput.trim());
-              setNewBrandInput('');
-              setIsAddingBrand(false);
-              await loadModuleData();
-            }}
+            type="button"
+            onClick={saveNewBrand}
+            disabled={isSavingBrand}
             className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold text-xs rounded-xl shadow-xs"
           >
-            Save Brand
+            {isSavingBrand ? 'Saving…' : 'Save Brand'}
           </button>
-          <button onClick={() => setIsAddingBrand(false)} className="text-xs text-bp-muted">Cancel</button>
+          <button type="button" data-bp-dismiss onClick={closeAddBrand} disabled={isSavingBrand} className="text-xs text-bp-muted disabled:opacity-50">Cancel</button>
         </div>
       )}
 
       {isAddingSize && (
-        <div className="bg-white p-4 rounded-2xl border border-bp-border flex items-center gap-3 shadow-xs animate-in fade-in">
+        <div data-bp-dismissable-panel="steel-size" aria-busy={isSavingSize} className="bg-white p-4 rounded-2xl border border-bp-border flex items-center gap-3 shadow-xs animate-in fade-in">
           <input
             type="text"
             value={newSizeInput}
@@ -493,18 +569,14 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
             className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
           />
           <button
-            onClick={async () => {
-              if (!newSizeInput.trim()) return;
-              await dataService.addSteelSize(newSizeInput.trim());
-              setNewSizeInput('');
-              setIsAddingSize(false);
-              await loadModuleData();
-            }}
+            type="button"
+            onClick={saveNewSize}
+            disabled={isSavingSize}
             className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold text-xs rounded-xl shadow-xs"
           >
-            Save Size
+            {isSavingSize ? 'Saving…' : 'Save Size'}
           </button>
-          <button onClick={() => setIsAddingSize(false)} className="text-xs text-bp-muted">Cancel</button>
+          <button type="button" data-bp-dismiss onClick={closeAddSize} disabled={isSavingSize} className="text-xs text-bp-muted disabled:opacity-50">Cancel</button>
         </div>
       )}
 
@@ -697,7 +769,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                 <Layers className="w-5 h-5 text-bp-text" />
                 Record Steel Transaction
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-bp-muted hover:text-bp-text">
+              <button type="button" onClick={handleCloseTransactionModal} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -711,8 +783,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                 </p>
                 <button
                   onClick={() => {
-                    setIsModalOpen(false);
-                    setSuccessSaved(null);
+                    handleCloseTransactionModal();
                   }}
                   className="px-5 py-2 bg-bp-cyan text-bp-text font-semibold text-xs rounded-xl shadow-xs"
                 >
@@ -875,7 +946,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                 <div className="pt-3 border-t border-bp-border flex justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={handleCloseTransactionModal}
                     className="px-4 py-2 rounded-xl text-bp-muted hover:bg-bp-background font-medium"
                   >
                     Cancel
@@ -919,7 +990,7 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setReversalTarget(null)} className="px-3 py-1.5 rounded-xl text-bp-muted">Cancel</button>
+                <button type="button" onClick={handleCloseReversal} className="px-3 py-1.5 rounded-xl text-bp-muted">Cancel</button>
                 <button type="submit" disabled={isReversing} className="px-4 py-1.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold rounded-xl">
                   {isReversing ? 'Reversing...' : 'Commit Reversal'}
                 </button>

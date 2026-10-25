@@ -313,8 +313,6 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
       }
     }
 
-    if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
-
     const loc = locations.find(l => l.id === txLocationId);
     const selectedItemDef = items.find(i => i.name === selectedItemName);
     const isItemReusable = selectedItemDef?.is_reusable ?? isReusable;
@@ -345,6 +343,15 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
 
     try {
       setIsSubmitting(true);
+      const duplicate = await dataService.checkGenericTransactionDuplicate(transactionInput);
+      if (duplicate) {
+        duplicateConfirmation.current.setPending(transactionInput);
+        setPendingDuplicateTransaction(transactionInput);
+        setDuplicateEntry(duplicate);
+        return;
+      }
+      if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
+
       const saved = await dataService.recordGenericTransaction(transactionInput);
 
       setSuccessSaved(saved);
@@ -367,6 +374,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
     setIsContinuingDuplicate(true);
     setIsSubmitting(true);
     try {
+      if (!hasTransactionAttachments(pendingDuplicateTransaction.attachments ?? emptyTransactionAttachments()) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
       const saved = await duplicateConfirmation.current.continue(input => dataService.recordGenericTransaction(input));
       if (!saved) return;
       setDuplicateEntry(null);
@@ -387,6 +395,57 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
     duplicateConfirmation.current.cancel();
     setDuplicateEntry(null);
     setPendingDuplicateTransaction(null);
+  };
+
+  const handleCloseMovement = () => {
+    if (isSubmitting || isContinuingDuplicate || isUploading) return;
+    setIsModalOpen(false);
+    setSelectedItemName(items[0]?.name || '');
+    setTxLocationId(locations[0]?.id || 'main-site');
+    setTxDate(getLocalDateString());
+    setTxType('receipt');
+    setTxQty('');
+    setTxUnit(items[0]?.default_unit || categoryDef?.default_unit || 'Nos');
+    setTxCondition('good');
+    setIssuedToCrew('');
+    setPartyName('');
+    setInvoiceNumber('');
+    setChallanNumber('');
+    setRemarks('');
+    setAttachment(null);
+    setAttachments(emptyTransactionAttachments());
+    setFormError(null);
+    setSuccessSaved(null);
+    handleCancelDuplicate();
+  };
+
+  const handleCloseAddItem = () => {
+    if (isAddingItemSaving) return;
+    setIsAddItemOpen(false);
+    setNewItemName('');
+    setNewItemUnit(categoryDef?.default_unit || 'Nos');
+    setNewItemMinStock('5');
+    setNewItemSpec('');
+    setNewItemBrand('');
+  };
+
+  const handleCloseEditItem = () => {
+    if (isEditSaving) return;
+    setIsEditItemOpen(false);
+    setEditingItem(null);
+    setEditItemName('');
+    setEditItemUnit(categoryDef?.default_unit || 'Nos');
+    setEditItemMinStock('5');
+    setEditItemSpec('');
+    setEditItemBrand('');
+    setEditItemReusable(false);
+    setEditError(null);
+  };
+
+  const handleCloseReversal = () => {
+    if (isReversing) return;
+    setReversalTarget(null);
+    setReversalReason('');
   };
 
   const handleAddItemSubmit = async (e: React.FormEvent) => {
@@ -1001,7 +1060,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <PlusCircle className="w-4 h-4 text-bp-cyan" />
                 Record Movement — {categoryDef?.name}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-bp-muted hover:text-bp-text">
+              <button type="button" onClick={handleCloseMovement} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1017,8 +1076,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 </p>
                 <button
                   onClick={() => {
-                    setIsModalOpen(false);
-                    setSuccessSaved(null);
+                    handleCloseMovement();
                   }}
                   className="px-5 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs transition-colors"
                 >
@@ -1272,7 +1330,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <div className="pt-3 border-t border-bp-border flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={handleCloseMovement}
                     className="px-4 py-2 border border-bp-border text-bp-muted font-semibold rounded-xl hover:bg-bp-background transition-colors"
                   >
                     Cancel
@@ -1300,7 +1358,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <Plus className="w-4 h-4 text-bp-text" />
                 Add Item to {categoryDef?.name}
               </h3>
-              <button onClick={() => setIsAddItemOpen(false)} className="text-bp-muted hover:text-bp-text">
+              <button type="button" onClick={handleCloseAddItem} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1369,7 +1427,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
               <div className="pt-3 border-t border-bp-border flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddItemOpen(false)}
+                  onClick={handleCloseAddItem}
                   className="px-4 py-2 border border-bp-border text-bp-muted font-semibold rounded-xl hover:bg-bp-background transition-colors"
                 >
                   Cancel
@@ -1396,7 +1454,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <Edit className="w-4 h-4 text-bp-text" />
                 Edit Material Details
               </h3>
-              <button onClick={() => setIsEditItemOpen(false)} className="text-bp-muted hover:text-bp-text">
+              <button type="button" onClick={handleCloseEditItem} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1483,7 +1541,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
               <div className="pt-3 border-t border-bp-border flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsEditItemOpen(false)}
+                  onClick={handleCloseEditItem}
                   className="px-4 py-2 border border-bp-border text-bp-muted font-semibold rounded-xl hover:bg-bp-background transition-colors"
                 >
                   Cancel
@@ -1510,7 +1568,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <RotateCcw className="w-4 h-4 text-bp-text" />
                 Audited Ledger Reversal
               </h3>
-              <button onClick={() => setReversalTarget(null)} className="text-bp-muted hover:text-bp-text">
+              <button type="button" onClick={handleCloseReversal} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1536,7 +1594,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
               <div className="pt-3 border-t border-bp-border flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setReversalTarget(null)}
+                  onClick={handleCloseReversal}
                   className="px-4 py-2 border border-bp-border text-bp-muted font-semibold rounded-xl hover:bg-bp-background transition-colors"
                 >
                   Cancel

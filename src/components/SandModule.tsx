@@ -88,6 +88,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
   // Admin Add Type
   const [isAddingType, setIsAddingType] = useState(false);
   const [newTypeInput, setNewTypeInput] = useState('');
+  const [isSavingType, setIsSavingType] = useState(false);
 
   // Reversal
   const [reversalTarget, setReversalTarget] = useState<GenericMaterialTransaction | null>(null);
@@ -165,8 +166,6 @@ export const SandModule: React.FC<SandModuleProps> = ({
 
     const qtyCft = toCanonicalCft(qty, inputUnit);
     const loc = locations.find(l => l.id === txLocationId);
-    if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
-
     const transactionInput: Parameters<typeof dataService.recordGenericTransaction>[0] = {
       projectId: project.id,
       projectName: project.name,
@@ -190,6 +189,15 @@ export const SandModule: React.FC<SandModuleProps> = ({
 
     try {
       setIsSubmitting(true);
+      const duplicate = await dataService.checkGenericTransactionDuplicate(transactionInput);
+      if (duplicate) {
+        duplicateConfirmation.current.setPending(transactionInput);
+        setPendingDuplicateTransaction(transactionInput);
+        setDuplicateEntry(duplicate);
+        return;
+      }
+      if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
+
       const saved = await dataService.recordGenericTransaction(transactionInput);
 
       setSuccessSaved(saved);
@@ -212,6 +220,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
     setIsContinuingDuplicate(true);
     setIsSubmitting(true);
     try {
+      if (!hasTransactionAttachments(pendingDuplicateTransaction.attachments ?? emptyTransactionAttachments()) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
       const saved = await duplicateConfirmation.current.continue(input => dataService.recordGenericTransaction(input));
       if (!saved) return;
       setDuplicateEntry(null);
@@ -232,6 +241,52 @@ export const SandModule: React.FC<SandModuleProps> = ({
     duplicateConfirmation.current.cancel();
     setDuplicateEntry(null);
     setPendingDuplicateTransaction(null);
+  };
+
+  const closeAddSandType = () => {
+    if (isSavingType) return;
+    setIsAddingType(false);
+    setNewTypeInput('');
+  };
+
+  const saveNewSandType = async () => {
+    if (!newTypeInput.trim() || isSavingType) return;
+    setIsSavingType(true);
+    try {
+      await dataService.addSandType(newTypeInput.trim());
+      setNewTypeInput('');
+      setIsAddingType(false);
+      await loadModuleData();
+    } finally {
+      setIsSavingType(false);
+    }
+  };
+
+  const handleCloseTransactionModal = () => {
+    if (isSubmitting || isContinuingDuplicate || isUploading) return;
+    setIsModalOpen(false);
+    setTxSandType(sandTypes[0] || 'River Sand');
+    setCustomTypeInput('');
+    setTxLocationId(locations[0]?.id || 'main-site');
+    setTxDate(getLocalDateString());
+    setTxType('receipt');
+    setTxQty('');
+    setInputUnit('cft');
+    setSupplierName('');
+    setInvoiceNumber('');
+    setChallanNumber('');
+    setRemarks('');
+    setAttachment(null);
+    setAttachments(emptyTransactionAttachments());
+    setFormError(null);
+    setSuccessSaved(null);
+    handleCancelDuplicate();
+  };
+
+  const handleCloseReversal = () => {
+    if (isReversing) return;
+    setReversalTarget(null);
+    setReversalReason('');
   };
 
   const handleReversalSubmit = async (e: React.FormEvent) => {
@@ -438,6 +493,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
 
         {isAdmin && activeTab === 'stock_overview' && (
           <button
+            data-bp-panel-trigger="sand-type"
             onClick={() => setIsAddingType(!isAddingType)}
             className="text-xs font-semibold text-bp-text hover:text-bp-muted pb-3 flex items-center gap-1"
           >
@@ -449,7 +505,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
 
       {/* Admin Add Sand Type Form */}
       {isAddingType && (
-        <div className="bg-white p-4 rounded-2xl border border-bp-border flex items-center gap-3 shadow-xs animate-in fade-in">
+        <div data-bp-dismissable-panel="sand-type" aria-busy={isSavingType} className="bg-white p-4 rounded-2xl border border-bp-border flex items-center gap-3 shadow-xs animate-in fade-in">
           <input
             type="text"
             value={newTypeInput}
@@ -458,18 +514,14 @@ export const SandModule: React.FC<SandModuleProps> = ({
             className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
           />
           <button
-            onClick={async () => {
-              if (!newTypeInput.trim()) return;
-              await dataService.addSandType(newTypeInput.trim());
-              setNewTypeInput('');
-              setIsAddingType(false);
-              await loadModuleData();
-            }}
+            type="button"
+            onClick={saveNewSandType}
+            disabled={isSavingType}
             className="px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold text-xs rounded-xl shadow-xs"
           >
-            Save Sand Type
+            {isSavingType ? 'Saving…' : 'Save Sand Type'}
           </button>
-          <button onClick={() => setIsAddingType(false)} className="text-xs text-bp-muted">Cancel</button>
+          <button type="button" data-bp-dismiss onClick={closeAddSandType} disabled={isSavingType} className="text-xs text-bp-muted disabled:opacity-50">Cancel</button>
         </div>
       )}
 
@@ -643,7 +695,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
                 <Mountain className="w-5 h-5 text-bp-text" />
                 Record Sand Movement
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-bp-muted hover:text-bp-text">
+              <button type="button" onClick={handleCloseTransactionModal} className="text-bp-muted hover:text-bp-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -657,8 +709,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
                 </p>
                 <button
                   onClick={() => {
-                    setIsModalOpen(false);
-                    setSuccessSaved(null);
+                    handleCloseTransactionModal();
                   }}
                   className="px-5 py-2 bg-bp-cyan text-bp-text font-semibold text-xs rounded-xl shadow-xs"
                 >
@@ -812,7 +863,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
                 <div className="pt-3 border-t border-bp-border flex justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={handleCloseTransactionModal}
                     className="px-4 py-2 rounded-xl text-bp-muted hover:bg-bp-background font-medium"
                   >
                     Cancel
@@ -855,7 +906,7 @@ export const SandModule: React.FC<SandModuleProps> = ({
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setReversalTarget(null)} className="px-3 py-1.5 rounded-xl text-bp-muted">Cancel</button>
+                <button type="button" onClick={handleCloseReversal} className="px-3 py-1.5 rounded-xl text-bp-muted">Cancel</button>
                 <button type="submit" disabled={isReversing} className="px-4 py-1.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold rounded-xl">
                   {isReversing ? 'Reversing...' : 'Commit Reversal'}
                 </button>
