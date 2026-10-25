@@ -110,7 +110,7 @@ export const OngoingProjectsView: React.FC<OngoingProjectsViewProps> = ({
           <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight flex items-center gap-2.5">
             <Clock className="w-6 h-6 text-bp-text" />
             Ongoing Projects
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-bp-cyan/20 text-bp-text border border-bp-cyan/40 font-mono ml-1">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-bp-cyan/20 text-bp-text border border-bp-cyan/40 bp-numeric ml-1">
               {filteredProjects.length}
             </span>
           </h1>

@@ -30,7 +30,7 @@ export const DuplicateStockEntryDialog: React.FC<DuplicateStockEntryDialogProps>
           <div className="min-w-0 flex-1">
             <h2 id="duplicate-stock-title" className="text-base font-bold text-bp-text">Possible Duplicate Stock Entry</h2>
             <p id="duplicate-stock-description" className="mt-1 text-sm leading-5 text-bp-muted">
-              Another user has already recorded this item at this site within the last 24 hours.
+              A matching stock entry is already recorded at this site within the last 24 hours.
             </p>
           </div>
         </div>

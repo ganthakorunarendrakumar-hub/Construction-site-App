@@ -186,6 +186,20 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     return groups.find(g => g.id === selectedGroupId) || null;
   }, [groups, selectedGroupId]);
 
+  const totalGroupGrossEarned = useMemo(
+    () => salarySummaries.reduce((total, summary) => total + summary.gross_earnings, 0),
+    [salarySummaries]
+  );
+
+  const salaryPeriodLabel = useMemo(() => {
+    const now = new Date();
+    if (salaryPeriod === 'this_month') {
+      return `This Month · ${now.toLocaleString(undefined, { month: 'long', year: 'numeric' })}`;
+    }
+    if (salaryPeriod === 'last_30_days') return 'Last 30 Days';
+    return `Full Year ${now.getFullYear()}`;
+  }, [salaryPeriod]);
+
   const groupEmployees = useMemo(() => {
     if (!selectedGroupId) return [];
     return employees.filter(e => e.group_id === selectedGroupId && e.status === 'active');
@@ -267,7 +281,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       setSalarySummaries(sums);
     }
     loadSalary();
-  }, [selectedGroupId, salaryPeriod, attendanceRecords, paymentRecords]);
+  }, [selectedGroupId, salaryPeriod, attendanceRecords, paymentRecords, employees]);
 
   // Load report data when reports tab is active or report parameters change
   useEffect(() => {
@@ -611,26 +625,26 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             <div className="pt-4 border-t border-bp-border grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
                 <p className="text-[11px] font-semibold text-bp-muted uppercase">Active Gang Groups</p>
-                <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
-                  {groups.filter(g => g.status === 'active').length} <span className="text-xs font-normal text-bp-muted">groups</span>
+                <p className="text-xl font-bold text-bp-text bp-numeric mt-0.5">
+                  {groups.filter(g => g.status === 'active').length}
                 </p>
               </div>
               <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
                 <p className="text-[11px] font-semibold text-bp-muted uppercase">Gang Group Workers</p>
-                <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
+                <p className="text-xl font-bold text-bp-text bp-numeric mt-0.5">
                   {employees.filter(e => e.group_id && e.group_id !== '' && e.status === 'active').length} <span className="text-xs font-normal text-bp-muted">assigned</span>
                 </p>
               </div>
               <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
                 <p className="text-[11px] font-semibold text-bp-muted uppercase">Individual Workers</p>
-                <p className="text-xl font-bold text-bp-blue font-mono mt-0.5">
+                <p className="text-xl font-bold text-bp-blue bp-numeric mt-0.5">
                   {individualEmployees.filter(e => e.status === 'active').length} <span className="text-xs font-normal text-bp-muted">direct</span>
                 </p>
               </div>
               <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
                 <p className="text-[11px] font-semibold text-bp-muted uppercase">Active Sites</p>
-                <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
-                  {projects.filter(p => p.status === 'in_progress').length} <span className="text-xs font-normal text-bp-muted">projects</span>
+                <p className="text-xl font-bold text-bp-text bp-numeric mt-0.5">
+                  {projects.filter(p => p.status === 'in_progress').length}
                 </p>
               </div>
             </div>
@@ -768,11 +782,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <div className="pt-2 border-t border-bp-border flex items-center justify-between text-xs">
                           <div>
                             <span className="text-bp-muted block text-[10px] uppercase font-semibold">Total Workers</span>
-                            <span className="font-bold text-sm text-bp-text font-mono">{count}</span>
+                            <span className="font-bold text-sm text-bp-text bp-numeric">{count}</span>
                           </div>
                           <div>
                             <span className="text-bp-muted block text-[10px] uppercase font-semibold">Today Present</span>
-                            <span className="font-bold text-sm text-emerald-700 font-mono">{todayPresent} / {count}</span>
+                            <span className="font-bold text-sm text-emerald-700 bp-numeric">{todayPresent} / {count}</span>
                           </div>
                         </div>
                       </div>
@@ -1028,9 +1042,6 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-bp-cyan text-bp-text uppercase font-mono">
-                      Group Workspace
-                    </span>
                     <span className="text-xs text-bp-muted">
                       Site: <strong className="text-bp-text">{activeGroup?.project_name || 'All Sites'}</strong>
                     </span>
@@ -1043,9 +1054,6 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     {activeGroup?.name}
                   </h1>
 
-                  <p className="text-xs text-bp-muted">
-                    Total Registered Workers: <strong className="text-bp-text font-mono">{groupEmployees.length} active</strong>
-                  </p>
                 </div>
               </div>
 
@@ -1670,8 +1678,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             <div className="space-y-4">
               
               {/* Controls & Record Payment button */}
-              <div className="bg-white rounded-2xl border border-bp-border p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
+              <div className="bg-white rounded-2xl border border-bp-border p-4 sm:p-5 shadow-xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-2 self-start">
                   <span className="text-xs font-semibold text-bp-muted">Period:</span>
                   <select
                     value={salaryPeriod}
@@ -1684,19 +1692,33 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   </select>
                 </div>
 
-                {canManage && (
-                  <button
-                    onClick={() => {
-                      setPaymentTargetEmployee(null);
-                      setPaymentSuggestedAmount(undefined);
-                      setIsRecordPaymentOpen(true);
-                    }}
-                    className="px-4 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-colors"
-                  >
-                    <DollarSign className="w-4 h-4 text-bp-text" />
-                    <span>Record Salary / Advance Payment</span>
-                  </button>
-                )}
+                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-stretch lg:w-auto lg:items-center lg:justify-end">
+                  <div className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded-xl border border-bp-border border-l-4 border-l-bp-cyan bg-white px-3.5 py-2.5 sm:min-w-[250px]">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold text-bp-muted">Total Group Salary</p>
+                      <p className="mt-0.5 truncate text-[10px] text-bp-muted" title={`${activeGroup?.name || 'Selected Group'} · ${salaryPeriodLabel}`}>
+                        {activeGroup?.name || 'Selected Group'} · {salaryPeriodLabel}
+                      </p>
+                    </div>
+                    <p className="shrink-0 font-mono text-lg font-bold tabular-nums text-bp-navy" aria-label={`Total gross earned salary ₹${totalGroupGrossEarned.toLocaleString()}`}>
+                      ₹{totalGroupGrossEarned.toLocaleString()}
+                    </p>
+                  </div>
+
+                  {canManage && (
+                    <button
+                      onClick={() => {
+                        setPaymentTargetEmployee(null);
+                        setPaymentSuggestedAmount(undefined);
+                        setIsRecordPaymentOpen(true);
+                      }}
+                      className="w-full shrink-0 px-4 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition-colors sm:w-auto"
+                    >
+                      <DollarSign className="w-4 h-4 text-bp-text" />
+                      <span>Record Salary / Advance Payment</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Salary Ledger Table */}
@@ -1828,17 +1850,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       Attendance & Labor Wage Reports
                     </h3>
                     <p className="text-xs text-bp-muted">
-                      Generate audited daily attendance registers, working hours, and CSV exports for Excel.
+                      Review attendance, working hours, and earnings by date.
                     </p>
                   </div>
-
-                  <button
-                    onClick={handleDownloadReportCsv}
-                    className="px-4 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02]"
-                  >
-                    <Download className="w-4 h-4 text-bp-text" />
-                    <span>Download Matching CSV</span>
-                  </button>
                 </div>
 
                 {/* The Two Report Options Cards */}
@@ -1846,6 +1860,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   {/* Option A: Date Range Report */}
                   <button
                     type="button"
+                    aria-pressed={reportMode === 'date_range'}
                     onClick={() => setReportMode('date_range')}
                     className={`text-left p-4 rounded-xl border-2 transition-all ${
                       reportMode === 'date_range'
@@ -1854,17 +1869,17 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-bp-text">Option A: Date Range Report</h4>
-                      {reportMode === 'date_range' && <CheckCircle2 className="w-4 h-4 text-bp-text" />}
+                      <h4 className="font-bold text-sm text-bp-text">Date range</h4>
                     </div>
                     <p className="text-xs text-bp-muted mt-1">
-                      Prompts for <strong>From Date</strong> and <strong>To Date</strong> (both dates included).
+                      Attendance and earnings between two dates.
                     </p>
                   </button>
 
                   {/* Option B: Total Report Up To Date */}
                   <button
                     type="button"
+                    aria-pressed={reportMode === 'up_to_date'}
                     onClick={() => setReportMode('up_to_date')}
                     className={`text-left p-4 rounded-xl border-2 transition-all ${
                       reportMode === 'up_to_date'
@@ -1873,11 +1888,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-bp-text">Option B: Total Report Up To Date</h4>
-                      {reportMode === 'up_to_date' && <CheckCircle2 className="w-4 h-4 text-bp-text" />}
+                      <h4 className="font-bold text-sm text-bp-text">Cumulative to date</h4>
                     </div>
                     <p className="text-xs text-bp-muted mt-1">
-                      Prompts for <strong>only one date: Report Up To Date</strong>. (No From Date asked).
+                      Attendance and earnings through the selected date.
                     </p>
                   </button>
                 </div>
@@ -2075,7 +2089,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
                 <div className="p-4 bg-bp-background border-t border-bp-border flex items-center justify-between">
                   <p className="text-xs text-bp-muted">
-                    Ready to export. CSV includes detailed itemized records with job type, check-in, check-out, payable days, and earnings.
+                    CSV includes attendance, working hours, payable days, and earnings.
                   </p>
                   <button
                     onClick={handleDownloadReportCsv}

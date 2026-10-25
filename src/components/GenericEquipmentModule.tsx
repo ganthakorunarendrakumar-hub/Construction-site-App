@@ -60,6 +60,7 @@ import { TransactionAttachments } from '../types';
 import { DuplicateStockEntryDialog } from './DuplicateStockEntryDialog';
 import type { DuplicateStockEntryDetails } from '../utils/stockDuplicate';
 import { DuplicateStockEntryConfirmation } from '../utils/stockDuplicate';
+import { StockSummaryArtwork, type StockArtworkMaterial } from './StockSummaryArtwork';
 
 interface GenericEquipmentModuleProps {
   categoryId: string;
@@ -70,6 +71,17 @@ interface GenericEquipmentModuleProps {
   onNavigateHome: () => void;
   onUploadFile: (file: File) => Promise<{ url: string; name: string; size: number }>;
 }
+
+const STOCK_ARTWORK_BY_CATEGORY: Record<string, StockArtworkMaterial> = {
+  plumbing: 'pipes',
+  electrical: 'electrical',
+  painting_finishing: 'paint',
+  flooring_tiles: 'tiles',
+  hardware_fasteners: 'hardware',
+  doors_windows_carpentry: 'carpentry',
+  adhesives_sealants: 'adhesives',
+  waterproofing_roofing: 'roofing'
+};
 
 export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
   categoryId,
@@ -194,6 +206,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
   }, [categoryId, project.id]);
 
   const isReusable = categoryDef?.is_reusable || false;
+  const stockArtworkMaterial = isReusable ? 'equipment' : (STOCK_ARTWORK_BY_CATEGORY[categoryId] || 'general');
 
   const subcategories = useMemo(() => {
     const subs = new Set<string>();
@@ -532,7 +545,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
               {categoryDef?.name}
             </h1>
             <p className="text-xs text-bp-muted mt-0.5">
-              Site: <strong className="text-bp-text font-semibold">{project.name}</strong> &bull; {isReusable ? 'Reusable Equipment & Tool Logistics' : 'Consumables & Material Inventory'}
+              Site: <strong className="text-bp-text font-semibold">{project.name}</strong>
             </p>
           </div>
         </div>
@@ -583,7 +596,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
 
       {/* KPI Overview Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-bp-navy text-white p-5 rounded-2xl border border-bp-navy-border shadow-xs">
+        <div className="relative isolate bg-bp-navy text-white p-5 rounded-2xl border border-bp-navy-border shadow-xs">
+          <StockSummaryArtwork material={stockArtworkMaterial} kind="available" dark />
           <p className="text-xs font-medium text-bp-border-strong">
             {isReusable ? 'Available in Yard' : 'Live Available Stock'}
           </p>
@@ -593,12 +607,10 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
             </span>
             <span className="text-xs text-bp-border-strong">{categoryDef?.default_unit || 'Units'}</span>
           </div>
-          <p className="text-[11px] text-bp-muted mt-2 font-mono">
-            {stockMetrics?.totalItemsCount ?? 0} catalogued materials
-          </p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material={stockArtworkMaterial} kind="received" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Total Delivered</span>
             <TrendingUp className="w-4 h-4 text-bp-text" />
@@ -609,10 +621,10 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
             </span>
             <span className="text-xs text-bp-muted">{categoryDef?.default_unit || 'Units'}</span>
           </div>
-          <p className="text-[11px] text-bp-muted mt-2">Delivered to site</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material={stockArtworkMaterial} kind="used" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>{isReusable ? 'Currently Issued on Site' : 'Total Consumed / Used'}</span>
             <TrendingDown className="w-4 h-4 text-bp-text" />
@@ -628,7 +640,8 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
           <p className="text-[11px] text-bp-muted mt-2">{isReusable ? 'Checked out to work zones' : 'Used on site'}</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material={stockArtworkMaterial} kind="damaged" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>{isReusable ? 'Under Repair' : 'Damaged / Scrap'}</span>
             <AlertOctagon className="w-4 h-4 text-bp-text" />
@@ -722,7 +735,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={`Search ${categoryDef?.name.toLowerCase()} materials and equipment...`}
+                placeholder={`Search ${categoryDef?.name.toLowerCase()}...`}
                 className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
               />
             </div>
@@ -737,7 +750,6 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <thead>
                   <tr className="bg-bp-background border-b border-bp-border text-[11px] font-semibold text-bp-muted uppercase tracking-wider">
                     <th className="py-3 px-4">Material / Item</th>
-                    <th className="py-3 px-4">Subcategory</th>
                     <th className="py-3 px-4">Unit</th>
                     <th className="py-3 px-4 text-right">Delivered (In)</th>
                     <th className="py-3 px-4 text-right">In Use / Consumed</th>
@@ -752,7 +764,7 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                 <tbody className="divide-y divide-[#E2E8F0]">
                   {filteredItems.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-bp-muted">
+                      <td colSpan={8} className="py-12 text-center text-bp-muted">
                         No materials found matching your search.
                       </td>
                     </tr>
@@ -760,24 +772,10 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
                     filteredItems.map((item) => (
                       <tr key={item.key} className="hover:bg-bp-background transition-colors">
                         <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-bp-text">{item.item_name}</span>
-                            <span className={`text-[9px] px-1.5 py-0.2 rounded border font-medium ${
-                              item.is_reusable
-                                ? 'bg-bp-background text-bp-text border-bp-border'
-                                : 'bg-white text-bp-muted border-bp-border'
-                            }`}>
-                              {item.is_reusable ? 'Reusable Tool' : 'Consumable'}
-                            </span>
-                          </div>
+                          <span className="font-semibold text-bp-text">{item.item_name}</span>
                           {item.brand_name && (
                             <span className="text-[11px] text-bp-muted font-normal block">Brand: {item.brand_name}</span>
                           )}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-bp-background text-bp-muted border border-bp-border font-medium whitespace-nowrap">
-                            {item.subcategory || 'General'}
-                          </span>
                         </td>
                         <td className="py-3 px-4 font-mono text-bp-muted">{item.unit}</td>
                         <td className="py-3 px-4 text-right font-mono font-semibold text-bp-text">

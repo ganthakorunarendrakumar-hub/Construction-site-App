@@ -24,6 +24,7 @@ import {
 } from '../types';
 import { CementTransactionModal } from './CementTransactionModal';
 import { CementLedgerTable } from './CementLedgerTable';
+import { StockSummaryArtwork } from './StockSummaryArtwork';
 
 interface CementPageProps {
   project: Project;
@@ -163,7 +164,8 @@ export const CementPage: React.FC<CementPageProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         
         {/* Available Stock */}
-        <div className="bg-bp-navy text-white p-5 rounded-2xl border border-bp-navy-border shadow-xs">
+        <div className="relative isolate bg-bp-navy text-white p-5 rounded-2xl border border-bp-navy-border shadow-xs">
+          <StockSummaryArtwork material="cement" kind="available" dark />
           <p className="text-xs font-medium text-bp-border-strong">Available Stock</p>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl sm:text-[28px] font-bold text-bp-cyan font-mono tabular-nums">
@@ -177,7 +179,8 @@ export const CementPage: React.FC<CementPageProps> = ({
         </div>
 
         {/* Total Received */}
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material="cement" kind="received" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Total Received</span>
             <TrendingUp className="w-4 h-4 text-bp-text" />
@@ -192,7 +195,8 @@ export const CementPage: React.FC<CementPageProps> = ({
         </div>
 
         {/* Total Used */}
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material="cement" kind="used" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Total Used</span>
             <TrendingDown className="w-4 h-4 text-bp-text" />
@@ -207,7 +211,8 @@ export const CementPage: React.FC<CementPageProps> = ({
         </div>
 
         {/* Total Damaged */}
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material="cement" kind="damaged" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Total Damaged</span>
             <AlertOctagon className="w-4 h-4 text-bp-text" />

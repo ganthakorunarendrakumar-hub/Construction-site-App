@@ -32,6 +32,7 @@ import { TransactionAttachments } from '../types';
 import { DuplicateStockEntryDialog } from './DuplicateStockEntryDialog';
 import type { DuplicateStockEntryDetails } from '../utils/stockDuplicate';
 import { DuplicateStockEntryConfirmation } from '../utils/stockDuplicate';
+import { StockSummaryArtwork } from './StockSummaryArtwork';
 
 interface SteelModuleProps {
   project: Project;
@@ -354,7 +355,8 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
 
       {/* KPI Overview Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-bp-navy text-white p-5 rounded-2xl border border-bp-navy-border shadow-xs">
+        <div className="relative isolate bg-bp-navy text-white p-5 rounded-2xl border border-bp-navy-border shadow-xs">
+          <StockSummaryArtwork material="steel" kind="available" dark />
           <p className="text-xs font-medium text-bp-border-strong">Available Steel</p>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl sm:text-[28px] font-bold text-bp-cyan font-mono tabular-nums">
@@ -367,7 +369,8 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
           </p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material="steel" kind="received" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Total Received</span>
             <TrendingUp className="w-4 h-4 text-bp-text" />
@@ -381,7 +384,8 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
           <p className="text-[11px] text-bp-muted mt-2">Certified TMT receipts</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material="steel" kind="used" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Total Used / Bent</span>
             <TrendingDown className="w-4 h-4 text-bp-text" />
@@ -395,7 +399,8 @@ export const SteelModule: React.FC<SteelModuleProps> = ({
           <p className="text-[11px] text-bp-muted mt-2">Bar bending & cages</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material="steel" kind="damaged" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Scrap & Cut-Offs</span>
             <AlertOctagon className="w-4 h-4 text-bp-text" />

@@ -125,18 +125,18 @@ export const WorkerPortalView: React.FC<WorkerPortalViewProps> = ({ currentUser 
                   WORKER PORTAL
                 </span>
                 <span className="text-xs text-bp-muted">
-                  User ID: <strong className="font-mono text-bp-text">{currentUser.user_id || 'CHEN-WRK'}</strong>
+                  User ID: <strong className="font-mono text-bp-text">{currentUser.user_id || '—'}</strong>
                 </span>
               </div>
               <h1 className="text-2xl font-bold text-bp-text tracking-tight mt-0.5">
                 {currentUser.full_name}
               </h1>
               <p className="text-xs text-bp-muted flex items-center gap-2 mt-1">
-                <span>Trade: <strong>{employee?.job_type || 'Specialist Worker'}</strong></span>
+                <span>Trade: <strong>{employee?.job_type || '—'}</strong></span>
                 <span>•</span>
-                <span>Team: <strong>{employee?.group_name || 'Assigned Gang'}</strong></span>
+                <span>Team: <strong>{employee?.group_name || 'Unassigned'}</strong></span>
                 <span>•</span>
-                <span>Site: <strong>{employee?.project_name || 'Skyline Commercial Hub'}</strong></span>
+                <span>Site: <strong>{employee?.project_name || 'Unassigned'}</strong></span>
               </p>
             </div>
           </div>
@@ -157,27 +157,27 @@ export const WorkerPortalView: React.FC<WorkerPortalViewProps> = ({ currentUser 
         <div className="pt-4 border-t border-bp-border grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
             <p className="text-[11px] font-semibold text-bp-muted uppercase">Days Worked</p>
-            <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
+            <p className="text-xl font-bold text-bp-text bp-numeric mt-0.5">
               {totalDays} <span className="text-xs font-normal text-bp-muted">present</span>
               {halfDays > 0 && <span className="text-xs text-amber-700 ml-1">({halfDays} half)</span>}
             </p>
           </div>
           <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
             <p className="text-[11px] font-semibold text-bp-muted uppercase">Hours Logged</p>
-            <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
+            <p className="text-xl font-bold text-bp-text bp-numeric mt-0.5">
               {totalHours} <span className="text-xs font-normal text-bp-muted">hrs</span>
               {totalOtHours > 0 && <span className="text-xs text-blue-700 ml-1">(+{totalOtHours} OT)</span>}
             </p>
           </div>
           <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
             <p className="text-[11px] font-semibold text-bp-muted uppercase">Gross Earnings</p>
-            <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
+            <p className="text-xl font-bold text-bp-text bp-numeric mt-0.5">
               ₹{grossEarnings.toLocaleString()}
             </p>
           </div>
           <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
             <p className="text-[11px] font-semibold text-bp-muted uppercase">Pending Balance</p>
-            <p className="text-xl font-bold text-emerald-700 font-mono mt-0.5">
+            <p className="text-xl font-bold text-emerald-700 bp-numeric mt-0.5">
               ₹{remainingBalance.toLocaleString()}
             </p>
           </div>

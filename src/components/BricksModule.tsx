@@ -32,6 +32,7 @@ import { TransactionAttachments } from '../types';
 import { DuplicateStockEntryDialog } from './DuplicateStockEntryDialog';
 import type { DuplicateStockEntryDetails } from '../utils/stockDuplicate';
 import { DuplicateStockEntryConfirmation } from '../utils/stockDuplicate';
+import { StockSummaryArtwork } from './StockSummaryArtwork';
 
 interface BricksModuleProps {
   project: Project;
@@ -334,7 +335,8 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
 
       {/* KPI Overview Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-bp-navy text-white p-5 rounded-2xl border border-bp-navy-border shadow-xs">
+        <div className="relative isolate bg-bp-navy text-white p-5 rounded-2xl border border-bp-navy-border shadow-xs">
+          <StockSummaryArtwork material="bricks" kind="available" dark />
           <p className="text-xs font-medium text-bp-border-strong">Available Bricks</p>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl sm:text-[28px] font-bold text-bp-cyan font-mono tabular-nums">
@@ -347,7 +349,8 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
           </p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material="bricks" kind="received" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Total Delivered</span>
             <TrendingUp className="w-4 h-4 text-bp-text" />
@@ -361,7 +364,8 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
           <p className="text-[11px] text-bp-muted mt-2">Pallets & loads delivered</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material="bricks" kind="used" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Masonry Laid</span>
             <TrendingDown className="w-4 h-4 text-bp-text" />
@@ -375,7 +379,8 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
           <p className="text-[11px] text-bp-muted mt-2">Walls & masonry</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+        <div className="relative isolate bg-white p-5 rounded-2xl border border-bp-border shadow-xs">
+          <StockSummaryArtwork material="bricks" kind="damaged" />
           <div className="flex items-center justify-between text-xs font-medium text-bp-muted">
             <span>Broken / Damaged</span>
             <AlertOctagon className="w-4 h-4 text-bp-text" />

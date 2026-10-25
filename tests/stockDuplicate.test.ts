@@ -36,8 +36,13 @@ test('A: different user, same site, item, quantity and unit within 24 hours warn
   assert.equal(isPotentialDuplicateStockEntry(currentEntry(), previousEntry(), now), true);
 });
 
-test('B: the same user is not warned', () => {
+test('B: a matching entry from the same user is not warned', () => {
   assert.equal(isPotentialDuplicateStockEntry(currentEntry(), previousEntry({ createdBy: 'user-2' }), now), false);
+});
+
+test('a missing creator identity cannot be treated as a different user', () => {
+  assert.equal(isPotentialDuplicateStockEntry(currentEntry(), previousEntry({ createdBy: undefined }), now), false);
+  assert.equal(isPotentialDuplicateStockEntry(currentEntry({ createdBy: undefined }), previousEntry(), now), false);
 });
 
 test('C: a different quantity is not a duplicate', () => {

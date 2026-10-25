@@ -7,7 +7,7 @@ export interface StockEntryDuplicateIdentity {
   diameterOrSize?: string;
   quantity: number;
   unit: string;
-  createdBy: string;
+  createdBy?: string;
 }
 
 export interface PreviousStockEntryDuplicateData extends StockEntryDuplicateIdentity {

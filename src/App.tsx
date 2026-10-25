@@ -11,7 +11,7 @@ import {
   TransactionType,
   ProjectStatus
 } from './types';
-import { dataService, PRESET_USERS } from './services/dataService';
+import { dataService } from './services/dataService';
 import { Navbar } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
 import { OngoingProjectsView } from './components/OngoingProjectsView';
@@ -33,7 +33,6 @@ import { authService } from './services/authService';
 import { UserSession } from './types';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { CloudSetupModal } from './components/CloudSetupModal';
-import { PlayCircle, CheckCircle2, ShieldAlert, Sparkles, X } from 'lucide-react';
 
 type ViewMode = 
   | 'home' 
@@ -62,9 +61,6 @@ export default function App() {
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isCloudSetupOpen, setIsCloudSetupOpen] = useState(false);
-  const [isTestWorkflowOpen, setIsTestWorkflowOpen] = useState(false);
-  const [testWorkflowLogs, setTestWorkflowLogs] = useState<string[]>([]);
-  const [isTestingWorkflow, setIsTestingWorkflow] = useState(false);
 
   // Core Data state
   const [company, setCompany] = useState<Company>({
@@ -272,169 +268,6 @@ export default function App() {
     return res;
   };
 
-  // Section 16 Automated End-to-End Verification Test Runner
-  const runSection16Tests = async () => {
-    setTestWorkflowLogs([
-      `[${new Date().toLocaleTimeString()}] The demo data verification runner is disabled for production use.`
-    ]);
-    return;
-
-    /* Legacy test workflow intentionally disabled: it creates business-looking
-       projects and inventory transactions in application storage. */
-    /*
-    setIsTestingWorkflow(true);
-    setTestWorkflowLogs([]);
-
-    const log = (msg: string) => {
-      setTestWorkflowLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
-    };
-
-    try {
-      log('Starting Section 16 End-to-End Verification Suite...');
-
-      // 1. Switch to Admin
-      dataService.switchRole('admin');
-      setCurrentUser(dataService.getCurrentUser());
-      log('Step 1: Authorized Administrator session active (Rajesh Sharma).');
-
-      // 2. Create Project
-      const testCode = `TEST-PRJ-${Date.now().toString().slice(-4)}`;
-      const createdProj = await dataService.createProject({
-        name: `Automated Test Tower ${testCode}`,
-        code: testCode,
-        client_name: 'Godrej Test Realty',
-        address: 'Sector 55 Testing Hub',
-        location: 'Bengaluru, KA',
-        description: 'Automated test site for inventory verification',
-        start_date: new Date().toISOString().split('T')[0],
-        expected_completion_date: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
-        project_manager_id: PRESET_USERS.project_manager.id,
-        project_manager_name: PRESET_USERS.project_manager.full_name,
-        status: 'in_progress'
-      });
-      log(`Step 2: Project created successfully with code: ${createdProj.code}.`);
-
-      // 3. Confirm in Ongoing Projects
-      const ongoing = await dataService.getProjects({ status: 'in_progress' });
-      const found = ongoing.find(p => p.id === createdProj.id);
-      if (!found) throw new Error('Failed: Newly created project not found in ongoing projects list.');
-      log('Step 3: Confirmed project appears in Ongoing Projects.');
-
-      // 4. Open project & Cement module
-      setSelectedProject(createdProj);
-      const allBrands = await dataService.getCementBrands();
-      const targetBrand = allBrands.find(b => b.code === 'ULTRATECH') || allBrands[0];
-      log(`Step 4: Selected project workspace & chose brand: ${targetBrand.brand_name}.`);
-
-      // 5. Record Receipt of 100 bags
-      await dataService.recordCementTransaction({
-        projectId: createdProj.id,
-        locationId: 'loc-test',
-        locationName: 'Test Staging Yard',
-        brandId: targetBrand.id,
-        brandName: targetBrand.brand_name,
-        transactionDate: new Date().toISOString().split('T')[0],
-        transactionType: 'receipt',
-        quantityBags: 100,
-        supplierName: 'Balaji Depot',
-        invoiceNumber: 'INV-TEST-100',
-        remarks: 'Verification batch receipt'
-      });
-      log('Step 5: Recorded material receipt of 100 bags.');
-
-      // 6. Record Usage of 25 bags
-      await dataService.recordCementTransaction({
-        projectId: createdProj.id,
-        locationId: 'loc-test',
-        locationName: 'Test Staging Yard',
-        brandId: targetBrand.id,
-        brandName: targetBrand.brand_name,
-        transactionDate: new Date().toISOString().split('T')[0],
-        transactionType: 'usage',
-        quantityBags: 25,
-        remarks: 'Pouring for column 3A'
-      });
-      log('Step 6: Recorded material usage of 25 bags.');
-
-      // 7. Record Damage of 3 bags
-      await dataService.recordCementTransaction({
-        projectId: createdProj.id,
-        locationId: 'loc-test',
-        locationName: 'Test Staging Yard',
-        brandId: targetBrand.id,
-        brandName: targetBrand.brand_name,
-        transactionDate: new Date().toISOString().split('T')[0],
-        transactionType: 'damage',
-        quantityBags: 3,
-        remarks: 'Wet bags damaged in heavy rain'
-      });
-      log('Step 7: Recorded damage of 3 bags.');
-
-      // 8. Verify exactly 72 bags available
-      const stock = await dataService.calculateCementStock(createdProj.id);
-      const brandSummary = stock.brandSummaries.find(b => b.brand_id === targetBrand.id);
-      const available = brandSummary?.available_stock ?? 0;
-      if (available !== 72) {
-        throw new Error(`Calculation error: Expected 72 available bags, but got ${available}.`);
-      }
-      log(`Step 8: Verified stock calculation: 100 - 25 - 3 = ${available} available bags! [PASSED]`);
-
-      // 9. Negative stock prevention test
-      try {
-        await dataService.recordCementTransaction({
-          projectId: createdProj.id,
-          locationId: 'loc-test',
-          locationName: 'Test Staging Yard',
-          brandId: targetBrand.id,
-          brandName: targetBrand.brand_name,
-          transactionDate: new Date().toISOString().split('T')[0],
-          transactionType: 'usage',
-          quantityBags: 1000 // Exceeds 72 available
-        });
-        throw new Error('Failure: System allowed negative stock movement!');
-      } catch (err: any) {
-        log(`Step 9: Negative stock protection correctly rejected overdraft: "${err.message}". [PASSED]`);
-      }
-
-      // 10. RBAC Test: Viewer cannot submit
-      dataService.switchRole('management_viewer');
-      try {
-        await dataService.recordCementTransaction({
-          projectId: createdProj.id,
-          locationId: 'loc-test',
-          locationName: 'Test Staging Yard',
-          brandId: targetBrand.id,
-          brandName: targetBrand.brand_name,
-          transactionDate: new Date().toISOString().split('T')[0],
-          transactionType: 'receipt',
-          quantityBags: 50
-        });
-        throw new Error('Failure: Management viewer was allowed to record transaction!');
-      } catch (err: any) {
-        log(`Step 10: RBAC restriction confirmed: Viewer was blocked from creating transactions. [PASSED]`);
-      }
-
-      // 11. Restore Admin & Mark Completed
-      dataService.switchRole('admin');
-      setCurrentUser(dataService.getCurrentUser());
-      await dataService.markProjectCompleted(createdProj.id);
-      log('Step 11: Marked project as completed. Verified project archived in Completed Projects.');
-
-      // 12. Check history retained
-      const finalTxs = await dataService.getCementTransactions(createdProj.id);
-      if (finalTxs.length < 3) throw new Error('Transaction history lost upon completion!');
-      log(`Step 12: Confirmed all ${finalTxs.length} historical ledger transactions remain intact. [PASSED]`);
-
-      log('SUCCESS: All Section 16 verification workflows passed seamlessly!');
-      await loadData();
-    } catch (e: any) {
-      log(`TEST FAILED: ${e.message}`);
-    } finally {
-      setIsTestingWorkflow(false);
-    }
-    */
-  };
-
   const handleUpdateProject = async (projectData: any) => {
     if (!editingProject) throw new Error('No project selected for editing.');
     const updated = await dataService.updateProject(editingProject.id, projectData);
@@ -461,6 +294,7 @@ export default function App() {
     <div className="bp-app-shell min-h-screen flex flex-col font-sans lg:flex-row">
       <Navbar
         currentUser={currentUser}
+        companyName={company.name}
         activeView={currentView}
         onOpenCloudSetup={() => setIsCloudSetupOpen(true)}
         onNavigateHome={() => setCurrentView('home')}
@@ -469,6 +303,10 @@ export default function App() {
         onNavigateAttendance={canViewAttendance ? () => setCurrentView('attendance') : undefined}
         onNavigateUserManagement={() => setCurrentView('user_management')}
         onLogout={handleLogout}
+        onProfileUpdated={(profile) => {
+          setCurrentUser(profile);
+          dataService.setCurrentUser(profile);
+        }}
         supabaseConfig={supabaseConfig}
         onRefreshData={handleRefreshData}
         isRefreshing={isRefreshing}
@@ -664,79 +502,6 @@ export default function App() {
         )}
 
       </main>
-
-      {/* Floating Section 16 Verification Runner Button */}
-      <aside aria-label="Testing Suite" className="hidden">
-        <button
-          onClick={() => setIsTestWorkflowOpen(true)}
-          className="px-3.5 py-2 bg-bp-navy text-bp-cyan hover:bg-bp-navy-light rounded-full shadow-lg border border-bp-navy-border text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-          title="Click to run Section 16 Automated Workflow Test (100 bags receipt -> 25 used -> 3 damaged = 72 bags)"
-        >
-          <PlayCircle className="w-4 h-4 text-bp-cyan" />
-          <span>Run Section 16 Test Suite</span>
-        </button>
-      </aside>
-
-      {/* Section 16 Test Modal Runner */}
-      {isTestWorkflowOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <PlayCircle className="w-5 h-5 text-bp-cyan" />
-                <h3 className="font-bold text-base">Section 16 Automated Verification Runner</h3>
-              </div>
-              <button
-                onClick={() => setIsTestWorkflowOpen(false)}
-                className="text-slate-400 hover:text-white p-1"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-600 leading-relaxed">
-                This executes the mandatory 14-step scenario from <strong>Section 16 of the prompt</strong>:
-                creates a test project, records 100 bags receipt, records 25 bags usage, records 3 bags damage, verifies the calculated balance equals <strong>exactly 72 bags</strong>, tests negative stock prevention, verifies RBAC restrictions, and confirms project completion preserves ledger history.
-              </p>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  disabled={isTestingWorkflow}
-                  onClick={runSection16Tests}
-                  className="px-5 py-2.5 bg-bp-blue hover:bg-bp-blue-dark text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
-                >
-                  <PlayCircle className="w-4 h-4" />
-                  {isTestingWorkflow ? 'Executing Test Steps...' : 'Execute Full Verification Sequence'}
-                </button>
-              </div>
-
-              {testWorkflowLogs.length > 0 && (
-                <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-slate-700 uppercase">Execution Logs:</span>
-                  <div className="bg-slate-950 text-slate-200 text-xs font-mono p-4 rounded-lg max-h-60 overflow-y-auto space-y-1">
-                    {testWorkflowLogs.map((l, i) => (
-                      <div key={i} className={l.includes('[PASSED]') ? 'text-emerald-400' : l.includes('FAILED') ? 'text-rose-400' : 'text-slate-300'}>
-                        {l}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex justify-end">
-              <button
-                onClick={() => setIsTestWorkflowOpen(false)}
-                className="px-4 py-2 bg-slate-900 text-white font-semibold text-xs rounded-lg hover:bg-slate-800 transition-colors"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* CREATE PROJECT MODAL */}
       <CreateProjectModal

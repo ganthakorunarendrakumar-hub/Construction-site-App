@@ -133,11 +133,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <div className="grid w-full grid-cols-2 gap-2 md:max-w-xs">
             <div className="bp-dashboard-stat rounded-xl border border-white/10 bg-white/10 px-3.5 py-3">
               <p className="text-[11px] font-medium text-bp-border-strong">Ongoing projects</p>
-              <p className="mt-0.5 font-mono text-2xl font-semibold tabular-nums text-white">{ongoingProjects.length}</p>
+              <p className="mt-0.5 bp-numeric text-2xl font-semibold text-white">{ongoingProjects.length}</p>
             </div>
             <div className="bp-dashboard-stat rounded-xl border border-white/10 bg-white/10 px-3.5 py-3">
               <p className="text-[11px] font-medium text-bp-border-strong">Completed projects</p>
-              <p className="mt-0.5 font-mono text-2xl font-semibold tabular-nums text-white">{completedProjects.length}</p>
+              <p className="mt-0.5 bp-numeric text-2xl font-semibold text-white">{completedProjects.length}</p>
             </div>
           </div>
         </div>
@@ -214,9 +214,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </h3>
               </div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-bp-background flex items-center justify-center group-hover:bg-bp-cyan transition-colors shrink-0">
-              <ArrowRight className="w-4 h-4 text-bp-muted transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
-            </div>
+            <ArrowRight className="h-4 w-4 shrink-0 text-bp-muted transition-transform group-hover:translate-x-0.5" />
           </div>
           )}
 
@@ -237,14 +235,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <h3 className="text-sm font-semibold text-bp-text">
                   Attendance
                 </h3>
-                <span className="inline-block mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-md bg-bp-cyan/20 text-bp-text border border-bp-cyan/30">
-                  Gangs & Wages
-                </span>
               </div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-bp-background flex items-center justify-center group-hover:bg-bp-cyan transition-colors shrink-0">
-              <ArrowRight className="w-4 h-4 text-bp-muted transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
-            </div>
+            <ArrowRight className="h-4 w-4 shrink-0 text-bp-muted transition-transform group-hover:translate-x-0.5" />
           </div>
           )}
 
@@ -267,9 +260,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   </h3>
                 </div>
               </div>
-              <div className="w-8 h-8 rounded-full bg-bp-background flex items-center justify-center group-hover:bg-bp-cyan transition-colors shrink-0">
-              <ArrowRight className="w-4 h-4 text-bp-muted transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
-              </div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-bp-muted transition-transform group-hover:translate-x-0.5" />
             </div>
           )}
 

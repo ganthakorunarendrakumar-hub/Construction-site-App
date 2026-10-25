@@ -83,7 +83,6 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-sm text-white">Reset Account Password</h3>
-              <p className="text-[11px] text-bp-muted">CHEN INFRA ERP Secure Recovery</p>
             </div>
           </div>
           <button
@@ -186,7 +185,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                   placeholder="e.g. 123456"
                   value={resetCode}
                   onChange={(e) => setResetCode(e.target.value.replace(/[^0-9]/g, ''))}
-                  className="w-full px-3 py-2 text-center text-base tracking-widest font-mono font-bold text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
+                  className="w-full px-3 py-2 text-center text-base tracking-widest bp-numeric font-bold text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                 />
               </div>
 

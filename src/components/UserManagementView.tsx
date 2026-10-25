@@ -297,17 +297,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       <div className="bg-white rounded-2xl border border-bp-border p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-bp-cyan text-bp-text font-mono">
-                ADMINISTRATION
-              </span>
-            </div>
             <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight">
               User Accounts & Security Permissions
             </h1>
-            <p className="text-xs sm:text-sm text-bp-muted max-w-2xl">
-              Manage staff accounts, site assignments, and role permissions.
-            </p>
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
@@ -333,26 +325,26 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
         <div className="pt-4 border-t border-bp-border grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
             <p className="text-[11px] font-semibold text-bp-muted uppercase">Total User Accounts</p>
-            <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
-              {accounts.length} <span className="text-xs font-normal text-bp-muted">users</span>
+            <p className="text-xl font-bold text-bp-text bp-numeric mt-0.5">
+              {accounts.length}
             </p>
           </div>
           <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
             <p className="text-[11px] font-semibold text-bp-muted uppercase">Active Administrators</p>
-            <p className="text-xl font-bold text-bp-text font-mono mt-0.5">
-              {accounts.filter(a => a.role === 'admin' && a.status === 'active').length} <span className="text-xs font-normal text-bp-muted">admins</span>
+            <p className="text-xl font-bold text-bp-text bp-numeric mt-0.5">
+              {accounts.filter(a => a.role === 'admin' && a.status === 'active').length}
             </p>
           </div>
           <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
             <p className="text-[11px] font-semibold text-bp-muted uppercase">Site Supervisors</p>
-            <p className="text-xl font-bold text-bp-blue font-mono mt-0.5">
-              {accounts.filter(a => a.role === 'site_supervisor' && a.status === 'active').length} <span className="text-xs font-normal text-bp-muted">supervisors</span>
+            <p className="text-xl font-bold text-bp-blue bp-numeric mt-0.5">
+              {accounts.filter(a => a.role === 'site_supervisor' && a.status === 'active').length}
             </p>
           </div>
           <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
             <p className="text-[11px] font-semibold text-bp-muted uppercase">Workers / Staff</p>
-            <p className="text-xl font-bold text-bp-blue font-mono mt-0.5">
-              {accounts.filter(a => a.role === 'worker' && a.status === 'active').length} <span className="text-xs font-normal text-bp-muted">workers</span>
+            <p className="text-xl font-bold text-bp-blue bp-numeric mt-0.5">
+              {accounts.filter(a => a.role === 'worker' && a.status === 'active').length}
             </p>
           </div>
         </div>

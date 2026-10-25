@@ -88,7 +88,7 @@ export const CompletedProjectsView: React.FC<CompletedProjectsViewProps> = ({
           <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight flex items-center gap-2.5">
             <CheckCircle2 className="w-6 h-6 text-bp-text" />
             Completed Projects
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-bp-background text-bp-text border border-bp-border font-mono ml-1">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-bp-background text-bp-text border border-bp-border bp-numeric ml-1">
               {filteredProjects.length}
             </span>
           </h1>

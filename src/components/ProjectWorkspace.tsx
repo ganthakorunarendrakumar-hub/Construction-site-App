@@ -297,22 +297,19 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <div className="w-9 h-9 rounded-xl bg-bp-cyan text-bp-text flex items-center justify-center font-bold text-xs">
-                      01
+                    <div className="w-9 h-9 rounded-xl bg-bp-cyan text-bp-text flex items-center justify-center">
+                      <Package className="w-4 h-4" />
                     </div>
                   </div>
                   <h3 className="text-base font-semibold text-bp-text group-hover:text-bp-text">
                     Cement
                   </h3>
-                  <p className="text-xs text-bp-muted mt-1 line-clamp-2">
-                    Multi-brand ledger, receipts, pouring consumption & damage tracking.
-                  </p>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-bp-border text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-bp-muted">Available:</span>
-                    <span className="font-bold text-bp-text font-mono text-sm">
+                    <span className="font-bold text-bp-text bp-numeric text-sm">
                       {stockMetrics?.totalAvailableBags ?? 0} bags
                     </span>
                   </div>
@@ -329,26 +326,20 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs p-5 flex flex-col justify-between hover:shadow-xs transition-all cursor-pointer group"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center mb-3">
                     <div className="w-9 h-9 rounded-xl bg-bp-background group-hover:bg-bp-cyan text-bp-text flex items-center justify-center font-bold text-xs transition-colors">
                       <Layers className="w-4 h-4 text-bp-text" />
                     </div>
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-bp-background text-bp-text border border-bp-border">
-                      TMT Rebars
-                    </span>
                   </div>
                   <h3 className="text-base font-semibold text-bp-text group-hover:text-bp-text">
                     Steel
                   </h3>
-                  <p className="text-xs text-bp-muted mt-1 line-clamp-2">
-                    Tata Tiscon, JSW, SAIL, Vizag & custom brands. Diameters 6mm–32mm.
-                  </p>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-bp-border text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-bp-muted">Available:</span>
-                    <span className="font-bold text-bp-text font-mono text-sm">
+                    <span className="font-bold text-bp-text bp-numeric text-sm">
                       {steelTotalKg !== null ? (
                         steelTotalKg >= 1000 ? `${(steelTotalKg / 1000).toFixed(2)} t` : `${steelTotalKg} kg`
                       ) : 'Live'}
@@ -367,26 +358,20 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs p-5 flex flex-col justify-between hover:shadow-xs transition-all cursor-pointer group"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center mb-3">
                     <div className="w-9 h-9 rounded-xl bg-bp-background group-hover:bg-bp-cyan text-bp-text flex items-center justify-center font-bold text-xs transition-colors">
                       <Mountain className="w-4 h-4 text-bp-text" />
                     </div>
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-bp-background text-bp-text border border-bp-border">
-                      Aggregates
-                    </span>
                   </div>
                   <h3 className="text-base font-semibold text-bp-text group-hover:text-bp-text">
                     Sand
                   </h3>
-                  <p className="text-xs text-bp-muted mt-1 line-clamp-2">
-                    River, M-Sand, Pit, Concrete sand with volumetric & mass conversion.
-                  </p>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-bp-border text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-bp-muted">Available:</span>
-                    <span className="font-bold text-bp-text font-mono text-sm">
+                    <span className="font-bold text-bp-text bp-numeric text-sm">
                       {sandTotalCft !== null ? `${sandTotalCft.toLocaleString()} cft` : 'Live'}
                     </span>
                   </div>
@@ -403,26 +388,20 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs p-5 flex flex-col justify-between hover:shadow-xs transition-all cursor-pointer group"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center mb-3">
                     <div className="w-9 h-9 rounded-xl bg-bp-background group-hover:bg-bp-cyan text-bp-text flex items-center justify-center font-bold text-xs transition-colors">
                       <Boxes className="w-4 h-4 text-bp-text" />
                     </div>
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-bp-background text-bp-text border border-bp-border">
-                      Masonry
-                    </span>
                   </div>
                   <h3 className="text-base font-semibold text-bp-text group-hover:text-bp-text">
                     Bricks & Blocks
                   </h3>
-                  <p className="text-xs text-bp-muted mt-1 line-clamp-2">
-                    Red clay, Fly Ash, AAC blocks, Porotherm with breakage tracking.
-                  </p>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-bp-border text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-bp-muted">Available:</span>
-                    <span className="font-bold text-bp-text font-mono text-sm">
+                    <span className="font-bold text-bp-text bp-numeric text-sm">
                       {bricksTotalNos !== null ? `${bricksTotalNos.toLocaleString()} Nos` : 'Live'}
                     </span>
                   </div>
@@ -439,26 +418,20 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs p-5 flex flex-col justify-between hover:shadow-xs transition-all cursor-pointer group"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center mb-3">
                     <div className="w-9 h-9 rounded-xl bg-bp-background group-hover:bg-bp-cyan text-bp-text flex items-center justify-center font-bold text-xs transition-colors">
                       <Gem className="w-4 h-4 text-bp-text" />
                     </div>
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-bp-background text-bp-text border border-bp-border">
-                      Blue Metal
-                    </span>
                   </div>
                   <h3 className="text-base font-semibold text-bp-text group-hover:text-bp-text">
                     Coarse Aggregate
                   </h3>
-                  <p className="text-xs text-bp-muted mt-1 line-clamp-2">
-                    10mm, 20mm, 40mm, 63mm, 80mm with bulk density conversion.
-                  </p>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-bp-border text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-bp-muted">Available:</span>
-                    <span className="font-bold text-bp-text font-mono text-sm">
+                    <span className="font-bold text-bp-text bp-numeric text-sm">
                       {aggregateTotalTonnes !== null ? `${aggregateTotalTonnes.toLocaleString()} t` : 'Live'}
                     </span>
                   </div>
@@ -489,63 +462,53 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               )}
             </div>
 
-            {/* Grid of the 9 Expandable Categories */}
+            {/* Material categories with hire modules after site-use materials */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {expandableCategories.map((cat) => (
-                <div
-                  key={cat.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onOpenCategoryModule(cat.id)}
-                  onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenCategoryModule(cat.id); } }}
-                  className="group flex cursor-pointer flex-col justify-between rounded-xl border border-bp-border bg-white p-4 transition-colors hover:border-bp-cyan hover:bg-bp-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bp-cyan"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-bp-background group-hover:bg-bp-cyan flex items-center justify-center shrink-0 transition-colors">
-                        {getCategoryIcon(cat.iconName)}
+                <React.Fragment key={cat.id}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onOpenCategoryModule(cat.id)}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenCategoryModule(cat.id); } }}
+                    className="group flex cursor-pointer flex-col justify-between rounded-xl border border-bp-border bg-white p-4 transition-colors hover:border-bp-cyan hover:bg-bp-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bp-cyan"
+                  >
+                    <div>
+                      <div className="mb-3 flex items-center">
+                        <div className="w-10 h-10 rounded-xl bg-bp-background group-hover:bg-bp-cyan flex items-center justify-center shrink-0 transition-colors">
+                          {getCategoryIcon(cat.iconName)}
+                        </div>
                       </div>
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md border ${
-                        cat.id === 'regular_site_use'
-                          ? 'bg-bp-cyan/20 text-bp-text border-bp-cyan/40 font-semibold'
-                          : 'bg-bp-background text-bp-text border-bp-border'
-                      }`}>
-                        {cat.id === 'regular_site_use' ? 'Site Essentials (29 Items)' : (cat.is_reusable ? 'Equipment' : 'Consumables')}
-                      </span>
+
+                      <h3 className="text-[17px] font-semibold text-bp-text group-hover:text-bp-text transition-colors">
+                        {cat.name}
+                      </h3>
                     </div>
 
-                    <h3 className="text-[17px] font-semibold text-bp-text group-hover:text-bp-text transition-colors">
-                      {cat.name}
-                    </h3>
-                    <p className="text-xs text-bp-muted mt-1 line-clamp-2">
-                      {cat.description}
-                    </p>
+                    <div className="mt-5 pt-3 border-t border-bp-border flex items-center justify-between text-xs">
+                      <span className="text-bp-muted">Unit: {cat.default_unit}</span>
+                      <span className="font-semibold text-bp-text group-hover:underline flex items-center gap-1">
+                        Open Module &rarr;
+                      </span>
+                    </div>
                   </div>
-
-                  <div className="mt-5 pt-3 border-t border-bp-border flex items-center justify-between text-xs">
-                    <span className="text-bp-muted">Unit: {cat.default_unit}</span>
-                    <span className="font-semibold text-bp-text group-hover:underline flex items-center gap-1">
-                      Open Module &rarr;
-                    </span>
-                  </div>
-                </div>
+                  {cat.id === 'regular_site_use' && (
+                    <>
+                      <HireCard
+                        title="Vehicle Hire"
+                        icon={<Truck className="w-5 h-5 text-bp-text" />}
+                        onOpen={onOpenVehicleHire}
+                      />
+                      <HireCard
+                        title="Machinery Hire"
+                        icon={<Wrench className="w-5 h-5 text-bp-text" />}
+                        onOpen={onOpenMachineryHire}
+                      />
+                    </>
+                  )}
+                </React.Fragment>
               ))}
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2">
-            <HireCard
-              title="Vehicle Hire"
-              description="Manage hired vehicles, operators, working hours, fuel, and supporting documents."
-              icon={<Truck className="w-5 h-5 text-bp-text" />}
-              onOpen={onOpenVehicleHire}
-            />
-            <HireCard
-              title="Machinery Hire"
-              description="Manage rented machinery, drilling tools, cutting tools, rental costs, and returns."
-              icon={<Wrench className="w-5 h-5 text-bp-text" />}
-              onOpen={onOpenMachineryHire}
-            />
           </div>
 
         </div>
@@ -661,10 +624,9 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
 const HireCard: React.FC<{
   title: string;
-  description: string;
   icon: React.ReactNode;
   onOpen: () => void;
-}> = ({ title, description, icon, onOpen }) => (
+}> = ({ title, icon, onOpen }) => (
   <div
     role="button"
     tabIndex={0}
@@ -677,10 +639,8 @@ const HireCard: React.FC<{
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-bp-background transition-colors group-hover:bg-bp-cyan">
           {icon}
         </div>
-        <ChevronRight className="h-4 w-4 text-bp-muted" />
       </div>
       <h3 className="text-[17px] font-semibold text-bp-text">{title}</h3>
-      <p className="mt-1 text-xs text-bp-muted">{description}</p>
     </div>
     <span className="mt-4 flex items-center justify-between border-t border-bp-border pt-3 text-xs font-semibold text-bp-text">
       Open module <ChevronRight className="h-4 w-4 text-bp-muted" />

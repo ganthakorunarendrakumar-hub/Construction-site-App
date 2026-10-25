@@ -13,7 +13,6 @@ import {
   TrendingUp,
   AlertTriangle,
   RotateCcw,
-  CheckCircle2,
   FileSpreadsheet,
   Calendar,
   ChevronRight,
@@ -193,35 +192,18 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight">
               Materials & Stock Reports
             </h1>
-            <p className="text-xs sm:text-sm text-bp-muted max-w-2xl">
-              Build date-range or cumulative stock reports, then export the results to CSV.
-            </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={handleExportCsv}
-              disabled={isLoading || isExporting}
-              className="px-4 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
-              title="Download CSV export matching the on-screen report"
-            >
-              <Download className="w-4 h-4 text-bp-text" />
-              <span>{isExporting ? 'Generating CSV...' : 'Download CSV Export'}</span>
-            </button>
-          </div>
         </div>
 
         {/* WORKFLOW: TWO PROMINENT REPORT SELECTION CARDS */}
-        <div className="pt-3 border-t border-bp-border">
-          <p className="text-xs font-semibold text-bp-muted uppercase tracking-wider mb-3">
-            Select Report Type:
-          </p>
-
+        <div className="border-t border-bp-border pt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
             {/* OPTION 1 CARD: Date Range Report */}
             <button
               type="button"
+              aria-pressed={reportMode === 'date_range'}
               onClick={() => {
                 setReportMode('date_range');
                 setActiveTab('materials');
@@ -243,33 +225,21 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </div>
                   <div>
                     <h3 className="font-bold text-sm sm:text-base text-bp-text flex items-center gap-2">
-                      Option 1: Date Range Report
-                      {reportMode === 'date_range' && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-bp-navy text-bp-cyan">
-                          ACTIVE
-                        </span>
-                      )}
+                      Date range
                     </h3>
                     <p className="text-xs text-bp-muted mt-0.5">
-                      Between two specific dates (From Date & To Date)
+                      Transactions between two dates, with opening and closing balances.
                     </p>
                   </div>
                 </div>
-                {reportMode === 'date_range' && (
-                  <CheckCircle2 className="w-5 h-5 text-bp-text shrink-0" />
-                )}
               </div>
 
-              <div className="mt-3 pt-3 border-t border-bp-border/70 text-[11px] text-bp-text-subtle space-y-1">
-                <p>&bull; Asks for <strong>From Date</strong> and <strong>To Date</strong> (both dates included).</p>
-                <p>&bull; Displays <strong>Opening Stock</strong> before start date, movements in range, and <strong>Closing Stock</strong>.</p>
-                <p>&bull; Provides matching date-range CSV export.</p>
-              </div>
             </button>
 
             {/* OPTION 2 CARD: Total Report Up To Date */}
             <button
               type="button"
+              aria-pressed={reportMode === 'up_to_date'}
               onClick={() => {
                 setReportMode('up_to_date');
                 setActiveTab('materials');
@@ -291,28 +261,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </div>
                   <div>
                     <h3 className="font-bold text-sm sm:text-base text-bp-text flex items-center gap-2">
-                      Option 2: Total Report Up To Date
-                      {reportMode === 'up_to_date' && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-bp-navy text-bp-cyan">
-                          ACTIVE
-                        </span>
-                      )}
+                      Cumulative to date
                     </h3>
                     <p className="text-xs text-bp-muted mt-0.5">
-                      Cumulative report up to one specific cut-off date
+                      Recorded stock totals through the selected date.
                     </p>
                   </div>
                 </div>
-                {reportMode === 'up_to_date' && (
-                  <CheckCircle2 className="w-5 h-5 text-bp-text shrink-0" />
-                )}
               </div>
 
-              <div className="mt-3 pt-3 border-t border-bp-border/70 text-[11px] text-bp-text-subtle space-y-1">
-                <p>&bull; Asks for <strong>only one date</strong>: Report Up To Date (No From Date asked).</p>
-                <p>&bull; Cumulative from start of history; includes all projects or specific project.</p>
-                <p>&bull; Displays cumulative movements and <strong>Closing Stock</strong> as of selected date.</p>
-              </div>
             </button>
 
           </div>
@@ -326,9 +283,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <SlidersHorizontal className="w-4 h-4 text-bp-text" />
             {reportMode === 'date_range' ? 'Date Range Configuration' : 'Cut-off Date Configuration'}
           </h2>
-          <span className="text-[11px] text-bp-muted">
-            {reportMode === 'date_range' ? 'Bounded Period Filter' : 'Single Cut-off Date Filter'}
-          </span>
         </div>
 
         {/* DYNAMIC DATE FIELDS BASED ON SELECTED OPTION */}
@@ -352,7 +306,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <div>
                 <label className="block text-[11px] font-bold text-bp-text uppercase mb-1 flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-bp-text" />
-                  To Date * (Inclusive)
+                  To Date *
                 </label>
                 <input
                   type="date"
@@ -384,7 +338,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   onClick={() => setQuickRange(getLocalDateStringOffset(-13), getLocalDateStringOffset(-2))}
                   className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-bp-border text-bp-text rounded-lg border border-bp-border-strong transition-colors"
                 >
-                  Previous 12-Day Audit Window
+                  Previous 12 Days
                 </button>
                 <button
                   type="button"
@@ -410,7 +364,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <div>
                 <label className="block text-[11px] font-bold text-bp-text uppercase mb-1 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-bp-text" />
-                  Report Up To Date * (Cut-off Date)
+                  Cut-off Date *
                 </label>
                 <input
                   type="date"
@@ -533,12 +487,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <p className="text-[11px] font-semibold text-bp-muted uppercase">
             {reportMode === 'date_range' ? 'Transactions in Range' : 'Total Transactions'}
           </p>
-          <p className="text-2xl font-bold text-bp-text font-mono mt-1">
+          <p className="text-2xl font-bold text-bp-text bp-numeric mt-1">
             {reportMode === 'date_range'
               ? (dateRangeReport?.totalTransactions ?? 0)
               : (cumulativeReport?.totalTransactions ?? 0)}
           </p>
-          <span className="text-[10px] text-bp-muted">audited entries</span>
         </div>
 
         {/* Total Received */}
@@ -546,12 +499,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <p className="text-[11px] font-semibold text-bp-muted uppercase">
             {reportMode === 'date_range' ? 'Received in Range' : 'Cumul. Received'}
           </p>
-          <p className="text-2xl font-bold text-bp-text font-mono mt-1">
+          <p className="text-2xl font-bold text-bp-text bp-numeric mt-1">
             {reportMode === 'date_range'
               ? (dateRangeReport?.totalReceived ?? 0).toLocaleString()
               : (cumulativeReport?.cumulativeReceived ?? 0).toLocaleString()}
           </p>
-          <span className="text-[10px] text-bp-muted">delivered to sites</span>
         </div>
 
         {/* Total Used / Issued */}
@@ -559,12 +511,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <p className="text-[11px] font-semibold text-bp-muted uppercase">
             {reportMode === 'date_range' ? 'Used / Issued in Range' : 'Cumul. Used / Issued'}
           </p>
-          <p className="text-2xl font-bold text-bp-text font-mono mt-1">
+          <p className="text-2xl font-bold text-bp-text bp-numeric mt-1">
             {reportMode === 'date_range'
               ? (dateRangeReport?.totalUsed ?? 0).toLocaleString()
               : (cumulativeReport?.cumulativeUsed ?? 0).toLocaleString()}
           </p>
-          <span className="text-[10px] text-bp-muted">consumed on works</span>
         </div>
 
         {/* Total Damaged / Scrap */}
@@ -572,12 +523,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <p className="text-[11px] font-semibold text-bp-muted uppercase">
             {reportMode === 'date_range' ? 'Damaged in Range' : 'Cumul. Damaged'}
           </p>
-          <p className="text-2xl font-bold text-rose-700 font-mono mt-1">
+          <p className="text-2xl font-bold text-rose-700 bp-numeric mt-1">
             {reportMode === 'date_range'
               ? (dateRangeReport?.totalDamaged ?? 0).toLocaleString()
               : (cumulativeReport?.cumulativeDamaged ?? 0).toLocaleString()}
           </p>
-          <span className="text-[10px] text-rose-600">spoilage / damaged</span>
         </div>
 
         {/* Total Returned */}
@@ -585,12 +535,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <p className="text-[11px] font-semibold text-bp-muted uppercase">
             {reportMode === 'date_range' ? 'Returned in Range' : 'Cumul. Returned'}
           </p>
-          <p className="text-2xl font-bold text-emerald-700 font-mono mt-1">
+          <p className="text-2xl font-bold text-emerald-700 bp-numeric mt-1">
             {reportMode === 'date_range'
               ? (dateRangeReport?.totalReturned ?? 0).toLocaleString()
               : (cumulativeReport?.cumulativeReturned ?? 0).toLocaleString()}
           </p>
-          <span className="text-[10px] text-emerald-600">returned to store</span>
         </div>
 
         {/* Total Adjusted / In Stock */}
@@ -598,14 +547,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <p className="text-[11px] font-semibold text-bp-muted uppercase">
             {reportMode === 'date_range' ? 'Adjusted in Range' : 'Items In Stock'}
           </p>
-          <p className="text-2xl font-bold text-bp-blue font-mono mt-1">
+          <p className="text-2xl font-bold text-bp-blue bp-numeric mt-1">
             {reportMode === 'date_range'
               ? (dateRangeReport?.totalAdjusted ?? 0).toLocaleString()
               : (cumulativeReport?.totalMaterialsInStock ?? 0).toLocaleString()}
           </p>
-          <span className="text-[10px] text-bp-blue">
-            {reportMode === 'date_range' ? 'audit adjustments' : 'active inventory'}
-          </span>
         </div>
 
       </div>
@@ -721,14 +667,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                           <tr key={m.key} className="hover:bg-bp-background transition-colors">
                             <td className="px-4 py-3 font-semibold text-bp-text">
                               <div>{m.itemName}</div>
-                              {m.brandName && (
+                              {((m.brandName && m.brandName !== m.itemName) || m.diameterOrSize) && (
                                 <span className="text-[11px] text-bp-muted font-normal">
-                                  {m.brandName} {m.diameterOrSize ? `• ${m.diameterOrSize}` : ''}
-                                </span>
-                              )}
-                              {m.subcategory && (
-                                <span className="inline-block ml-1 text-[10px] px-1.5 py-0.2 bg-bp-border text-bp-text-subtle rounded">
-                                  {m.subcategory}
+                                  {m.brandName && m.brandName !== m.itemName ? m.brandName : ''} {m.diameterOrSize ? `• ${m.diameterOrSize}` : ''}
                                 </span>
                               )}
                             </td>
@@ -812,14 +753,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                           <tr key={m.key} className="hover:bg-bp-background transition-colors">
                             <td className="px-4 py-3 font-semibold text-bp-text">
                               <div>{m.itemName}</div>
-                              {m.brandName && (
+                              {((m.brandName && m.brandName !== m.itemName) || m.diameterOrSize) && (
                                 <span className="text-[11px] text-bp-muted font-normal">
-                                  {m.brandName} {m.diameterOrSize ? `• ${m.diameterOrSize}` : ''}
-                                </span>
-                              )}
-                              {m.subcategory && (
-                                <span className="inline-block ml-1 text-[10px] px-1.5 py-0.2 bg-bp-border text-bp-text-subtle rounded">
-                                  {m.subcategory}
+                                  {m.brandName && m.brandName !== m.itemName ? m.brandName : ''} {m.diameterOrSize ? `• ${m.diameterOrSize}` : ''}
                                 </span>
                               )}
                             </td>
@@ -914,8 +850,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                           </td>
                           <td className="px-4 py-3 font-semibold text-bp-text">
                             <div>{tx.itemName}</div>
-                            {tx.brandName && (
-                              <div className="text-[11px] text-bp-muted font-normal">{tx.brandName}</div>
+                            {((tx.brandName && tx.brandName !== tx.itemName) || tx.diameterOrSize) && (
+                              <div className="text-[11px] text-bp-muted font-normal">
+                                {tx.brandName && tx.brandName !== tx.itemName ? tx.brandName : ''} {tx.diameterOrSize ? `• ${tx.diameterOrSize}` : ''}
+                              </div>
                             )}
                           </td>
                           <td className="px-3 py-3 text-center whitespace-nowrap">
@@ -963,29 +901,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
           </div>
         )}
-
-        {/* Footer info & CSV button */}
-        <div className="px-5 py-3 border-t border-bp-border bg-bp-background flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-bp-muted">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-bp-cyan" />
-            <span>
-              {reportMode === 'date_range'
-                ? `Historical Stock Ledger between ${fromDate} and ${toDate}`
-                : `Cumulative Total Stock Ledger up to ${upToDate}`}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleExportCsv}
-              disabled={isLoading || isExporting}
-              className="px-3.5 py-1.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors"
-            >
-              <Download className="w-3.5 h-3.5 text-bp-text" />
-              Download Matching CSV
-            </button>
-          </div>
-        </div>
 
       </div>
 

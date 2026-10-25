@@ -504,6 +504,57 @@ class AuthService {
     };
   }
 
+  /** Update only the signed-in user's display name in the local account store. */
+  public async updateCurrentProfile(updates: { full_name: string }): Promise<UserProfile> {
+    await this.ensureInitialized();
+    const session = this.getSession();
+    if (!session) throw new Error('Sign in again before editing your profile.');
+    if (dataService.isCloudConnected()) {
+      throw new Error('Profile editing is unavailable while cloud profiles are read-only. Contact your administrator to update your cloud profile.');
+    }
+
+    const fullName = updates.full_name.trim();
+    if (!fullName) throw new Error('Name cannot be empty.');
+    if (fullName.length > 120) throw new Error('Name must be 120 characters or fewer.');
+
+    const accountIndex = this.accounts.findIndex(account =>
+      account.auth_uid === session.auth_uid || account.user_id === session.user_id
+    );
+    if (accountIndex < 0) throw new Error('The signed-in account could not be found.');
+
+    const nextAccounts = [...this.accounts];
+    const updatedAccount = {
+      ...nextAccounts[accountIndex],
+      full_name: fullName,
+      updated_at: new Date().toISOString()
+    };
+    nextAccounts[accountIndex] = updatedAccount;
+    const nextSession = { ...session, full_name: fullName };
+    const previousAccounts = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
+    const previousSession = localStorage.getItem(STORAGE_KEYS.SESSION);
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(nextAccounts));
+      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(nextSession));
+    } catch {
+      try {
+        if (previousAccounts === null) localStorage.removeItem(STORAGE_KEYS.ACCOUNTS);
+        else localStorage.setItem(STORAGE_KEYS.ACCOUNTS, previousAccounts);
+        if (previousSession === null) localStorage.removeItem(STORAGE_KEYS.SESSION);
+        else localStorage.setItem(STORAGE_KEYS.SESSION, previousSession);
+      } catch {
+        // Keep the original storage error as the user-facing failure.
+      }
+      throw new Error('Your profile could not be saved. Check available browser storage and try again.');
+    }
+
+    this.accounts = nextAccounts;
+    this.currentSession = nextSession;
+    this.syncDataServiceUser(nextSession);
+    this.recordAuditLog('update_own_profile', updatedAccount.auth_uid, { fields: ['full_name'] });
+    return this.getCurrentUser();
+  }
+
   // ==========================================
   // 2. PASSWORD RESET WORKFLOW
   // ==========================================
