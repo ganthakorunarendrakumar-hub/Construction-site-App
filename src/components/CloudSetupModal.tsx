@@ -320,7 +320,7 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
                     Staff Accounts & RBAC
                   </div>
                   <p className="text-bp-muted text-[11px]">
-                    Company Admin, Project Manager, Site Engineer, Storekeeper, Management Viewer with instant role switcher.
+                    Role-based permissions for administrators, project managers, engineers, storekeepers, and viewers.
                   </p>
                 </div>
 

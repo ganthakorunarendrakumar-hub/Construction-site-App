@@ -139,8 +139,13 @@ class AuthService {
     this.initSession();
   }
 
+  private isLocalAdminRecoveryMode(): boolean {
+    return import.meta.env.DEV === true && import.meta.env.MODE === 'local-recovery';
+  }
+
   /**
-   * Initialize accounts and seed default cryptographic credentials if empty.
+   * Initialize local accounts and use the existing fresh-install seed outside
+   * the owner-only recovery mode.
    */
   public async ensureInitialized(): Promise<void> {
     if (this.isInitialized) return;
@@ -153,7 +158,24 @@ class AuthService {
         return;
       }
     } catch (e) {
+      if (this.isLocalAdminRecoveryMode()) {
+        // Recovery must never replace a missing or malformed account store with
+        // the normal preset accounts. The recovery screen validates the store
+        // and fails closed if it exists but cannot be parsed.
+        this.accounts = [];
+        this.isInitialized = true;
+        return;
+      }
       console.warn('Failed reading stored auth accounts, re-seeding.', e);
+    }
+
+    if (this.isLocalAdminRecoveryMode()) {
+      // The ordinary initialization path creates preset users when no store
+      // exists. Skip that behavior during owner recovery so no default account
+      // or password is introduced.
+      this.accounts = [];
+      this.isInitialized = true;
+      return;
     }
 
     // Default Seed Accounts with real PBKDF2 cryptography
@@ -712,6 +734,219 @@ class AuthService {
     });
 
     return newAccount;
+  }
+
+  /**
+   * Creates one local administrator after explicit approval in the local
+   * development server's terminal. This deliberately avoids account seeding,
+   * cloud auth, and the ordinary admin-session-gated account-creation path.
+   */
+  public async getLocalAdminRecoveryStatus(): Promise<{ available: boolean; message?: string }> {
+    if (import.meta.env.DEV !== true || import.meta.env.MODE !== 'local-recovery') {
+      return { available: false, message: 'Start the dedicated local recovery command to continue.' };
+    }
+
+    const configuredCloud = dataService.getConfig();
+    if (dataService.isCloudConnected() || configuredCloud.url.trim() || configuredCloud.anonKey.trim()) {
+      return { available: false, message: 'Recovery is disabled while cloud authentication or configuration is present.' };
+    }
+
+    try {
+      const response = await fetch('/__buildpulse_local_admin_recovery/status', { cache: 'no-store' });
+      const result = await response.json().catch(() => ({})) as { available?: unknown };
+      if (!response.ok || typeof result.available !== 'boolean') {
+        return { available: false, message: 'The local recovery server could not verify one-time availability.' };
+      }
+      return result.available
+        ? { available: true }
+        : { available: false, message: 'The one-time local recovery has already been used for this workspace on this OS account.' };
+    } catch {
+      return { available: false, message: 'The local recovery server is unavailable. Start it from the project terminal.' };
+    }
+  }
+
+  public async recoverLocalAdministrator(input: {
+    full_name: string;
+    user_id: string;
+    email: string;
+    password: string;
+  }): Promise<AuthAccount> {
+    if (import.meta.env.DEV !== true || import.meta.env.MODE !== 'local-recovery') {
+      throw new Error('Local administrator recovery is available only in the dedicated development recovery mode.');
+    }
+
+    const configuredCloud = dataService.getConfig();
+    if (dataService.isCloudConnected() || configuredCloud.url.trim() || configuredCloud.anonKey.trim()) {
+      throw new Error('Local recovery is disabled while cloud authentication or configuration is present.');
+    }
+
+    if (this.currentSession && this.currentSession.expires_at > Date.now()) {
+      throw new Error('Sign out before starting local administrator recovery.');
+    }
+
+    const fullName = input.full_name.trim();
+    const email = input.email.trim().toLowerCase();
+    const userId = input.user_id.trim().toUpperCase();
+    if (!fullName || fullName.length > 120) throw new Error('Enter a valid full name.');
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error('Enter a valid email address.');
+    }
+    if (!/^[A-Z0-9._-]{3,40}$/.test(userId)) {
+      throw new Error('User ID must be 3 to 40 letters, numbers, dots, underscores, or hyphens.');
+    }
+    if (input.password.length < 12 || input.password.length > 128) {
+      throw new Error('Use a password between 12 and 128 characters.');
+    }
+
+    const storedAccounts = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
+    let existingAccounts: AuthAccount[] = [];
+    if (storedAccounts !== null) {
+      try {
+        const parsed: unknown = JSON.parse(storedAccounts);
+        if (!Array.isArray(parsed) || parsed.some(account =>
+          !account || typeof account !== 'object' ||
+          typeof account.auth_uid !== 'string' || typeof account.user_id !== 'string' ||
+          typeof account.email !== 'string' || typeof account.company_id !== 'string'
+        )) {
+          throw new Error('Invalid account store.');
+        }
+        existingAccounts = parsed as AuthAccount[];
+      } catch {
+        throw new Error('The existing local account store could not be validated. No recovery changes were made.');
+      }
+    }
+    if (existingAccounts.some(account => account.email.toLowerCase() === email)) {
+      throw new Error('An account with that email already exists.');
+    }
+    if (existingAccounts.some(account => account.user_id.toUpperCase() === userId)) {
+      throw new Error('That User ID is already in use.');
+    }
+
+    const salt = AuthCrypto.generateSalt(16);
+    const passwordHash = await AuthCrypto.hashPassword(input.password, salt);
+
+    let grant: string | null = null;
+    const recoveryPath = '/__buildpulse_local_admin_recovery';
+    const sendRecoveryRequest = async (path: string, body?: Record<string, string>): Promise<Response> =>
+      fetch(`${recoveryPath}/${path}`, {
+        method: body ? 'POST' : 'GET',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+        cache: 'no-store'
+      });
+
+    try {
+      const authorizationResponse = await sendRecoveryRequest('authorize', {
+        full_name: fullName,
+        user_id: userId,
+        email
+      });
+      const authorizationResult = await authorizationResponse.json().catch(() => ({})) as {
+        grant?: unknown;
+        message?: unknown;
+      };
+      if (!authorizationResponse.ok || typeof authorizationResult.grant !== 'string') {
+        throw new Error(typeof authorizationResult.message === 'string'
+          ? authorizationResult.message
+          : 'The local owner did not authorize recovery.');
+      }
+      const approvedGrant = authorizationResult.grant;
+      grant = approvedGrant;
+
+      if (localStorage.getItem(STORAGE_KEYS.ACCOUNTS) !== storedAccounts) {
+        throw new Error('Local account data changed during recovery. Reload and try again.');
+      }
+
+      const companyId = existingAccounts.find(account => account.role === 'admin')?.company_id ||
+        existingAccounts[0]?.company_id || 'comp-apex-01';
+      const now = new Date().toISOString();
+      const newAccount: AuthAccount = {
+        auth_uid: `auth-usr-local-${AuthCrypto.generateSessionToken()}`,
+        user_id: userId,
+        email,
+        full_name: fullName,
+        role: 'admin',
+        role_title: ROLE_TITLES.admin,
+        company_id: companyId,
+        assigned_projects: [],
+        status: 'active',
+        password_hash: passwordHash,
+        password_salt: salt,
+        failed_attempts: 0,
+        lockout_until: null,
+        must_change_password: false,
+        created_at: now,
+        updated_at: now,
+        created_by: 'local_owner_recovery'
+      };
+      const updatedAccounts = [...existingAccounts, newAccount];
+      const serializedAccounts = JSON.stringify(updatedAccounts);
+
+      try {
+        localStorage.setItem(STORAGE_KEYS.ACCOUNTS, serializedAccounts);
+      } catch {
+        throw new Error('The new account could not be saved in browser storage. No existing accounts were replaced.');
+      }
+
+      this.accounts = updatedAccounts;
+      this.isInitialized = true;
+
+      let completionSucceeded = false;
+      try {
+        const completionResponse = await sendRecoveryRequest('complete', { grant: approvedGrant });
+        completionSucceeded = completionResponse.ok;
+      } catch {
+        completionSucceeded = false;
+      }
+
+      if (!completionSucceeded) {
+        let completionVerified: boolean | null = null;
+        try {
+          const statusResponse = await sendRecoveryRequest('status', { grant: approvedGrant });
+          const status = await statusResponse.json() as { completedForThisGrant?: unknown };
+          if (statusResponse.ok && typeof status.completedForThisGrant === 'boolean') {
+            completionVerified = status.completedForThisGrant;
+          }
+        } catch {
+          // If the server is unreachable, retain the account rather than risk
+          // rolling back after the one-time marker may already have been set.
+        }
+
+        if (completionVerified === false) {
+          if (localStorage.getItem(STORAGE_KEYS.ACCOUNTS) === serializedAccounts) {
+            if (storedAccounts === null) {
+              localStorage.removeItem(STORAGE_KEYS.ACCOUNTS);
+            } else {
+              localStorage.setItem(STORAGE_KEYS.ACCOUNTS, storedAccounts);
+            }
+          }
+          this.accounts = existingAccounts;
+          try {
+            await sendRecoveryRequest('cancel', { grant: approvedGrant });
+          } catch {
+            // The grant expires automatically if cancellation cannot reach the server.
+          }
+          throw new Error('Recovery could not be completed. Existing account data was restored. Try again after checking the local server.');
+        }
+      }
+
+      this.recordAuditLog('local_admin_recovery', newAccount.auth_uid, {
+        user_id: newAccount.user_id,
+        email: newAccount.email,
+        authorization: 'local_development_terminal_confirmation'
+      });
+      return newAccount;
+    } catch (error) {
+      const grantToCancel = grant;
+      if (grantToCancel && localStorage.getItem(STORAGE_KEYS.ACCOUNTS) === storedAccounts) {
+        try {
+          await sendRecoveryRequest('cancel', { grant: grantToCancel });
+        } catch {
+          // The grant expires automatically if cancellation cannot reach the server.
+        }
+      }
+      throw error;
+    }
   }
 
   /**

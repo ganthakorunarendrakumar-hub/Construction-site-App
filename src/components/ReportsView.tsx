@@ -190,19 +190,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       <div className="bg-white rounded-2xl border border-bp-border p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-bp-cyan text-bp-text font-mono">
-                CHEN INFRA ERP
-              </span>
-              <span className="text-xs text-bp-muted font-medium">
-                Live Transaction & Stock Auditing
-              </span>
-            </div>
             <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight">
               Materials & Stock Reports
             </h1>
             <p className="text-xs sm:text-sm text-bp-muted max-w-2xl">
-              Generate audited material inventory statements with historical accuracy. Choose between a bounded date range or cumulative stock ledger up to any date.
+              Build date-range or cumulative stock reports, then export the results to CSV.
             </p>
           </div>
 
@@ -602,16 +594,16 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* Total Adjusted / In Stock */}
-        <div className="bg-white p-4 rounded-2xl border border-bp-border shadow-xs border-l-4 border-l-blue-500">
+        <div className="bg-white p-4 rounded-2xl border border-bp-border shadow-xs border-l-4 border-l-bp-blue">
           <p className="text-[11px] font-semibold text-bp-muted uppercase">
             {reportMode === 'date_range' ? 'Adjusted in Range' : 'Items In Stock'}
           </p>
-          <p className="text-2xl font-bold text-blue-700 font-mono mt-1">
+          <p className="text-2xl font-bold text-bp-blue font-mono mt-1">
             {reportMode === 'date_range'
               ? (dateRangeReport?.totalAdjusted ?? 0).toLocaleString()
               : (cumulativeReport?.totalMaterialsInStock ?? 0).toLocaleString()}
           </p>
-          <span className="text-[10px] text-blue-600">
+          <span className="text-[10px] text-bp-blue">
             {reportMode === 'date_range' ? 'audit adjustments' : 'active inventory'}
           </span>
         </div>

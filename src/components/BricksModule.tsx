@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Boxes,
   PlusCircle,
@@ -25,10 +25,13 @@ import {
   CategoryStockMetrics,
   ExtendedTransactionType
 } from '../types';
-import { dataService } from '../services/dataService';
+import { dataService, PossibleDuplicateStockEntryError } from '../services/dataService';
 import { getLocalDateString } from '../utils/dateUtils';
 import { AttachmentLinks, AttachmentSections, emptyTransactionAttachments, hasTransactionAttachments } from './AttachmentSections';
 import { TransactionAttachments } from '../types';
+import { DuplicateStockEntryDialog } from './DuplicateStockEntryDialog';
+import type { DuplicateStockEntryDetails } from '../utils/stockDuplicate';
+import { DuplicateStockEntryConfirmation } from '../utils/stockDuplicate';
 
 interface BricksModuleProps {
   project: Project;
@@ -76,6 +79,10 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successSaved, setSuccessSaved] = useState<GenericMaterialTransaction | null>(null);
+  const [duplicateEntry, setDuplicateEntry] = useState<DuplicateStockEntryDetails | null>(null);
+  const [pendingDuplicateTransaction, setPendingDuplicateTransaction] = useState<Parameters<typeof dataService.recordGenericTransaction>[0] | null>(null);
+  const duplicateConfirmation = useRef(new DuplicateStockEntryConfirmation<Parameters<typeof dataService.recordGenericTransaction>[0]>());
+  const [isContinuingDuplicate, setIsContinuingDuplicate] = useState(false);
 
   // Admin Add Custom Brick Type
   const [isAddingType, setIsAddingType] = useState(false);
@@ -151,35 +158,71 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
     const loc = locations.find(l => l.id === txLocationId);
     if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
 
+    const transactionInput: Parameters<typeof dataService.recordGenericTransaction>[0] = {
+      projectId: project.id,
+      projectName: project.name,
+      locationId: txLocationId,
+      locationName: loc ? loc.name : 'Main Masonry Staging',
+      category: 'bricks',
+      itemName: finalType,
+      unit: 'Nos',
+      transactionDate: txDate,
+      transactionType: txType,
+      quantity: qtyNos,
+      supplierName,
+      invoiceNumber,
+      challanNumber,
+      remarks: remarks ? `${remarks} (Logged as ${qty} ${inputUnit})` : `Logged as ${qty} ${inputUnit}`,
+      attachmentUrl: attachment?.url,
+      attachmentName: attachment?.name,
+      attachmentSize: attachment?.size,
+      attachments
+    };
+
     try {
       setIsSubmitting(true);
-      const saved = await dataService.recordGenericTransaction({
-        projectId: project.id,
-        locationId: txLocationId,
-        locationName: loc ? loc.name : 'Main Masonry Staging',
-        category: 'bricks',
-        itemName: finalType,
-        unit: 'Nos',
-        transactionDate: txDate,
-        transactionType: txType,
-        quantity: qtyNos,
-        supplierName,
-        invoiceNumber,
-        challanNumber,
-        remarks: remarks ? `${remarks} (Logged as ${qty} ${inputUnit})` : `Logged as ${qty} ${inputUnit}`,
-        attachmentUrl: attachment?.url,
-        attachmentName: attachment?.name,
-        attachmentSize: attachment?.size,
-        attachments
-      });
+      const saved = await dataService.recordGenericTransaction(transactionInput);
 
       setSuccessSaved(saved);
       await loadModuleData();
     } catch (err: any) {
+      if (err instanceof PossibleDuplicateStockEntryError) {
+        duplicateConfirmation.current.setPending(transactionInput);
+        setPendingDuplicateTransaction(transactionInput);
+        setDuplicateEntry(err.duplicate);
+        return;
+      }
       setFormError(err.message || 'Transaction recording failed');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleContinueDuplicate = async () => {
+    if (!pendingDuplicateTransaction) return;
+    setIsContinuingDuplicate(true);
+    setIsSubmitting(true);
+    try {
+      const saved = await duplicateConfirmation.current.continue(input => dataService.recordGenericTransaction(input));
+      if (!saved) return;
+      setDuplicateEntry(null);
+      setPendingDuplicateTransaction(null);
+      setSuccessSaved(saved);
+      await loadModuleData();
+    } catch (err: any) {
+      setDuplicateEntry(null);
+      setPendingDuplicateTransaction(null);
+      setFormError(err.message || 'Transaction recording failed');
+    } finally {
+      setIsContinuingDuplicate(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelDuplicate = () => {
+    duplicateConfirmation.current.cancel();
+    setDuplicateEntry(null);
+    setPendingDuplicateTransaction(null);
   };
 
   const handleReversalSubmit = async (e: React.FormEvent) => {
@@ -421,11 +464,11 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="text-xs py-2 px-3 rounded-xl border border-bp-border bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
+                className="w-full max-w-full rounded-xl border border-bp-border bg-white px-3 py-2 text-xs text-bp-text focus:border-bp-cyan focus:outline-none sm:w-auto"
               >
                 <option value="all">All Brick & Block Types</option>
                 {brickTypes.map(t => <option key={t} value={t}>{t}</option>)}
@@ -794,6 +837,15 @@ export const BricksModule: React.FC<BricksModuleProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {duplicateEntry && (
+        <DuplicateStockEntryDialog
+          duplicate={duplicateEntry}
+          isContinuing={isContinuingDuplicate}
+          onCancel={handleCancelDuplicate}
+          onContinue={handleContinueDuplicate}
+        />
       )}
 
     </div>

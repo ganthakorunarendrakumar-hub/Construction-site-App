@@ -568,19 +568,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           <div className="bg-white rounded-2xl border border-bp-border p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-bp-cyan text-bp-text font-mono">
-                    CHEN INFRA ERP
-                  </span>
-                  <span className="text-xs text-bp-muted font-medium">
-                    Group-Based Attendance & Labor Ledger
-                  </span>
-                </div>
                 <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight">
                   Worker Groups & Gang Attendance
                 </h1>
                 <p className="text-xs sm:text-sm text-bp-muted max-w-2xl">
-                  Manage worker teams, subcontractor gangs, daily attendance registers, wage rates, and CSV payroll statements.
+                  Manage worker groups, daily attendance, working hours, and wages.
                 </p>
               </div>
 
@@ -1331,7 +1323,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                         : form.status === 'Leave'
                                         ? 'bg-amber-100 text-amber-800 border-amber-300'
                                         : form.status === 'Weekly Off' || form.status === 'Holiday'
-                                        ? 'bg-purple-100 text-purple-800 border-purple-300'
+                                        ? 'bg-bp-cyan-soft text-bp-navy border-bp-cyan-border'
                                         : 'bg-slate-100 text-slate-600 border-slate-300'
                                     }`}
                                   >

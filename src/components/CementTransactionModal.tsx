@@ -28,6 +28,10 @@ import {
 import { getLocalDateString } from '../utils/dateUtils';
 import { AttachmentSections, emptyTransactionAttachments, hasTransactionAttachments } from './AttachmentSections';
 import { TransactionAttachments } from '../types';
+import { PossibleDuplicateStockEntryError } from '../services/dataService';
+import { DuplicateStockEntryDialog } from './DuplicateStockEntryDialog';
+import type { DuplicateStockEntryDetails } from '../utils/stockDuplicate';
+import { DuplicateStockEntryConfirmation } from '../utils/stockDuplicate';
 
 interface CementTransactionModalProps {
   isOpen: boolean;
@@ -40,6 +44,7 @@ interface CementTransactionModalProps {
   preselectedBrandId?: string;
   onSaveTransaction: (txData: {
     projectId: string;
+    projectName?: string;
     locationId: string;
     locationName: string;
     brandId: string;
@@ -55,6 +60,7 @@ interface CementTransactionModalProps {
     attachmentName?: string;
     attachmentSize?: number;
     attachments?: TransactionAttachments;
+    allowPossibleDuplicate?: boolean;
   }) => Promise<MaterialTransaction>;
   onUploadFile: (file: File) => Promise<{ url: string; name: string; size: number }>;
 }
@@ -90,6 +96,10 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successSaved, setSuccessSaved] = useState<MaterialTransaction | null>(null);
+  const [duplicateEntry, setDuplicateEntry] = useState<DuplicateStockEntryDetails | null>(null);
+  const [pendingDuplicateTransaction, setPendingDuplicateTransaction] = useState<Parameters<CementTransactionModalProps['onSaveTransaction']>[0] | null>(null);
+  const duplicateConfirmation = useRef(new DuplicateStockEntryConfirmation<Parameters<CementTransactionModalProps['onSaveTransaction']>[0]>());
+  const [isContinuingDuplicate, setIsContinuingDuplicate] = useState(false);
 
   if (!isOpen) return null;
 
@@ -154,38 +164,74 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
     const locName = selectedLoc ? selectedLoc.name : 'Main Site Cement Yard';
     if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
 
+    const transactionInput: Parameters<CementTransactionModalProps['onSaveTransaction']>[0] = {
+      projectId: project.id,
+      projectName: project.name,
+      locationId,
+      locationName: locName,
+      brandId: selectedBrandId,
+      brandName: finalBrandName,
+      transactionDate,
+      transactionType,
+      quantityBags: qty,
+      supplierName: supplierName.trim(),
+      invoiceNumber: invoiceNumber.trim(),
+      challanNumber: challanNumber.trim(),
+      remarks: remarks.trim(),
+      attachmentUrl: attachments.invoice?.url || attachments.dc?.url,
+      attachmentName: attachments.invoice?.name || attachments.dc?.name,
+      attachmentSize: attachments.invoice?.size || attachments.dc?.size,
+      attachments
+    };
+
     try {
       setIsSubmitting(true);
-      const saved = await onSaveTransaction({
-        projectId: project.id,
-        locationId,
-        locationName: locName,
-        brandId: selectedBrandId,
-        brandName: finalBrandName,
-        transactionDate,
-        transactionType,
-        quantityBags: qty,
-        supplierName: supplierName.trim(),
-        invoiceNumber: invoiceNumber.trim(),
-        challanNumber: challanNumber.trim(),
-        remarks: remarks.trim(),
-        attachmentUrl: attachments.invoice?.url || attachments.dc?.url,
-        attachmentName: attachments.invoice?.name || attachments.dc?.name,
-        attachmentSize: attachments.invoice?.size || attachments.dc?.size,
-        attachments
-      });
+      const saved = await onSaveTransaction(transactionInput);
 
       setSuccessSaved(saved);
     } catch (err: any) {
+      if (err instanceof PossibleDuplicateStockEntryError) {
+        duplicateConfirmation.current.setPending(transactionInput);
+        setPendingDuplicateTransaction(transactionInput);
+        setDuplicateEntry(err.duplicate);
+        return;
+      }
       setFormError(err.message || 'Failed to record transaction.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleContinueDuplicate = async () => {
+    if (!pendingDuplicateTransaction) return;
+    setIsContinuingDuplicate(true);
+    setIsSubmitting(true);
+    setDuplicateEntry(null);
+    setFormError(null);
+    try {
+      const saved = await duplicateConfirmation.current.continue(input => onSaveTransaction(input));
+      if (!saved) return;
+      setPendingDuplicateTransaction(null);
+      setSuccessSaved(saved);
+    } catch (err: any) {
+      setPendingDuplicateTransaction(null);
+      setFormError(err.message || 'Failed to record transaction.');
+    } finally {
+      setIsContinuingDuplicate(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelDuplicate = () => {
+    duplicateConfirmation.current.cancel();
+    setDuplicateEntry(null);
+    setPendingDuplicateTransaction(null);
+  };
+
   const handleClose = () => {
     setSuccessSaved(null);
     setFormError(null);
+    handleCancelDuplicate();
     onClose();
   };
 
@@ -527,6 +573,14 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
         )}
 
       </div>
+      {duplicateEntry && (
+        <DuplicateStockEntryDialog
+          duplicate={duplicateEntry}
+          isContinuing={isContinuingDuplicate}
+          onCancel={handleCancelDuplicate}
+          onContinue={handleContinueDuplicate}
+        />
+      )}
     </div>
   );
 };

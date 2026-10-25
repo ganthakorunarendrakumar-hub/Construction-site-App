@@ -3,7 +3,6 @@ import {
   Company,
   Project,
   UserProfile,
-  UserRole,
   CementBrand,
   MaterialLocation,
   MaterialTransaction,
@@ -79,6 +78,8 @@ export default function App() {
   const [session, setSession] = useState<UserSession | null>(() => authService.getSession());
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => authService.getCurrentUser());
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const canViewReports = authService.canPerformAction('view_reports');
+  const canViewAttendance = authService.canPerformAction('view_attendance');
 
   useEffect(() => {
     async function initAuth() {
@@ -195,23 +196,6 @@ export default function App() {
 
   const handleOpenCementModule = () => {
     setCurrentView('cement_module');
-  };
-
-  const handleSwitchRole = async (role: UserRole) => {
-    const preset = PRESET_USERS[role];
-    if (preset) {
-      try {
-        const s = await authService.login(preset.user_id || preset.email, 'ChenInfra@2026', true);
-        setSession(s);
-        const u = authService.getCurrentUser();
-        setCurrentUser(u);
-        dataService.setCurrentUser(u);
-        setCurrentView('home');
-      } catch {
-        const updated = dataService.switchRole(role);
-        setCurrentUser(updated);
-      }
-    }
   };
 
   const handleUpdateCompanyName = async (newName: string) => {
@@ -474,18 +458,15 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-bp-background flex flex-col font-sans">
-      
-      {/* Top Navbar */}
+    <div className="bp-app-shell min-h-screen flex flex-col font-sans lg:flex-row">
       <Navbar
         currentUser={currentUser}
         activeView={currentView}
-        onSwitchRole={handleSwitchRole}
         onOpenCloudSetup={() => setIsCloudSetupOpen(true)}
         onNavigateHome={() => setCurrentView('home')}
         onNavigateProjects={() => setCurrentView('ongoing_projects')}
-        onNavigateReports={() => setCurrentView('reports')}
-        onNavigateAttendance={() => setCurrentView('attendance')}
+        onNavigateReports={canViewReports ? () => setCurrentView('reports') : undefined}
+        onNavigateAttendance={canViewAttendance ? () => setCurrentView('attendance') : undefined}
         onNavigateUserManagement={() => setCurrentView('user_management')}
         onLogout={handleLogout}
         supabaseConfig={supabaseConfig}
@@ -494,7 +475,7 @@ export default function App() {
       />
 
       {/* Main Content Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="bp-main-content min-w-0 w-full max-w-[1680px] flex-1 px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
         
         {/* ROLE-RESTRICTED VIEW: WORKER PORTAL (Restricted only to own records) */}
         {currentUser.role === 'worker' ? (
@@ -512,8 +493,8 @@ export default function App() {
                 onNavigateCreateProject={() => setIsCreateProjectOpen(true)}
                 onNavigateOngoing={() => setCurrentView('ongoing_projects')}
                 onNavigateCompleted={() => setCurrentView('completed_projects')}
-                onNavigateReports={() => setCurrentView('reports')}
-                onNavigateAttendance={() => setCurrentView('attendance')}
+                onNavigateReports={canViewReports ? () => setCurrentView('reports') : undefined}
+                onNavigateAttendance={canViewAttendance ? () => setCurrentView('attendance') : undefined}
                 onNavigateUserManagement={() => setCurrentView('user_management')}
                 onOpenProject={handleOpenProject}
               />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Mountain,
   PlusCircle,
@@ -25,10 +25,13 @@ import {
   CategoryStockMetrics,
   ExtendedTransactionType
 } from '../types';
-import { dataService } from '../services/dataService';
+import { dataService, PossibleDuplicateStockEntryError } from '../services/dataService';
 import { getLocalDateString } from '../utils/dateUtils';
 import { AttachmentLinks, AttachmentSections, emptyTransactionAttachments, hasTransactionAttachments } from './AttachmentSections';
 import { TransactionAttachments } from '../types';
+import { DuplicateStockEntryDialog } from './DuplicateStockEntryDialog';
+import type { DuplicateStockEntryDetails } from '../utils/stockDuplicate';
+import { DuplicateStockEntryConfirmation } from '../utils/stockDuplicate';
 
 interface SandModuleProps {
   project: Project;
@@ -76,6 +79,10 @@ export const SandModule: React.FC<SandModuleProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successSaved, setSuccessSaved] = useState<GenericMaterialTransaction | null>(null);
+  const [duplicateEntry, setDuplicateEntry] = useState<DuplicateStockEntryDetails | null>(null);
+  const [pendingDuplicateTransaction, setPendingDuplicateTransaction] = useState<Parameters<typeof dataService.recordGenericTransaction>[0] | null>(null);
+  const duplicateConfirmation = useRef(new DuplicateStockEntryConfirmation<Parameters<typeof dataService.recordGenericTransaction>[0]>());
+  const [isContinuingDuplicate, setIsContinuingDuplicate] = useState(false);
 
   // Admin Add Type
   const [isAddingType, setIsAddingType] = useState(false);
@@ -159,35 +166,71 @@ export const SandModule: React.FC<SandModuleProps> = ({
     const loc = locations.find(l => l.id === txLocationId);
     if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
 
+    const transactionInput: Parameters<typeof dataService.recordGenericTransaction>[0] = {
+      projectId: project.id,
+      projectName: project.name,
+      locationId: txLocationId,
+      locationName: loc ? loc.name : 'Main Sand Stockpile',
+      category: 'sand',
+      itemName: finalType,
+      unit: 'cft',
+      transactionDate: txDate,
+      transactionType: txType,
+      quantity: qtyCft,
+      supplierName,
+      invoiceNumber,
+      challanNumber,
+      remarks: remarks ? `${remarks} (Logged as ${qty} ${inputUnit})` : `Logged as ${qty} ${inputUnit}`,
+      attachmentUrl: attachment?.url,
+      attachmentName: attachment?.name,
+      attachmentSize: attachment?.size,
+      attachments
+    };
+
     try {
       setIsSubmitting(true);
-      const saved = await dataService.recordGenericTransaction({
-        projectId: project.id,
-        locationId: txLocationId,
-        locationName: loc ? loc.name : 'Main Sand Stockpile',
-        category: 'sand',
-        itemName: finalType,
-        unit: 'cft',
-        transactionDate: txDate,
-        transactionType: txType,
-        quantity: qtyCft,
-        supplierName,
-        invoiceNumber,
-        challanNumber,
-        remarks: remarks ? `${remarks} (Logged as ${qty} ${inputUnit})` : `Logged as ${qty} ${inputUnit}`,
-        attachmentUrl: attachment?.url,
-        attachmentName: attachment?.name,
-        attachmentSize: attachment?.size,
-        attachments
-      });
+      const saved = await dataService.recordGenericTransaction(transactionInput);
 
       setSuccessSaved(saved);
       await loadModuleData();
     } catch (err: any) {
+      if (err instanceof PossibleDuplicateStockEntryError) {
+        duplicateConfirmation.current.setPending(transactionInput);
+        setPendingDuplicateTransaction(transactionInput);
+        setDuplicateEntry(err.duplicate);
+        return;
+      }
       setFormError(err.message || 'Transaction recording failed');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleContinueDuplicate = async () => {
+    if (!pendingDuplicateTransaction) return;
+    setIsContinuingDuplicate(true);
+    setIsSubmitting(true);
+    try {
+      const saved = await duplicateConfirmation.current.continue(input => dataService.recordGenericTransaction(input));
+      if (!saved) return;
+      setDuplicateEntry(null);
+      setPendingDuplicateTransaction(null);
+      setSuccessSaved(saved);
+      await loadModuleData();
+    } catch (err: any) {
+      setDuplicateEntry(null);
+      setPendingDuplicateTransaction(null);
+      setFormError(err.message || 'Transaction recording failed');
+    } finally {
+      setIsContinuingDuplicate(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelDuplicate = () => {
+    duplicateConfirmation.current.cancel();
+    setDuplicateEntry(null);
+    setPendingDuplicateTransaction(null);
   };
 
   const handleReversalSubmit = async (e: React.FormEvent) => {
@@ -816,6 +859,15 @@ export const SandModule: React.FC<SandModuleProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {duplicateEntry && (
+        <DuplicateStockEntryDialog
+          duplicate={duplicateEntry}
+          isContinuing={isContinuingDuplicate}
+          onCancel={handleCancelDuplicate}
+          onContinue={handleContinueDuplicate}
+        />
       )}
 
     </div>

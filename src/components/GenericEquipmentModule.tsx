@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Wrench,
   ShieldAlert,
@@ -53,10 +53,13 @@ import {
   MaterialItem,
   MaterialCategoryDef
 } from '../types';
-import { dataService } from '../services/dataService';
+import { dataService, PossibleDuplicateStockEntryError } from '../services/dataService';
 import { getLocalDateString } from '../utils/dateUtils';
 import { AttachmentLinks, AttachmentSections, emptyTransactionAttachments, hasTransactionAttachments } from './AttachmentSections';
 import { TransactionAttachments } from '../types';
+import { DuplicateStockEntryDialog } from './DuplicateStockEntryDialog';
+import type { DuplicateStockEntryDetails } from '../utils/stockDuplicate';
+import { DuplicateStockEntryConfirmation } from '../utils/stockDuplicate';
 
 interface GenericEquipmentModuleProps {
   categoryId: string;
@@ -114,6 +117,10 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successSaved, setSuccessSaved] = useState<GenericMaterialTransaction | null>(null);
+  const [duplicateEntry, setDuplicateEntry] = useState<DuplicateStockEntryDetails | null>(null);
+  const [pendingDuplicateTransaction, setPendingDuplicateTransaction] = useState<Parameters<typeof dataService.recordGenericTransaction>[0] | null>(null);
+  const duplicateConfirmation = useRef(new DuplicateStockEntryConfirmation<Parameters<typeof dataService.recordGenericTransaction>[0]>());
+  const [isContinuingDuplicate, setIsContinuingDuplicate] = useState(false);
 
   // Admin Add Item Modal State
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
@@ -295,42 +302,78 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
 
     if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
 
+    const loc = locations.find(l => l.id === txLocationId);
+    const selectedItemDef = items.find(i => i.name === selectedItemName);
+    const isItemReusable = selectedItemDef?.is_reusable ?? isReusable;
+    const transactionInput: Parameters<typeof dataService.recordGenericTransaction>[0] = {
+      projectId: project.id,
+      projectName: project.name,
+      locationId: txLocationId,
+      locationName: loc ? loc.name : 'Main Site',
+      category: categoryId as any,
+      subcategory: currentItemStock?.subcategory || selectedItemDef?.subcategory,
+      itemId: selectedItemDef?.id,
+      itemName: selectedItemName,
+      transactionType: txType,
+      quantity: qty,
+      unit: txUnit,
+      transactionDate: txDate,
+      issued_to: isItemReusable ? (issuedToCrew.trim() || undefined) : undefined,
+      equipment_condition: isItemReusable ? txCondition : undefined,
+      supplierName: partyName.trim() || undefined,
+      invoiceNumber: invoiceNumber.trim() || undefined,
+      challanNumber: challanNumber.trim() || undefined,
+      remarks: remarks.trim() || undefined,
+      attachmentUrl: attachment?.url,
+      attachmentName: attachment?.name,
+      attachmentSize: attachment?.size,
+      attachments
+    };
+
     try {
       setIsSubmitting(true);
-      const loc = locations.find(l => l.id === txLocationId);
-      const selectedItemDef = items.find(i => i.name === selectedItemName);
-      const isItemReusable = selectedItemDef?.is_reusable ?? isReusable;
-
-      const saved = await dataService.recordGenericTransaction({
-        projectId: project.id,
-        locationId: txLocationId,
-        locationName: loc ? loc.name : 'Main Site',
-        category: categoryId as any,
-        subcategory: currentItemStock?.subcategory || selectedItemDef?.subcategory,
-        itemName: selectedItemName,
-        transactionType: txType,
-        quantity: qty,
-        unit: txUnit,
-        transactionDate: txDate,
-        issued_to: isItemReusable ? (issuedToCrew.trim() || undefined) : undefined,
-        equipment_condition: isItemReusable ? txCondition : undefined,
-        supplierName: partyName.trim() || undefined,
-        invoiceNumber: invoiceNumber.trim() || undefined,
-        challanNumber: challanNumber.trim() || undefined,
-        remarks: remarks.trim() || undefined,
-        attachmentUrl: attachment?.url,
-        attachmentName: attachment?.name,
-        attachmentSize: attachment?.size,
-        attachments
-      });
+      const saved = await dataService.recordGenericTransaction(transactionInput);
 
       setSuccessSaved(saved);
       await loadData();
     } catch (err: any) {
+      if (err instanceof PossibleDuplicateStockEntryError) {
+        duplicateConfirmation.current.setPending(transactionInput);
+        setPendingDuplicateTransaction(transactionInput);
+        setDuplicateEntry(err.duplicate);
+        return;
+      }
       setFormError(err.message || 'Failed to record transaction');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleContinueDuplicate = async () => {
+    if (!pendingDuplicateTransaction) return;
+    setIsContinuingDuplicate(true);
+    setIsSubmitting(true);
+    try {
+      const saved = await duplicateConfirmation.current.continue(input => dataService.recordGenericTransaction(input));
+      if (!saved) return;
+      setDuplicateEntry(null);
+      setPendingDuplicateTransaction(null);
+      setSuccessSaved(saved);
+      await loadData();
+    } catch (err: any) {
+      setDuplicateEntry(null);
+      setPendingDuplicateTransaction(null);
+      setFormError(err.message || 'Failed to record transaction');
+    } finally {
+      setIsContinuingDuplicate(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelDuplicate = () => {
+    duplicateConfirmation.current.cancel();
+    setDuplicateEntry(null);
+    setPendingDuplicateTransaction(null);
   };
 
   const handleAddItemSubmit = async (e: React.FormEvent) => {
@@ -1511,6 +1554,15 @@ export const GenericEquipmentModule: React.FC<GenericEquipmentModuleProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {duplicateEntry && (
+        <DuplicateStockEntryDialog
+          duplicate={duplicateEntry}
+          isContinuing={isContinuingDuplicate}
+          onCancel={handleCancelDuplicate}
+          onContinue={handleContinueDuplicate}
+        />
       )}
 
     </div>

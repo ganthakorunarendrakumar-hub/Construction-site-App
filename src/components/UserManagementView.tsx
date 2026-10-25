@@ -21,7 +21,9 @@ import {
   UserCheck,
   Check,
   ShieldAlert,
-  Calendar
+  Calendar,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { AuthAccount, UserRole, Project, Employee } from '../types';
 import { authService, ROLE_TITLES } from '../services/authService';
@@ -45,7 +47,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AuthAccount | null>(null);
   const [resettingPasswordAccount, setResettingPasswordAccount] = useState<AuthAccount | null>(null);
-  const [adminNewPassword, setAdminNewPassword] = useState('ChenInfra@2026');
+  const [adminNewPassword, setAdminNewPassword] = useState('');
+  const [showAdminNewPassword, setShowAdminNewPassword] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -57,7 +60,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
   const [createRole, setCreateRole] = useState<UserRole>('site_supervisor');
   const [createAssignedProjects, setCreateAssignedProjects] = useState<string[]>([]);
   const [createEmployeeId, setCreateEmployeeId] = useState<string>('');
-  const [createPassword, setCreatePassword] = useState('ChenInfra@2026');
+  const [createPassword, setCreatePassword] = useState('');
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [createRequireChange, setCreateRequireChange] = useState(true);
   const [createStatus, setCreateStatus] = useState<'active' | 'inactive'>('active');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -111,6 +115,12 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
   });
 
   // Handle open create modal
+  const handleCloseCreate = () => {
+    setIsCreateModalOpen(false);
+    setCreatePassword('');
+    setShowCreatePassword(false);
+  };
+
   const handleOpenCreate = () => {
     setCreateFullName('');
     setCreateRole('site_supervisor');
@@ -118,7 +128,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
     setCreatePhone('');
     setCreateAssignedProjects(projects.slice(0, 1).map(p => p.id));
     setCreateEmployeeId('');
-    setCreatePassword('ChenInfra@2026');
+    setCreatePassword('');
+    setShowCreatePassword(false);
     setCreateRequireChange(true);
     setCreateStatus('active');
 
@@ -162,7 +173,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       });
 
       await loadData();
-      setIsCreateModalOpen(false);
+      handleCloseCreate();
       setNoticeMessage(`Account created successfully for ${created.full_name} with User ID "${created.user_id}".`);
       setTimeout(() => setNoticeMessage(null), 6000);
     } catch (err: any) {
@@ -235,7 +246,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
 
     try {
       await authService.adminResetUserPassword(resettingPasswordAccount.auth_uid, adminNewPassword);
-      setResettingPasswordAccount(null);
+      handleClosePasswordReset();
       setNoticeMessage(`Password for ${resettingPasswordAccount.full_name} has been reset.`);
       setTimeout(() => setNoticeMessage(null), 5000);
     } catch (err: any) {
@@ -243,6 +254,12 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleClosePasswordReset = () => {
+    setResettingPasswordAccount(null);
+    setAdminNewPassword('');
+    setShowAdminNewPassword(false);
   };
 
   // Delete account
@@ -282,17 +299,14 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-bp-cyan text-bp-text font-mono">
-                ADMINISTRATION CONSOLE
-              </span>
-              <span className="text-xs text-bp-muted font-medium">
-                Server-Enforced Role-Based Access Control
+                ADMINISTRATION
               </span>
             </div>
             <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight">
               User Accounts & Security Permissions
             </h1>
             <p className="text-xs sm:text-sm text-bp-muted max-w-2xl">
-              Create individual staff accounts with unique User IDs, PBKDF2 cryptographic passwords, assigned construction sites, and strict server-enforced role privileges.
+              Manage staff accounts, site assignments, and role permissions.
             </p>
           </div>
 
@@ -337,7 +351,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
           </div>
           <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
             <p className="text-[11px] font-semibold text-bp-muted uppercase">Workers / Staff</p>
-            <p className="text-xl font-bold text-blue-600 font-mono mt-0.5">
+            <p className="text-xl font-bold text-bp-blue font-mono mt-0.5">
               {accounts.filter(a => a.role === 'worker' && a.status === 'active').length} <span className="text-xs font-normal text-bp-muted">workers</span>
             </p>
           </div>
@@ -579,7 +593,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                           <button
                             onClick={() => {
                               setResettingPasswordAccount(acc);
-                              setAdminNewPassword('ChenInfra@2026');
+                              setAdminNewPassword('');
+                              setShowAdminNewPassword(false);
                             }}
                             className="p-1.5 text-bp-muted hover:text-bp-text hover:bg-bp-border rounded-lg transition-colors"
                             title="Reset password for this user"
@@ -629,7 +644,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                 <h3 className="font-bold text-sm text-white">Register New User Account</h3>
               </div>
               <button
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={handleCloseCreate}
                 className="text-bp-muted hover:text-white p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -706,7 +721,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-bp-text mb-1">
-                    Role & Server Permissions *
+                    Role & Access *
                   </label>
                   <select
                     value={createRole}
@@ -774,21 +789,32 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
               </div>
 
               {/* Password configuration */}
-              <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
-                  <Lock className="w-4 h-4 text-amber-700" />
-                  <span>Initial Password Setup (PBKDF2 Encrypted)</span>
+              <div className="rounded-xl border border-bp-cyan-border bg-bp-cyan-soft p-3.5 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-bp-navy">
+                  <Lock className="w-4 h-4 text-bp-blue" />
+                  <span>Initial password *</span>
                 </div>
-                <div>
+                <div className="relative">
                   <input
-                    type="text"
+                    type={showCreatePassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     required
                     value={createPassword}
                     onChange={(e) => setCreatePassword(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs font-mono font-bold text-bp-text bg-white rounded-lg border border-amber-300"
+                    placeholder="Set a password for the new account"
+                    className="min-h-11 w-full rounded-lg border border-bp-border-strong bg-white py-2 pl-3 pr-12 text-sm text-bp-text"
                   />
-                  <p className="text-[10px] text-amber-800 mt-1">
-                    A cryptographic salt will be generated and hashed using PBKDF2 with 100,000 iterations.
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePassword(value => !value)}
+                    className="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center rounded-r-lg text-bp-muted hover:text-bp-navy"
+                    aria-label={showCreatePassword ? 'Hide initial password' : 'Show initial password'}
+                    aria-pressed={showCreatePassword}
+                  >
+                    {showCreatePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                  <p className="mt-1 text-[11px] text-bp-text-subtle">
+                    Passwords are stored as salted PBKDF2 hashes.
                   </p>
                 </div>
 
@@ -797,16 +823,16 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                     type="checkbox"
                     checked={createRequireChange}
                     onChange={(e) => setCreateRequireChange(e.target.checked)}
-                    className="rounded text-bp-text focus:ring-bp-cyan"
+                    className="rounded accent-bp-cyan focus:ring-bp-cyan"
                   />
-                  <span className="text-xs text-amber-900 font-medium">Require user to change password on first login</span>
+                  <span className="text-xs text-bp-text font-medium">Require user to change password on first sign-in</span>
                 </label>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
+                  onClick={handleCloseCreate}
                   className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl"
                 >
                   Cancel
@@ -935,7 +961,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                 <KeyRound className="w-4 h-4 text-bp-cyan" />
                 <h3 className="font-bold text-sm text-white">Reset Password: {resettingPasswordAccount.full_name}</h3>
               </div>
-              <button onClick={() => setResettingPasswordAccount(null)} className="text-bp-muted hover:text-white p-1">
+              <button onClick={handleClosePasswordReset} className="text-bp-muted hover:text-white p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -949,19 +975,31 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                 <label className="block text-xs font-semibold text-bp-text mb-1">
                   New Password (min 8 characters)
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={adminNewPassword}
-                  onChange={(e) => setAdminNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-mono font-bold text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
-                />
+                <div className="relative">
+                  <input
+                    type={showAdminNewPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    value={adminNewPassword}
+                    onChange={(e) => setAdminNewPassword(e.target.value)}
+                    className="min-h-11 w-full rounded-xl border border-bp-border-strong bg-white py-2 pl-3 pr-12 text-sm text-bp-text"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminNewPassword(value => !value)}
+                    className="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center rounded-r-xl text-bp-muted hover:text-bp-navy"
+                    aria-label={showAdminNewPassword ? 'Hide new password' : 'Show new password'}
+                    aria-pressed={showAdminNewPassword}
+                  >
+                    {showAdminNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setResettingPasswordAccount(null)}
+                  onClick={handleClosePasswordReset}
                   className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl"
                 >
                   Cancel

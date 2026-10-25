@@ -143,8 +143,7 @@ export const CompletedProjectsView: React.FC<CompletedProjectsViewProps> = ({
 
                 <div>
                   <h3
-                    onClick={() => onOpenProject(p)}
-                    className="font-semibold text-[17px] text-bp-text hover:underline cursor-pointer transition-colors line-clamp-1"
+                    className="font-semibold text-[17px] text-bp-text line-clamp-1"
                     title={p.name}
                   >
                     {p.name}
@@ -155,9 +154,9 @@ export const CompletedProjectsView: React.FC<CompletedProjectsViewProps> = ({
                   </p>
                 </div>
 
-                <p className="text-xs text-bp-muted line-clamp-2 leading-relaxed">
-                  {p.description || 'Commercial project finalized and archived with complete material audit trail.'}
-                </p>
+                {p.description && (
+                  <p className="text-xs text-bp-muted line-clamp-2 leading-relaxed">{p.description}</p>
+                )}
 
                 <div className="space-y-1.5 pt-2.5 border-t border-bp-border text-xs text-bp-muted">
                   <div className="flex items-center gap-2">

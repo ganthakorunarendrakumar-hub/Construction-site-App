@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Plus,
-  Clock,
   CheckCircle2,
   Building2,
   Edit2,
@@ -10,7 +9,6 @@ import {
   ArrowRight,
   MapPin,
   User,
-  Calendar,
   FileSpreadsheet,
   Users,
   ShieldCheck
@@ -73,19 +71,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-150">
+    <div className="space-y-5 animate-in fade-in duration-150">
       
       {/* Company overview */}
-      <section className="relative overflow-hidden rounded-2xl border border-[#24496F] bg-bp-navy p-5 text-white shadow-sm sm:p-7">
-        <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-bp-cyan/15" />
-        <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+      <section className="bp-dashboard-hero rounded-2xl border border-bp-navy-border bg-bp-navy p-4 text-white sm:p-6">
+        <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
-            <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-bp-cyan-light">
-              <Building2 className="h-4 w-4" />
-              Construction operations
-            </p>
-            <h1 className="text-[28px] font-bold leading-tight tracking-tight text-white sm:text-[32px]">
-              Manage your projects
+            <h1 className="text-xl font-semibold leading-tight tracking-tight text-white sm:text-2xl">
+              Company overview
             </h1>
 
             {/* Editable Company Name */}
@@ -137,14 +130,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </div>
             )}
           </div>
-          <div className="grid w-full grid-cols-2 gap-3 md:max-w-sm">
-            <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-3.5">
+          <div className="grid w-full grid-cols-2 gap-2 md:max-w-xs">
+            <div className="bp-dashboard-stat rounded-xl border border-white/10 bg-white/10 px-3.5 py-3">
               <p className="text-[11px] font-medium text-bp-border-strong">Ongoing projects</p>
-              <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-white">{ongoingProjects.length}</p>
+              <p className="mt-0.5 font-mono text-2xl font-semibold tabular-nums text-white">{ongoingProjects.length}</p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-3.5">
+            <div className="bp-dashboard-stat rounded-xl border border-white/10 bg-white/10 px-3.5 py-3">
               <p className="text-[11px] font-medium text-bp-border-strong">Completed projects</p>
-              <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-white">{completedProjects.length}</p>
+              <p className="mt-0.5 font-mono text-2xl font-semibold tabular-nums text-white">{completedProjects.length}</p>
             </div>
           </div>
         </div>
@@ -152,119 +145,96 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* SECTION 4: REDESIGNED THREE MAIN OPERATION CARDS */}
       <section className="space-y-3">
-        <h2 className="text-xl sm:text-[22px] font-semibold text-bp-text tracking-tight">
-          Your Projects
+        <h2 className="text-lg font-semibold tracking-tight text-bp-text">
+          Workspace shortcuts
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 
           {/* 1. Create Project */}
+          {canCreateProject && (
           <div
-            onClick={canCreateProject ? onNavigateCreateProject : undefined}
-            className={`group bg-white rounded-2xl border border-bp-border p-5 transition-all duration-150 flex items-center justify-between shadow-xs ${
-              canCreateProject
-                ? 'hover:border-bp-cyan hover:shadow-sm cursor-pointer'
-                : 'opacity-60 cursor-not-allowed'
-            }`}
+            role="button"
+            tabIndex={0}
+            onClick={onNavigateCreateProject}
+            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onNavigateCreateProject(); } }}
+            className="bp-dashboard-shortcut group flex cursor-pointer items-center justify-between rounded-xl border border-bp-border bg-white p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bp-cyan"
           >
             <div className="flex items-center gap-3.5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-bp-blue font-bold text-white transition-transform group-hover:scale-105">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-bp-blue font-bold text-white">
                 <Plus className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h3 className="text-[16px] sm:text-[17px] font-semibold text-bp-text group-hover:text-bp-text">
+                <h3 className="text-sm font-semibold text-bp-text">
                   Create Project
                 </h3>
-                <span className="mt-0.5 inline-block rounded-md bg-bp-cyan-soft px-2 py-0.5 text-xs font-semibold text-bp-blue">
-                  + New
-                </span>
               </div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-bp-background flex items-center justify-center group-hover:bg-bp-cyan transition-colors shrink-0">
-              <ArrowRight className="w-4 h-4 text-bp-muted transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
-            </div>
+            <ArrowRight className="h-4 w-4 shrink-0 text-bp-muted" />
           </div>
+          )}
 
-          {/* 2. Ongoing Projects */}
+          {/* Completed Projects */}
           <div
-            onClick={onNavigateOngoing}
-            className="group bg-white rounded-2xl border border-bp-border p-5 transition-all duration-150 flex items-center justify-between shadow-xs hover:border-bp-cyan hover:shadow-sm cursor-pointer"
-          >
-            <div className="flex items-center gap-3.5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-bp-cyan-soft font-bold text-bp-blue transition-colors group-hover:bg-bp-blue group-hover:text-white">
-                <Clock className="h-5 w-5 text-bp-blue group-hover:text-white" />
-              </div>
-              <div>
-                <h3 className="text-[16px] sm:text-[17px] font-semibold text-bp-text group-hover:text-bp-text">
-                  Ongoing Sites
-                </h3>
-                <span className="inline-block mt-0.5 text-xs font-medium px-2 py-0.5 rounded-md bg-bp-background text-bp-text border border-bp-border">
-                  {ongoingProjects.length} Active
-                </span>
-              </div>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-bp-background flex items-center justify-center group-hover:bg-bp-cyan transition-colors shrink-0">
-              <ArrowRight className="w-4 h-4 text-bp-muted transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
-            </div>
-          </div>
-
-          {/* 3. Completed Projects */}
-          <div
+            role="button"
+            tabIndex={0}
             onClick={onNavigateCompleted}
-            className="group bg-white rounded-2xl border border-bp-border p-5 transition-all duration-150 flex items-center justify-between shadow-xs hover:border-bp-cyan hover:shadow-sm cursor-pointer"
+            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onNavigateCompleted(); } }}
+            className="bp-dashboard-shortcut group flex cursor-pointer items-center justify-between rounded-xl border border-bp-border bg-white p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bp-cyan"
           >
             <div className="flex items-center gap-3.5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-bp-cyan-soft font-bold text-bp-blue transition-colors group-hover:bg-bp-blue group-hover:text-white">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-bp-cyan-soft text-bp-blue">
                 <CheckCircle2 className="h-5 w-5 text-bp-blue group-hover:text-white" />
               </div>
               <div>
-                <h3 className="text-[16px] sm:text-[17px] font-semibold text-bp-text group-hover:text-bp-text">
+                <h3 className="text-sm font-semibold text-bp-text">
                   Completed
                 </h3>
-                <span className="inline-block mt-0.5 text-xs font-medium px-2 py-0.5 rounded-md bg-bp-background text-bp-text border border-bp-border">
-                  {completedProjects.length} Archived
-                </span>
               </div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-bp-background flex items-center justify-center group-hover:bg-bp-cyan transition-colors shrink-0">
-              <ArrowRight className="w-4 h-4 text-bp-muted transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
-            </div>
+            <ArrowRight className="h-4 w-4 shrink-0 text-bp-muted" />
           </div>
 
           {/* 4. Material & Stock Reports */}
+          {onNavigateReports && (
           <div
+            role="button"
+            tabIndex={0}
             onClick={onNavigateReports}
-            className="group bg-white rounded-2xl border border-bp-border p-5 transition-all duration-150 flex items-center justify-between shadow-xs hover:border-bp-cyan hover:shadow-sm cursor-pointer"
+            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onNavigateReports(); } }}
+            className="bp-dashboard-shortcut group flex cursor-pointer items-center justify-between rounded-xl border border-bp-border bg-white p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bp-cyan"
           >
             <div className="flex items-center gap-3.5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-bp-cyan-soft font-bold text-bp-blue transition-colors group-hover:bg-bp-blue group-hover:text-white">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-bp-cyan-soft text-bp-blue">
                 <FileSpreadsheet className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-[16px] sm:text-[17px] font-semibold text-bp-text group-hover:text-bp-text">
+                <h3 className="text-sm font-semibold text-bp-text">
                   Stock Reports
                 </h3>
-                <span className="inline-block mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-md bg-bp-cyan/20 text-bp-text border border-bp-cyan/30">
-                  2 Reports • CSV
-                </span>
               </div>
             </div>
             <div className="w-8 h-8 rounded-full bg-bp-background flex items-center justify-center group-hover:bg-bp-cyan transition-colors shrink-0">
               <ArrowRight className="w-4 h-4 text-bp-muted transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
             </div>
           </div>
+          )}
 
           {/* 5. Attendance & Worker Groups */}
+          {onNavigateAttendance && (
           <div
+            role="button"
+            tabIndex={0}
             onClick={onNavigateAttendance}
-            className="group bg-white rounded-2xl border border-bp-border p-5 transition-all duration-150 flex items-center justify-between shadow-xs hover:border-bp-cyan hover:shadow-sm cursor-pointer"
+            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onNavigateAttendance(); } }}
+            className="bp-dashboard-shortcut group flex cursor-pointer items-center justify-between rounded-xl border border-bp-border bg-white p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bp-cyan"
           >
             <div className="flex items-center gap-3.5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-bp-cyan-soft font-bold text-bp-blue transition-colors group-hover:bg-bp-blue group-hover:text-white">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-bp-cyan-soft text-bp-blue">
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-[16px] sm:text-[17px] font-semibold text-bp-text group-hover:text-bp-text">
+                <h3 className="text-sm font-semibold text-bp-text">
                   Attendance
                 </h3>
                 <span className="inline-block mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-md bg-bp-cyan/20 text-bp-text border border-bp-cyan/30">
@@ -276,24 +246,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <ArrowRight className="w-4 h-4 text-bp-muted transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
             </div>
           </div>
+          )}
 
           {/* 6. User Accounts & Security (Admin Only) */}
           {currentUser.role === 'admin' && onNavigateUserManagement && (
             <div
+              role="button"
+              tabIndex={0}
               onClick={onNavigateUserManagement}
-              className="group bg-white rounded-2xl border border-bp-border p-5 transition-all duration-150 flex items-center justify-between shadow-xs hover:border-bp-cyan hover:shadow-sm cursor-pointer"
+              onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onNavigateUserManagement(); } }}
+              className="bp-dashboard-shortcut group flex cursor-pointer items-center justify-between rounded-xl border border-bp-border bg-white p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bp-cyan"
             >
               <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-bp-cyan-soft font-bold text-bp-blue transition-colors group-hover:bg-bp-blue group-hover:text-white">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-bp-cyan-soft text-bp-blue">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-[16px] sm:text-[17px] font-semibold text-bp-text group-hover:text-bp-text">
+                  <h3 className="text-sm font-semibold text-bp-text">
                     User Accounts
                   </h3>
-                  <span className="inline-block mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-md bg-bp-cyan/20 text-bp-text border border-bp-cyan/30">
-                    Roles & Security
-                  </span>
                 </div>
               </div>
               <div className="w-8 h-8 rounded-full bg-bp-background flex items-center justify-center group-hover:bg-bp-cyan transition-colors shrink-0">
@@ -306,46 +277,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       </section>
 
       {/* ACTIVE SITE HIGHLIGHTS: Clean consumer-app list */}
-      <section className="bg-white rounded-2xl border border-bp-border p-5 sm:p-6 shadow-xs space-y-4">
+      <section className="bp-dashboard-section space-y-3 rounded-2xl border border-bp-border bg-white p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-[18px] sm:text-xl font-semibold text-bp-text">
               Active Sites
             </h3>
-            <p className="text-xs text-bp-muted mt-0.5">
-              Quick access to your ongoing project workspaces
-            </p>
           </div>
           <button
             onClick={onNavigateOngoing}
             className="text-xs font-semibold text-bp-text hover:text-bp-muted flex items-center gap-1 transition-colors"
           >
-            View all ({ongoingProjects.length}) &rarr;
+            View all &rarr;
           </button>
         </div>
 
         {ongoingProjects.length === 0 ? (
-          <div className="text-center py-10 bg-bp-background rounded-xl border border-dashed border-bp-border">
-            <Building2 className="w-7 h-7 text-bp-muted mx-auto mb-2" />
+          <div className="rounded-lg border border-dashed border-bp-border bg-bp-background py-7 text-center">
+            <Building2 className="mx-auto mb-2 h-6 w-6 text-bp-muted" />
             <p className="text-sm font-medium text-bp-text">No ongoing projects</p>
-            <p className="text-xs text-bp-muted mt-0.5">Create your first construction project to get started</p>
-            {canCreateProject && (
-              <button
-                onClick={onNavigateCreateProject}
-                className="mt-3.5 px-4 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text font-semibold text-xs rounded-xl transition-colors inline-flex items-center gap-1.5 shadow-xs"
-              >
-                <Plus className="w-4 h-4" />
-                Create Project
-              </button>
-            )}
+            <p className="mt-1 text-xs text-bp-muted">Use Create Project above to get started.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {ongoingProjects.slice(0, 3).map((proj) => (
               <div
                 key={proj.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => onOpenProject(proj)}
-                className="group p-4 rounded-xl border border-bp-border hover:border-bp-cyan transition-all bg-white hover:shadow-xs cursor-pointer flex flex-col justify-between"
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenProject(proj); } }}
+                className="bp-dashboard-shortcut group flex cursor-pointer flex-col justify-between rounded-xl border border-bp-border bg-white p-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bp-cyan"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">

@@ -246,8 +246,7 @@ export const OngoingProjectsView: React.FC<OngoingProjectsViewProps> = ({
 
                   <div>
                     <h3
-                      onClick={() => onOpenProject(p)}
-                      className="font-semibold text-[17px] text-bp-text group-hover:text-bp-text cursor-pointer transition-colors line-clamp-1"
+                      className="font-semibold text-[17px] text-bp-text line-clamp-1"
                       title={p.name}
                     >
                       {p.name}
@@ -258,9 +257,9 @@ export const OngoingProjectsView: React.FC<OngoingProjectsViewProps> = ({
                     </p>
                   </div>
 
-                  <p className="text-xs text-bp-muted line-clamp-2 leading-relaxed">
-                    {p.description || 'Standard multi-story construction site with active material tracking.'}
-                  </p>
+                  {p.description && (
+                    <p className="text-xs text-bp-muted line-clamp-2 leading-relaxed">{p.description}</p>
+                  )}
 
                   <div className="space-y-1.5 pt-2.5 border-t border-bp-border text-xs text-bp-muted">
                     <div className="flex items-center gap-2">

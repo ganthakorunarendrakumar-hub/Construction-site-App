@@ -2,12 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Package,
   Layers,
-  MapPin,
-  Calendar,
-  User,
   Lock,
   Wrench,
-  TrendingUp,
   FileSpreadsheet,
   ChevronRight,
   Mountain,
@@ -29,15 +25,14 @@ import {
   Plus,
   X,
   AlertTriangle,
-  CheckCircle2,
   SlidersHorizontal,
-  ArrowRight,
   Sparkles,
   ClipboardList,
   Users
 } from 'lucide-react';
 import { Project, UserProfile, ProjectStockMetrics, MaterialCategoryDef } from '../types';
 import { dataService } from '../services/dataService';
+import { authService } from '../services/authService';
 import { ReportsView } from './ReportsView';
 import { AttendanceView } from './AttendanceView';
 
@@ -72,7 +67,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   onNavigateHome,
   onNavigateProjects
 }) => {
-  const [activeTab, setActiveTab] = useState<'materials' | 'progress' | 'sites' | 'reports' | 'attendance'>('materials');
+  const [activeTab, setActiveTab] = useState<'materials' | 'reports' | 'attendance'>('materials');
   const [categories, setCategories] = useState<MaterialCategoryDef[]>([]);
   const [isAddCatModalOpen, setIsAddCatModalOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -90,6 +85,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
   const isCompleted = project.status === 'completed';
   const isAdmin = currentUser.role === 'admin';
+  const canViewReports = authService.canPerformAction('view_reports');
 
   const loadCategoriesAndStats = async () => {
     try {
@@ -226,26 +222,10 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             </h1>
 
             <p className="text-xs sm:text-sm text-bp-muted">
-              Client: <span className="font-semibold text-bp-text">{project.client_name}</span> &bull; {project.location}
+              Client: <span className="font-semibold text-bp-text">{project.client_name}</span> &bull; {project.location} &bull; Manager: <span className="font-semibold text-bp-text">{project.project_manager_name}</span>
             </p>
           </div>
 
-          {/* Quick Metrics */}
-          <div className="flex items-center gap-6 border-t md:border-t-0 md:border-l border-bp-border pt-4 md:pt-0 md:pl-6 shrink-0">
-            <div>
-              <p className="text-xs font-medium text-bp-muted">Project Manager</p>
-              <p className="text-sm font-semibold text-bp-text flex items-center gap-1 mt-0.5">
-                <User className="w-3.5 h-3.5 text-bp-text" />
-                {project.project_manager_name}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-bp-muted">Available Cement</p>
-              <p className="text-xl sm:text-2xl font-bold text-bp-text font-mono tabular-nums mt-0.5">
-                {stockMetrics?.totalAvailableBags ?? 0} <span className="text-xs text-bp-muted font-normal">bags</span>
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* Section Tabs */}
@@ -259,40 +239,10 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             }`}
           >
             <Package className="w-3.5 h-3.5 text-bp-text" />
-            Materials & Inventory
+            Materials
           </button>
 
-          <button
-            onClick={() => setActiveTab('progress')}
-            className={`px-3.5 py-1.5 text-xs font-medium rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'progress'
-                ? 'bg-bp-navy text-white'
-                : 'text-bp-muted hover:text-bp-text hover:bg-bp-background'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            Work Progress
-            <span className="text-[10px] px-1.5 py-0.2 bg-bp-background text-bp-muted rounded border border-bp-border">
-              Phase 2
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('sites')}
-            className={`px-3.5 py-1.5 text-xs font-medium rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'sites'
-                ? 'bg-bp-navy text-white'
-                : 'text-bp-muted hover:text-bp-text hover:bg-bp-background'
-            }`}
-          >
-            <MapPin className="w-3.5 h-3.5" />
-            Site Locations
-            <span className="text-[10px] px-1.5 py-0.2 bg-bp-background text-bp-muted rounded border border-bp-border">
-              Phase 2
-            </span>
-          </button>
-
-          <button
+          {canViewReports && <button
             onClick={() => setActiveTab('reports')}
             className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'reports'
@@ -301,8 +251,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             }`}
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            Reports & Audits
-          </button>
+            Reports
+          </button>}
 
           <button
             onClick={() => setActiveTab('attendance')}
@@ -313,7 +263,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            Attendance & Labor
+            Attendance
           </button>
         </div>
       </div>
@@ -330,14 +280,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   <Package className="w-5 h-5 text-bp-text" />
                   Primary Structural Materials
                 </h2>
-                <p className="text-xs text-bp-muted">
-                  Real-time stock ledger, delivery challan verification, and consumption tracking.
-                </p>
               </div>
-              <span className="text-xs font-medium text-bp-text bg-bp-background px-2.5 py-1 rounded-xl border border-bp-border self-start sm:self-auto flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-bp-text" />
-                5 Modules Active
-              </span>
             </div>
 
             {/* 5 Core Material Cards */}
@@ -345,7 +288,11 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               
               {/* 1. CEMENT */}
               <div
+                role="button"
+                tabIndex={0}
+                aria-label="Open cement ledger"
                 onClick={onOpenCementModule}
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenCementModule(); } }}
                 className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs p-5 flex flex-col justify-between hover:shadow-xs transition-all cursor-pointer group"
               >
                 <div>
@@ -353,9 +300,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                     <div className="w-9 h-9 rounded-xl bg-bp-cyan text-bp-text flex items-center justify-center font-bold text-xs">
                       01
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-bp-cyan/20 text-bp-text">
-                      Live
-                    </span>
                   </div>
                   <h3 className="text-base font-semibold text-bp-text group-hover:text-bp-text">
                     Cement
@@ -365,22 +309,23 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   </p>
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-bp-border space-y-2 text-xs">
+                <div className="mt-4 pt-3 border-t border-bp-border text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-bp-muted">Available:</span>
                     <span className="font-bold text-bp-text font-mono text-sm">
                       {stockMetrics?.totalAvailableBags ?? 0} bags
                     </span>
                   </div>
-                  <button className="w-full py-1.5 px-3 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-semibold rounded-xl transition-colors text-center">
-                    Open Ledger &rarr;
-                  </button>
                 </div>
               </div>
 
               {/* 2. STEEL MODULE */}
               <div
+                role="button"
+                tabIndex={0}
+                aria-label="Open steel inventory"
                 onClick={onOpenSteelModule}
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenSteelModule(); } }}
                 className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs p-5 flex flex-col justify-between hover:shadow-xs transition-all cursor-pointer group"
               >
                 <div>
@@ -400,7 +345,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   </p>
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-bp-border space-y-2 text-xs">
+                <div className="mt-4 pt-3 border-t border-bp-border text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-bp-muted">Available:</span>
                     <span className="font-bold text-bp-text font-mono text-sm">
@@ -409,15 +354,16 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                       ) : 'Live'}
                     </span>
                   </div>
-                  <button className="w-full py-1.5 px-3 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-semibold rounded-xl transition-colors text-center">
-                    Open Inventory &rarr;
-                  </button>
                 </div>
               </div>
 
               {/* 3. SAND MODULE */}
               <div
+                role="button"
+                tabIndex={0}
+                aria-label="Open sand inventory"
                 onClick={onOpenSandModule}
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenSandModule(); } }}
                 className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs p-5 flex flex-col justify-between hover:shadow-xs transition-all cursor-pointer group"
               >
                 <div>
@@ -437,22 +383,23 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   </p>
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-bp-border space-y-2 text-xs">
+                <div className="mt-4 pt-3 border-t border-bp-border text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-bp-muted">Available:</span>
                     <span className="font-bold text-bp-text font-mono text-sm">
                       {sandTotalCft !== null ? `${sandTotalCft.toLocaleString()} cft` : 'Live'}
                     </span>
                   </div>
-                  <button className="w-full py-1.5 px-3 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-semibold rounded-xl transition-colors text-center">
-                    Open Inventory &rarr;
-                  </button>
                 </div>
               </div>
 
               {/* 4. BRICKS & BLOCKS */}
               <div
+                role="button"
+                tabIndex={0}
+                aria-label="Open bricks and blocks inventory"
                 onClick={onOpenBricksModule}
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenBricksModule(); } }}
                 className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs p-5 flex flex-col justify-between hover:shadow-xs transition-all cursor-pointer group"
               >
                 <div>
@@ -472,22 +419,23 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   </p>
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-bp-border space-y-2 text-xs">
+                <div className="mt-4 pt-3 border-t border-bp-border text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-bp-muted">Available:</span>
                     <span className="font-bold text-bp-text font-mono text-sm">
                       {bricksTotalNos !== null ? `${bricksTotalNos.toLocaleString()} Nos` : 'Live'}
                     </span>
                   </div>
-                  <button className="w-full py-1.5 px-3 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-semibold rounded-xl transition-colors text-center">
-                    Open Inventory &rarr;
-                  </button>
                 </div>
               </div>
 
               {/* 5. COARSE AGGREGATE */}
               <div
+                role="button"
+                tabIndex={0}
+                aria-label="Open aggregate inventory"
                 onClick={onOpenAggregateModule}
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenAggregateModule(); } }}
                 className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs p-5 flex flex-col justify-between hover:shadow-xs transition-all cursor-pointer group"
               >
                 <div>
@@ -507,16 +455,13 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   </p>
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-bp-border space-y-2 text-xs">
+                <div className="mt-4 pt-3 border-t border-bp-border text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-bp-muted">Available:</span>
                     <span className="font-bold text-bp-text font-mono text-sm">
                       {aggregateTotalTonnes !== null ? `${aggregateTotalTonnes.toLocaleString()} t` : 'Live'}
                     </span>
                   </div>
-                  <button className="w-full py-1.5 px-3 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-semibold rounded-xl transition-colors text-center">
-                    Open Inventory &rarr;
-                  </button>
                 </div>
               </div>
 
@@ -531,9 +476,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   <Wrench className="w-5 h-5 text-bp-text" />
                   Material Categories & Equipment
                 </h2>
-                <p className="text-xs text-bp-muted">
-                  Dedicated interactive inventory ledgers for tool checkouts, returns, and consumables.
-                </p>
               </div>
 
               {isAdmin && (
@@ -552,8 +494,11 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               {expandableCategories.map((cat) => (
                 <div
                   key={cat.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onOpenCategoryModule(cat.id)}
-                  className="bg-white rounded-2xl border border-bp-border p-5 hover:border-bp-cyan hover:shadow-xs transition-all cursor-pointer group flex flex-col justify-between shadow-xs"
+                  onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenCategoryModule(cat.id); } }}
+                  className="group flex cursor-pointer flex-col justify-between rounded-xl border border-bp-border bg-white p-4 transition-colors hover:border-bp-cyan hover:bg-bp-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bp-cyan"
                 >
                   <div>
                     <div className="flex items-center justify-between mb-3">
@@ -604,7 +549,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           </div>
 
         </div>
-      ) : activeTab === 'reports' ? (
+      ) : activeTab === 'reports' && canViewReports ? (
         /* LIVE REPORTS & INVENTORY AUDITS */
         <ReportsView
           initialProjectId={project.id}
@@ -618,25 +563,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           onNavigateHome={onNavigateHome}
           onNavigateProjects={onNavigateProjects}
         />
-      ) : (
-        /* Placeholder for Phase 2 tabs */
-        <div className="bg-white rounded-2xl border border-bp-border p-12 text-center space-y-3 shadow-xs">
-          <Layers className="w-10 h-10 text-bp-muted mx-auto" />
-          <h3 className="text-base font-semibold text-bp-text">
-            {activeTab === 'progress' && 'Work Progress & Milestones'}
-            {activeTab === 'sites' && 'Site Locations'}
-          </h3>
-          <p className="text-xs text-bp-muted max-w-md mx-auto">
-            This module is reserved for Phase 2. The database schema and permission tables are configured to support this workflow.
-          </p>
-          <button
-            onClick={() => setActiveTab('materials')}
-            className="px-4 py-2 bg-bp-cyan text-bp-text text-xs font-semibold rounded-xl hover:bg-bp-blue transition-colors inline-block shadow-xs"
-          >
-            Switch to Materials Section &rarr;
-          </button>
-        </div>
-      )}
+      ) : null}
 
       {/* Dynamic Add Category Modal for Administrators */}
       {isAddCatModalOpen && (
@@ -739,8 +666,11 @@ const HireCard: React.FC<{
   onOpen: () => void;
 }> = ({ title, description, icon, onOpen }) => (
   <div
+    role="button"
+    tabIndex={0}
     onClick={onOpen}
-    className="group flex cursor-pointer flex-col justify-between rounded-2xl border border-bp-border bg-white p-5 shadow-xs transition-all hover:border-bp-cyan hover:shadow-xs"
+    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(); } }}
+    className="group flex cursor-pointer flex-col justify-between rounded-xl border border-bp-border bg-white p-4 transition-colors hover:border-bp-cyan hover:bg-bp-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bp-cyan"
   >
     <div>
       <div className="mb-3 flex items-center justify-between">
@@ -752,15 +682,8 @@ const HireCard: React.FC<{
       <h3 className="text-[17px] font-semibold text-bp-text">{title}</h3>
       <p className="mt-1 text-xs text-bp-muted">{description}</p>
     </div>
-    <button
-      type="button"
-      onClick={event => {
-        event.stopPropagation();
-        onOpen();
-      }}
-      className="mt-5 flex w-full items-center justify-center rounded-xl bg-bp-cyan px-3 py-1.5 text-center text-xs font-semibold text-bp-text transition-colors hover:bg-bp-blue"
-    >
-      Open Module &rarr;
-    </button>
+    <span className="mt-4 flex items-center justify-between border-t border-bp-border pt-3 text-xs font-semibold text-bp-text">
+      Open module <ChevronRight className="h-4 w-4 text-bp-muted" />
+    </span>
   </div>
 );
