@@ -261,7 +261,7 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h5 id="company-branding-migration-title" className="text-xs font-bold text-bp-navy">Existing Supabase installation</h5>
-                    <p className="mt-1 text-[11px] text-bp-text-subtle">Run this additive migration once to add company branding fields, administrator policies, and a private company-logo bucket.</p>
+                    <p className="mt-1 text-[11px] text-bp-text-subtle">Run this additive migration once to add logo, watermark, and stock slideshow fields, administrator policies, and private company image storage.</p>
                   </div>
                   <button type="button" onClick={handleCopyBrandingMigration} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-bp-navy px-3 py-2 text-xs font-semibold text-white hover:bg-bp-blue">
                     {copiedBrandingSql ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}

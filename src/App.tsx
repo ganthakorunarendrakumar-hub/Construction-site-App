@@ -9,7 +9,9 @@ import {
   ProjectStockMetrics,
   SupabaseConfig,
   TransactionType,
-  ProjectStatus
+  ProjectStatus,
+  CompanyStockBackgroundSlideshow,
+  StockInventoryModuleId
 } from './types';
 import { dataService } from './services/dataService';
 import { Navbar } from './components/Navbar';
@@ -35,6 +37,7 @@ import { CreateProjectModal } from './components/CreateProjectModal';
 import { CloudSetupModal } from './components/CloudSetupModal';
 import { ModalDismissalManager } from './components/ModalDismissalManager';
 import { CompanyBrandingContext } from './contexts/CompanyBrandingContext';
+import { StockBackgroundSlideshow } from './components/StockBackgroundSlideshow';
 
 type ViewMode = 
   | 'home' 
@@ -72,10 +75,12 @@ export default function App() {
     watermark_enabled: false,
     watermark_opacity: 6,
     watermark_size: 280,
+    stock_background_slideshow: { enabled: false, images: [], transition_seconds: 6, overlay_opacity: 32, modules: ['cement_module', 'steel_module', 'sand_module', 'bricks_module', 'aggregate_module'] },
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }));
   const [companyLogoDisplayUrl, setCompanyLogoDisplayUrl] = useState<string | undefined>();
+  const [resolvedStockBackgroundImages, setResolvedStockBackgroundImages] = useState<Array<{ id: string; src: string }>>([]);
 
   const [session, setSession] = useState<UserSession | null>(() => authService.getSession());
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => authService.getCurrentUser());
@@ -125,6 +130,19 @@ export default function App() {
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(dataService.getConfig());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const resolveStockBackgroundImages = useCallback(async (settings: CompanyStockBackgroundSlideshow | undefined) => {
+    if (!settings?.images.length) return [];
+    const resolved = await Promise.all(settings.images.map(async image => {
+      try {
+        const src = await dataService.resolveCompanyLogoUrl(image.url);
+        return src ? { id: image.id, src } : null;
+      } catch {
+        return null;
+      }
+    }));
+    return resolved.filter((image): image is { id: string; src: string } => image !== null);
+  }, []);
+
   // Load all initial data
   const loadData = useCallback(async () => {
     try {
@@ -136,6 +154,7 @@ export default function App() {
       ]);
 
       setCompany(comp);
+      setResolvedStockBackgroundImages(await resolveStockBackgroundImages(comp.stock_background_slideshow));
       try {
         setCompanyLogoDisplayUrl(await dataService.resolveCompanyLogoUrl(comp.logo_url));
       } catch {
@@ -161,7 +180,7 @@ export default function App() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [selectedProject, currentUser.company_id]);
+  }, [selectedProject, currentUser.company_id, resolveStockBackgroundImages]);
 
   const handleRefreshData = useCallback(async () => {
     await dataService.syncCloudState();
@@ -175,6 +194,14 @@ export default function App() {
   // Derived lists
   const ongoingProjects = projects.filter(p => p.status !== 'completed');
   const completedProjects = projects.filter(p => p.status === 'completed');
+  const stockModuleIds: Partial<Record<ViewMode, StockInventoryModuleId>> = {
+    cement_module: 'cement_module',
+    steel_module: 'steel_module',
+    sand_module: 'sand_module',
+    bricks_module: 'bricks_module',
+    aggregate_module: 'aggregate_module'
+  };
+  const currentStockModuleId = stockModuleIds[currentView] || null;
 
   // Navigation handlers
   const handleOpenProject = async (project: Project) => {
@@ -212,19 +239,43 @@ export default function App() {
 
   const handleSaveCompanyBranding = async (
     settings: { watermark_enabled: boolean; watermark_opacity: number; watermark_size: number },
-    logoFile?: File
-  ) => {
+    logoFile: File | undefined,
+    slideshowDraft: Omit<CompanyStockBackgroundSlideshow, 'images'> & {
+      images: Array<{ id: string; name: string; size_bytes: number; url?: string; file?: File }>;
+    }
+  ): Promise<CompanyStockBackgroundSlideshow> => {
     const logoUrl = logoFile ? await dataService.uploadCompanyLogo(logoFile) : company.logo_url;
+    const images = await Promise.all(slideshowDraft.images.map(async image => {
+      if (image.file) return dataService.uploadStockBackgroundImage(image.file);
+      if (!image.url) throw new Error(`Background image “${image.name}” is missing. Remove it and select it again.`);
+      return { id: image.id, name: image.name, size_bytes: image.size_bytes, url: image.url };
+    }));
+    const stockBackgroundSlideshow: CompanyStockBackgroundSlideshow = {
+      enabled: slideshowDraft.enabled,
+      images,
+      transition_seconds: slideshowDraft.transition_seconds,
+      overlay_opacity: slideshowDraft.overlay_opacity,
+      modules: slideshowDraft.modules
+    };
     const updated = await dataService.updateCompanySettings({
       ...settings,
-      ...(logoUrl ? { logo_url: logoUrl } : {})
+      ...(logoUrl ? { logo_url: logoUrl } : {}),
+      stock_background_slideshow: stockBackgroundSlideshow
     });
     setCompany(updated);
+    setResolvedStockBackgroundImages(await resolveStockBackgroundImages(updated.stock_background_slideshow));
     try {
       setCompanyLogoDisplayUrl(await dataService.resolveCompanyLogoUrl(updated.logo_url));
     } catch {
       setCompanyLogoDisplayUrl(undefined);
     }
+    return updated.stock_background_slideshow || {
+      enabled: false,
+      images: [],
+      transition_seconds: 6,
+      overlay_opacity: 32,
+      modules: ['cement_module', 'steel_module', 'sand_module', 'bricks_module', 'aggregate_module']
+    };
   };
 
   const handleCreateProject = async (projectData: any) => {
@@ -363,7 +414,15 @@ export default function App() {
           />
         </div>
       )}
-      <main className="bp-main-content relative min-w-0 w-full max-w-[1680px] flex-1 px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+      <main className="bp-main-content relative isolate min-w-0 w-full max-w-[1680px] flex-1 px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+        {currentStockModuleId && selectedProject && (
+          <StockBackgroundSlideshow
+            moduleId={currentStockModuleId}
+            settings={company.stock_background_slideshow}
+            images={resolvedStockBackgroundImages}
+          />
+        )}
+        <div className={currentStockModuleId ? 'relative z-10' : undefined}>
         
         {/* ROLE-RESTRICTED VIEW: WORKER PORTAL (Restricted only to own records) */}
         {currentUser.role === 'worker' ? (
@@ -380,6 +439,7 @@ export default function App() {
                 currentUser={currentUser}
                 onUpdateCompanyName={handleUpdateCompanyName}
                 onSaveCompanyBranding={handleSaveCompanyBranding}
+                resolvedStockBackgroundImages={resolvedStockBackgroundImages}
                 onNavigateCreateProject={() => setIsCreateProjectOpen(true)}
                 onNavigateOngoing={() => setCurrentView('ongoing_projects')}
                 onNavigateCompleted={() => setCurrentView('completed_projects')}
@@ -552,6 +612,7 @@ export default function App() {
             )}
           </>
         )}
+        </div>
 
       </main>
       </div>

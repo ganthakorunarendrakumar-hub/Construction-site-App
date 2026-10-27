@@ -18,6 +18,7 @@ Object.defineProperty(globalThis, 'window', { configurable: true, value: { crypt
 
 const { dataService } = await import('../src/services/dataService.ts');
 const { COMPANY_BRANDING_MIGRATION_SQL } = await import('../src/services/supabaseSchemaSql.ts');
+const { DEFAULT_STOCK_BACKGROUND_SLIDESHOW, isStockBackgroundEnabledForModule, normalizeStockBackgroundSlideshow } = await import('../src/utils/stockBackground.ts');
 const COMPANY_KEY = 'buildpulse_company_v1';
 
 const makeUser = (role: UserProfile['role'], companyId = 'company-test-1'): UserProfile => ({
@@ -170,8 +171,95 @@ test('saving one company does not overwrite another company branding record in t
 
 test('the existing-cloud migration keeps logos private and company scoped', () => {
   assert.match(COMPANY_BRANDING_MIGRATION_SQL, /ADD COLUMN IF NOT EXISTS watermark_enabled/);
+  assert.match(COMPANY_BRANDING_MIGRATION_SQL, /ADD COLUMN IF NOT EXISTS stock_background_slideshow JSONB/);
   assert.match(COMPANY_BRANDING_MIGRATION_SQL, /VALUES \('company-branding', 'company-branding', false\)/);
   assert.match(COMPANY_BRANDING_MIGRATION_SQL, /Company admins can upload their company branding/);
   assert.match(COMPANY_BRANDING_MIGRATION_SQL, /Company members can read their company branding/);
   assert.match(COMPANY_BRANDING_MIGRATION_SQL, /company_id::text/);
+});
+
+test('stock background slideshow is disabled by default and only targets selected inventory modules', () => {
+  values.clear();
+  dataService.setCurrentUser(makeUser('admin'));
+  const defaultSettings = normalizeStockBackgroundSlideshow(undefined);
+  assert.equal(defaultSettings.enabled, false);
+  assert.equal(defaultSettings.images.length, 0);
+  assert.equal(defaultSettings.transition_seconds, 6);
+  assert.equal(defaultSettings.overlay_opacity, 32);
+
+  const configured = normalizeStockBackgroundSlideshow({
+    ...DEFAULT_STOCK_BACKGROUND_SLIDESHOW,
+    enabled: true,
+    images: [{ id: 'slide-1', name: 'yard.webp', url: 'data:image/webp;base64,AA==', size_bytes: 1200 }],
+    modules: ['cement_module', 'aggregate_module']
+  });
+  assert.equal(isStockBackgroundEnabledForModule(configured, 'cement_module'), true);
+  assert.equal(isStockBackgroundEnabledForModule(configured, 'aggregate_module'), true);
+  assert.equal(isStockBackgroundEnabledForModule(configured, 'steel_module'), false);
+});
+
+test('stock slideshow settings, image order, modules and values persist on the company record', async () => {
+  values.clear();
+  dataService.setCurrentUser(makeUser('admin'));
+  const settings = normalizeStockBackgroundSlideshow({
+    enabled: true,
+    images: [
+      { id: 'slide-first', name: 'Cement yard', url: 'data:image/png;base64,AA==', size_bytes: 400 },
+      { id: 'slide-second', name: 'Steel bundles', url: 'data:image/jpeg;base64,BB==', size_bytes: 800 }
+    ],
+    transition_seconds: 7,
+    overlay_opacity: 45,
+    modules: ['cement_module', 'steel_module']
+  });
+
+  const updated = await dataService.updateCompanySettings({ stock_background_slideshow: settings });
+  const loaded = await dataService.getCompany();
+
+  assert.deepEqual(updated.stock_background_slideshow, settings);
+  assert.deepEqual(loaded.stock_background_slideshow, settings);
+  assert.deepEqual(loaded.stock_background_slideshow?.images.map(image => image.id), ['slide-first', 'slide-second']);
+  assert.equal(loaded.stock_background_slideshow?.transition_seconds, 7);
+  assert.equal(loaded.stock_background_slideshow?.overlay_opacity, 45);
+  assert.deepEqual(loaded.stock_background_slideshow?.modules, ['cement_module', 'steel_module']);
+});
+
+test('stock slideshow values are clamped and invalid references are rejected without saving', async () => {
+  values.clear();
+  dataService.setCurrentUser(makeUser('admin'));
+  const normalized = normalizeStockBackgroundSlideshow({
+    enabled: true,
+    images: [{ id: 'slide', name: 'Sand', url: 'data:image/png;base64,AA==', size_bytes: 10 }],
+    transition_seconds: 30,
+    overlay_opacity: 100,
+    modules: ['sand_module']
+  });
+  assert.equal(normalized.transition_seconds, 15);
+  assert.equal(normalized.overlay_opacity, 80);
+
+  await assert.rejects(dataService.updateCompanySettings({
+    stock_background_slideshow: { ...normalized, images: [{ ...normalized.images[0], url: 'https://example.test/unconfigured-image.jpg' }] }
+  }), /reference is invalid/i);
+  await assert.rejects(dataService.updateCompanySettings({
+    stock_background_slideshow: {
+      ...normalized,
+      images: Array.from({ length: 6 }, (_, index) => ({ ...normalized.images[0], id: `slide-${index}` }))
+    }
+  }), /maximum of 5/i);
+  assert.equal(values.has(COMPANY_KEY), false);
+});
+
+test('non-admin users cannot change stock slideshow settings', async () => {
+  values.clear();
+  dataService.setCurrentUser(makeUser('site_supervisor'));
+
+  await assert.rejects(dataService.updateCompanySettings({
+    stock_background_slideshow: {
+      enabled: false,
+      images: [],
+      transition_seconds: 6,
+      overlay_opacity: 32,
+      modules: ['cement_module']
+    }
+  }), /Administrators/i);
+  assert.equal(values.has(COMPANY_KEY), false);
 });

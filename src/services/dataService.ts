@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   Company,
+  CompanyStockBackgroundImage,
   UserProfile,
   UserRole,
   Project,
@@ -27,7 +28,16 @@ import {
   VehicleMovementRecord,
   VehicleHireBillingBasis,
   VehicleHireDateRule,
-  VehicleTypeRecord
+  VehicleTypeRecord,
+  VehicleDealerRecord,
+  VehicleHireContractRecord,
+  VehicleHireReturnRecord,
+  VehicleDealerPaymentRecord,
+  VehicleFuelEntryRecord,
+  VehicleDriverFuelAdvanceRecord,
+  VehicleDealerPaymentMethod,
+  VehicleDealerPaymentType,
+  VehicleFuelPayer
 } from '../types';
 import {
   INITIAL_STEEL_BRANDS,
@@ -40,8 +50,23 @@ import {
   REGULAR_SITE_USE_DETAILED_ITEMS
 } from './materialCatalog';
 import { getLocalDateString } from '../utils/dateUtils';
-import { calculateVehicleRental, calculateWorkingSessions, isValidVehicleHireDate, vehicleHirePeriodsOverlap } from '../utils/vehicleHire';
+import {
+  calculateFinalVehicleHireBill,
+  calculateVehicleFuelAmount,
+  calculateVehicleRental,
+  calculateWorkingSessions,
+  isValidVehicleHireDate,
+  signedVehicleDealerPaymentAmount,
+  vehicleHirePeriodsOverlap
+} from '../utils/vehicleHire';
 import { mergeVehicleTypeOptions, VEHICLE_TYPES } from '../utils/hireCatalog';
+import {
+  DEFAULT_STOCK_BACKGROUND_SLIDESHOW,
+  MAX_LOCAL_STOCK_BACKGROUND_BYTES,
+  MAX_STOCK_BACKGROUND_IMAGE_BYTES,
+  MAX_STOCK_BACKGROUND_IMAGES,
+  normalizeStockBackgroundSlideshow
+} from '../utils/stockBackground';
 import {
   DuplicateStockEntryDetails,
   isPotentialDuplicateStockEntry,
@@ -225,6 +250,12 @@ const STORAGE_KEYS = {
   VEHICLE_RENTALS: 'buildpulse_vehicle_rentals_v1',
   VEHICLE_MOVEMENTS: 'buildpulse_vehicle_movements_v1',
   VEHICLE_TYPES: 'buildpulse_vehicle_types_v1',
+  VEHICLE_DEALERS: 'buildpulse_vehicle_dealers_v1',
+  VEHICLE_HIRE_CONTRACTS: 'buildpulse_vehicle_hire_contracts_v1',
+  VEHICLE_HIRE_RETURNS: 'buildpulse_vehicle_hire_returns_v1',
+  VEHICLE_DEALER_PAYMENTS: 'buildpulse_vehicle_dealer_payments_v1',
+  VEHICLE_FUEL_ENTRIES: 'buildpulse_vehicle_fuel_entries_v1',
+  VEHICLE_FUEL_ADVANCES: 'buildpulse_vehicle_fuel_advances_v1',
   MACHINERY_HIRE: 'buildpulse_machinery_hire_v1',
 };
 
@@ -1865,7 +1896,8 @@ class DataService {
       name: UNCONFIGURED_COMPANY_NAMES.has(name.toLocaleLowerCase()) ? '' : name,
       watermark_enabled: company.watermark_enabled === true,
       watermark_opacity: this.clampCompanyWatermarkOpacity(company.watermark_opacity),
-      watermark_size: this.clampCompanyWatermarkSize(company.watermark_size)
+      watermark_size: this.clampCompanyWatermarkSize(company.watermark_size),
+      stock_background_slideshow: normalizeStockBackgroundSlideshow(company.stock_background_slideshow)
     };
   }
 
@@ -1912,7 +1944,8 @@ class DataService {
           name: UNCONFIGURED_COMPANY_NAMES.has(name.toLocaleLowerCase()) ? '' : name,
           watermark_enabled: data.watermark_enabled === true,
           watermark_opacity: this.clampCompanyWatermarkOpacity(data.watermark_opacity),
-          watermark_size: this.clampCompanyWatermarkSize(data.watermark_size)
+          watermark_size: this.clampCompanyWatermarkSize(data.watermark_size),
+          stock_background_slideshow: normalizeStockBackgroundSlideshow(data.stock_background_slideshow)
         } as Company;
       }
     }
@@ -1927,6 +1960,11 @@ class DataService {
       watermark_enabled: false,
       watermark_opacity: DEFAULT_COMPANY_WATERMARK_OPACITY,
       watermark_size: DEFAULT_COMPANY_WATERMARK_SIZE,
+      stock_background_slideshow: {
+        ...DEFAULT_STOCK_BACKGROUND_SLIDESHOW,
+        images: [],
+        modules: [...DEFAULT_STOCK_BACKGROUND_SLIDESHOW.modules]
+      },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -1949,7 +1987,7 @@ class DataService {
   }
 
   public async updateCompanySettings(updates: Partial<Pick<Company,
-    'name' | 'logo_url' | 'watermark_enabled' | 'watermark_opacity' | 'watermark_size'
+    'name' | 'logo_url' | 'watermark_enabled' | 'watermark_opacity' | 'watermark_size' | 'stock_background_slideshow'
   >>): Promise<Company> {
     if (this.currentUser.role !== 'admin') {
       throw new Error('Only Company Administrators have permission to edit company details.');
@@ -1963,6 +2001,32 @@ class DataService {
     if (watermarkEnabled && !logoUrl) {
       throw new Error('Select and save a company logo before enabling the watermark.');
     }
+    const slideshow = normalizeStockBackgroundSlideshow(
+      updates.stock_background_slideshow ?? company.stock_background_slideshow
+    );
+    if (updates.stock_background_slideshow?.enabled && (!slideshow.images.length || !slideshow.modules.length)) {
+      throw new Error('Add at least one valid image and select a stock module before enabling the slideshow.');
+    }
+    if (slideshow.images.length > MAX_STOCK_BACKGROUND_IMAGES) throw new Error(`A maximum of ${MAX_STOCK_BACKGROUND_IMAGES} stock background images is allowed.`);
+    for (const image of slideshow.images) {
+      if (!image.url.startsWith('data:image/png;')
+        && !image.url.startsWith('data:image/jpeg;')
+        && !image.url.startsWith('data:image/webp;')
+        && !image.url.startsWith('company-branding/')) {
+        throw new Error('A stock background image reference is invalid. Re-select the image and try again.');
+      }
+    }
+    if (!this.isCloudConnected()) {
+      const localTotalBytes = slideshow.images.reduce((total, image) => {
+        if (image.size_bytes > 0) return total + image.size_bytes;
+        if (!image.url.startsWith('data:')) return total;
+        const commaIndex = image.url.indexOf(',');
+        return total + (commaIndex >= 0 ? Math.floor((image.url.length - commaIndex - 1) * 0.75) : 0);
+      }, 0);
+      if (localTotalBytes > MAX_LOCAL_STOCK_BACKGROUND_BYTES) {
+        throw new Error('Local browser storage supports up to 2 MB of stock background images. Reduce image sizes before saving.');
+      }
+    }
 
     const updated: Company = {
       ...company,
@@ -1971,6 +2035,7 @@ class DataService {
       watermark_enabled: watermarkEnabled,
       watermark_opacity: this.clampCompanyWatermarkOpacity(updates.watermark_opacity ?? company.watermark_opacity),
       watermark_size: this.clampCompanyWatermarkSize(updates.watermark_size ?? company.watermark_size),
+      stock_background_slideshow: slideshow,
       updated_at: new Date().toISOString()
     };
 
@@ -1981,6 +2046,9 @@ class DataService {
         watermark_enabled: updated.watermark_enabled,
         watermark_opacity: updated.watermark_opacity,
         watermark_size: updated.watermark_size,
+        ...(updates.stock_background_slideshow !== undefined
+          ? { stock_background_slideshow: updated.stock_background_slideshow }
+          : {}),
         updated_at: updated.updated_at
       };
       const { data, error } = await this.supabase
@@ -1992,6 +2060,7 @@ class DataService {
       if (error) throw new Error(`Company settings could not be saved: ${error.message}`);
       if (!data) throw new Error('The company record was not found in the connected database. No new company was created.');
       Object.assign(updated, data);
+      updated.stock_background_slideshow = normalizeStockBackgroundSlideshow(data.stock_background_slideshow);
       if (updates.name === undefined) {
         const savedName = typeof data.name === 'string' ? data.name.trim() : '';
         updated.name = UNCONFIGURED_COMPANY_NAMES.has(savedName.toLocaleLowerCase()) ? '' : savedName;
@@ -2053,6 +2122,58 @@ class DataService {
       reader.onerror = () => reject(new Error('The selected company logo could not be read.'));
       reader.readAsDataURL(file);
     });
+  }
+
+  public async uploadStockBackgroundImage(file: File): Promise<CompanyStockBackgroundImage> {
+    if (this.currentUser.role !== 'admin') {
+      throw new Error('Only Company Administrators can change stock background images.');
+    }
+    const allowedTypes: Record<string, string> = {
+      'image/png': 'png',
+      'image/jpeg': 'jpg',
+      'image/webp': 'webp'
+    };
+    if (!file || !allowedTypes[file.type]) throw new Error('Choose a PNG, JPG, or WebP background image.');
+    if (file.size <= 0 || file.size > MAX_STOCK_BACKGROUND_IMAGE_BYTES) {
+      throw new Error('Each stock background image must be 1.5 MB or smaller.');
+    }
+
+    let url: string;
+    if (this.supabase && this.config.isConnected) {
+      const company = await this.getCompany();
+      const safeCompanyId = company.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const uniquePart = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const storagePath = `${safeCompanyId}/stock-background-${uniquePart}.${allowedTypes[file.type]}`;
+      const { data, error } = await this.supabase.storage
+        .from('company-branding')
+        .upload(storagePath, file, {
+          cacheControl: '3600',
+          contentType: file.type,
+          upsert: false
+        });
+      if (error || !data) throw new Error(`Stock background upload failed: ${error?.message || 'Private storage is unavailable.'}`);
+      url = `company-branding/${storagePath}`;
+    } else {
+      url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result !== 'string' || !reader.result.startsWith(`data:${file.type};`)) {
+            reject(new Error('The selected stock background could not be read.'));
+            return;
+          }
+          resolve(reader.result);
+        };
+        reader.onerror = () => reject(new Error('The selected stock background could not be read.'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    return {
+      id: `stock-bg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      name: file.name.slice(0, 160),
+      url,
+      size_bytes: file.size
+    };
   }
 
   public async resolveCompanyLogoUrl(reference?: string): Promise<string | undefined> {
@@ -4374,6 +4495,665 @@ class DataService {
     await this.requireHireProject(record.project_id);
     localStorage.setItem(STORAGE_KEYS.VEHICLE_MOVEMENTS, JSON.stringify(all.filter(item => item.id !== movementId)));
     this.recordAuditLog('delete_vehicle_movement', 'vehicle_movements', movementId, { asset_id: record.asset_id, project_id: record.project_id });
+  }
+
+  private validHireDateTime(value: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return false;
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.getTime())
+      && `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}T${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}` === value;
+  }
+
+  public async getVehicleDealers(): Promise<VehicleDealerRecord[]> {
+    return this.readHireRecords<VehicleDealerRecord>(STORAGE_KEYS.VEHICLE_DEALERS, 'vehicle dealer')
+      .filter(record => record.company_id === this.currentUser.company_id)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  public async saveVehicleDealer(input: Omit<VehicleDealerRecord, 'id' | 'company_id' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at'> & { id?: string }): Promise<VehicleDealerRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to manage vehicle dealers.');
+    const dealerId = input.dealer_id.trim();
+    const name = input.name.trim();
+    const contact = input.contact_person.trim();
+    const phone = input.phone.trim();
+    const address = input.address.trim();
+    if (!dealerId || !name || !contact || !phone || !address) throw new Error('Dealer ID, name, contact person, phone, and address are required.');
+    if (input.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email.trim())) throw new Error('Enter a valid dealer email address.');
+    const all = this.readHireRecords<VehicleDealerRecord>(STORAGE_KEYS.VEHICLE_DEALERS, 'vehicle dealer');
+    const existing = input.id ? all.find(record => record.id === input.id && record.company_id === this.currentUser.company_id) : undefined;
+    if (input.id && !existing) throw new Error('Dealer was not found. Refresh and try again.');
+    if (all.some(record => record.company_id === this.currentUser.company_id && record.id !== existing?.id
+      && record.dealer_id.trim().toLocaleLowerCase() === dealerId.toLocaleLowerCase())) {
+      throw new Error('Dealer ID already exists.');
+    }
+    const now = new Date().toISOString();
+    const record: VehicleDealerRecord = {
+      ...input,
+      id: existing?.id || input.id || `vdl-${generateUuid()}`,
+      company_id: existing?.company_id || this.currentUser.company_id,
+      dealer_id: dealerId,
+      name,
+      contact_person: contact,
+      phone,
+      address,
+      email: input.email?.trim() || undefined,
+      payment_details: input.payment_details?.trim() || undefined,
+      remarks: input.remarks?.trim() || undefined,
+      status: existing?.status === 'archived' ? 'archived' : input.status,
+      created_by: existing?.created_by || this.currentUser.id,
+      created_by_name: existing?.created_by_name || this.currentUser.full_name,
+      created_at: existing?.created_at || now,
+      updated_at: now
+    };
+    const index = all.findIndex(item => item.id === record.id);
+    if (index >= 0) all[index] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALERS, JSON.stringify(all));
+    this.recordAuditLog(index >= 0 ? 'update_vehicle_dealer' : 'create_vehicle_dealer', 'vehicle_dealers', record.id, { dealer_id: dealerId });
+    return record;
+  }
+
+  public async archiveVehicleDealer(dealerId: string): Promise<void> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to archive vehicle dealers.');
+    const all = this.readHireRecords<VehicleDealerRecord>(STORAGE_KEYS.VEHICLE_DEALERS, 'vehicle dealer');
+    const dealer = all.find(record => record.id === dealerId && record.company_id === this.currentUser.company_id);
+    if (!dealer) throw new Error('Dealer was not found.');
+    const archived = { ...dealer, status: 'archived' as const, updated_at: new Date().toISOString() };
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALERS, JSON.stringify(all.map(record => record.id === dealer.id ? archived : record)));
+    this.recordAuditLog('archive_vehicle_dealer', 'vehicle_dealers', dealer.id, { dealer_id: dealer.dealer_id });
+  }
+
+  public async deleteVehicleDealerIfUnused(dealerId: string): Promise<void> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to delete vehicle dealers.');
+    const dealers = this.readHireRecords<VehicleDealerRecord>(STORAGE_KEYS.VEHICLE_DEALERS, 'vehicle dealer');
+    const dealer = dealers.find(record => record.id === dealerId && record.company_id === this.currentUser.company_id);
+    if (!dealer) throw new Error('Dealer was not found.');
+    const hires = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract')
+      .filter(record => record.company_id === this.currentUser.company_id && record.dealer_id === dealer.id);
+    const hireIds = new Set(hires.map(hire => hire.id));
+    const payments = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment')
+      .filter(record => record.company_id === this.currentUser.company_id && record.dealer_id === dealer.id);
+    const fuelEntries = this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel')
+      .filter(record => record.company_id === this.currentUser.company_id && record.dealer_id === dealer.id);
+    const advances = this.readHireRecords<VehicleDriverFuelAdvanceRecord>(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, 'driver fuel advance')
+      .filter(record => record.company_id === this.currentUser.company_id && record.hire_id && hireIds.has(record.hire_id));
+    if (hires.length || payments.length || fuelEntries.length || advances.length) {
+      throw new Error('This dealer has hire, payment, or fuel history. Archive the dealer to preserve its transaction links.');
+    }
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALERS, JSON.stringify(dealers.filter(record => record.id !== dealer.id)));
+    this.recordAuditLog('delete_vehicle_dealer', 'vehicle_dealers', dealer.id, { dealer_id: dealer.dealer_id, name: dealer.name });
+  }
+
+  public async getVehicleHireContracts(projectIds?: string[]): Promise<VehicleHireContractRecord[]> {
+    const projectFilter = projectIds ? new Set(projectIds) : null;
+    return this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract')
+      .filter(record => record.company_id === this.currentUser.company_id && this.canAccessHireProject(record.project_id)
+        && (!projectFilter || projectFilter.has(record.project_id)))
+      .sort((a, b) => b.start_at.localeCompare(a.start_at));
+  }
+
+  public async getVehicleHireReturns(projectIds?: string[]): Promise<VehicleHireReturnRecord[]> {
+    const projectFilter = projectIds ? new Set(projectIds) : null;
+    const hires = await this.getVehicleHireContracts(projectIds);
+    const hireIds = new Set(hires.map(hire => hire.id));
+    return this.readHireRecords<VehicleHireReturnRecord>(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, 'vehicle return')
+      .filter(record => record.company_id === this.currentUser.company_id && hireIds.has(record.hire_id));
+  }
+
+  public async getVehicleDealerPayments(projectIds?: string[]): Promise<VehicleDealerPaymentRecord[]> {
+    const projectFilter = projectIds ? new Set(projectIds) : null;
+    const hires = await this.getVehicleHireContracts(projectIds);
+    const hireIds = new Set(hires.map(hire => hire.id));
+    return this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment')
+      .filter(record => record.company_id === this.currentUser.company_id
+        && (record.hire_ids.length === 0
+          ? !projectFilter && this.currentUser.role !== 'site_supervisor'
+          : record.hire_ids.some(id => hireIds.has(id))));
+  }
+
+  public async getVehicleFuelEntries(projectIds?: string[]): Promise<VehicleFuelEntryRecord[]> {
+    const projectFilter = projectIds ? new Set(projectIds) : null;
+    return this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel')
+      .filter(record => record.company_id === this.currentUser.company_id && this.canAccessHireProject(record.project_id)
+        && (!projectFilter || projectFilter.has(record.project_id)))
+      .sort((a, b) => b.fuel_date.localeCompare(a.fuel_date));
+  }
+
+  public async getVehicleDriverFuelAdvances(projectIds?: string[]): Promise<VehicleDriverFuelAdvanceRecord[]> {
+    const projectFilter = projectIds ? new Set(projectIds) : null;
+    return this.readHireRecords<VehicleDriverFuelAdvanceRecord>(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, 'driver fuel advance')
+      .filter(record => record.company_id === this.currentUser.company_id && this.canAccessHireProject(record.project_id)
+        && (!projectFilter || projectFilter.has(record.project_id)))
+      .sort((a, b) => b.advance_date.localeCompare(a.advance_date));
+  }
+
+  public async recordVehicleDriverFuelAdvance(input: Omit<VehicleDriverFuelAdvanceRecord, 'id' | 'company_id' | 'project_name' | 'created_by' | 'created_by_name' | 'created_at'> & { id?: string }): Promise<VehicleDriverFuelAdvanceRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to record driver advances.');
+    const project = await this.requireHireProject(input.project_id);
+    await this.validateHireSite(input.project_id, input.site_id, input.site_name);
+    if (!input.driver_name.trim()) throw new Error('Driver name is required for a fuel advance.');
+    if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error('Driver advance must be greater than zero.');
+    if (!isValidVehicleHireDate(input.advance_date)) throw new Error('Enter a valid driver advance date.');
+    const existing = this.readHireRecords<VehicleDriverFuelAdvanceRecord>(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, 'driver fuel advance');
+    const duplicate = existing.find(record => record.company_id === this.currentUser.company_id && record.idempotency_key === input.idempotency_key);
+    if (duplicate) return duplicate;
+    if (input.hire_id) {
+      const hire = (await this.getVehicleHireContracts([project.id])).find(record => record.id === input.hire_id);
+      if (!hire || hire.project_id !== project.id || hire.driver_name?.trim().toLocaleLowerCase() !== input.driver_name.trim().toLocaleLowerCase()) {
+        throw new Error('Driver advance must match the selected hire and driver.');
+      }
+    }
+    const now = new Date().toISOString();
+    const record: VehicleDriverFuelAdvanceRecord = {
+      ...input,
+      id: input.id || `vfadv-${generateUuid()}`,
+      company_id: project.company_id,
+      project_name: project.name,
+      driver_name: input.driver_name.trim(),
+      transaction_reference: input.transaction_reference?.trim() || undefined,
+      employee_id: input.employee_id.trim(),
+      employee_name: input.employee_name.trim(),
+      created_by: this.currentUser.id,
+      created_by_name: this.currentUser.full_name,
+      created_at: now
+    };
+    existing.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, JSON.stringify(existing));
+    this.recordAuditLog('record_vehicle_driver_fuel_advance', 'vehicle_fuel_advances', record.id, { project_id: project.id, amount: record.amount });
+    return record;
+  }
+
+  public async saveVehicleHireContract(input: Omit<VehicleHireContractRecord, 'id' | 'company_id' | 'hire_reference' | 'project_name' | 'advance_payment_id' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at' | 'status'> & {
+    id?: string;
+    advance_payment_method?: VehicleDealerPaymentMethod;
+    advance_transaction_reference?: string;
+  }): Promise<VehicleHireContractRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to create vehicle hires.');
+    const project = await this.requireHireProject(input.project_id);
+    await this.validateHireSite(input.project_id, input.site_id, input.site_name);
+    const dealers = await this.getVehicleDealers();
+    const dealer = dealers.find(record => record.id === input.dealer_id && record.status === 'active');
+    if (!dealer) throw new Error('Select an active dealer.');
+    if (!input.vehicle_type.trim() || !input.vehicle_description.trim()) throw new Error('Vehicle type and description are required.');
+    if (!this.validHireDateTime(input.start_at) || !this.validHireDateTime(input.expected_return_at)) throw new Error('Enter valid local start and expected return date and times.');
+    if (input.expected_return_at <= input.start_at) throw new Error('Expected return must be after the hire start.');
+    if (!Number.isFinite(input.agreed_rate) || input.agreed_rate < 0) throw new Error('Agreed rate cannot be negative or invalid.');
+    if (input.billing_method === 'fixed_contract' && input.agreed_rate <= 0) throw new Error('Enter the fixed contract amount.');
+    if (!Number.isFinite(input.advance_amount) || input.advance_amount < 0) throw new Error('Advance payment cannot be negative or invalid.');
+    for (const reading of [input.initial_meter_reading, input.initial_engine_hours]) {
+      if (reading !== undefined && (!Number.isFinite(reading) || reading < 0)) throw new Error('Meter and engine-hour readings must be non-negative.');
+    }
+    if (input.asset_id) {
+      const assets = await this.getVehicleAssets();
+      if (!assets.some(asset => asset.id === input.asset_id)) throw new Error('Select a registered vehicle that is accessible to your account.');
+    }
+    const all = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract');
+    const previous = input.id ? all.find(record => record.id === input.id && record.company_id === this.currentUser.company_id) : undefined;
+    if (input.id && !previous) throw new Error('Hire record was not found. Refresh and try again.');
+    const returns = this.readHireRecords<VehicleHireReturnRecord>(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, 'vehicle return');
+    if (previous && returns.some(record => record.hire_id === previous.id)) throw new Error('A returned hire cannot be edited. Correct it through the return audit workflow.');
+    const registration = input.registration_number?.trim().toLocaleLowerCase();
+    if (all.some(record => record.company_id === this.currentUser.company_id && record.id !== previous?.id
+      && record.status === 'active'
+      && ((input.asset_id && record.asset_id === input.asset_id)
+        || (registration && record.registration_number?.trim().toLocaleLowerCase() === registration))
+      && input.start_at < (returns.find(returnRecord => returnRecord.hire_id === record.id)?.actual_return_at || record.expected_return_at)
+      && record.start_at < input.expected_return_at)) {
+      throw new Error('This vehicle has an overlapping active hire period.');
+    }
+    const now = new Date().toISOString();
+    const id = previous?.id || input.id || `vhc-${generateUuid()}`;
+    const hire: VehicleHireContractRecord = {
+      ...input,
+      id,
+      company_id: project.company_id,
+      hire_reference: previous?.hire_reference || `VH-${input.start_at.slice(0, 10).replaceAll('-', '')}-${generateUuid().slice(0, 6).toUpperCase()}`,
+      project_name: project.name,
+      dealer_id: dealer.id,
+      vehicle_type: input.vehicle_type.trim(),
+      registration_number: input.registration_number?.trim() || undefined,
+      vehicle_description: input.vehicle_description.trim(),
+      driver_name: input.driver_name?.trim() || undefined,
+      driver_phone: input.driver_phone?.trim() || undefined,
+      site_name: input.site_name.trim(),
+      remarks: input.remarks?.trim() || undefined,
+      status: previous?.status || 'active',
+      advance_amount: previous?.advance_amount ?? input.advance_amount,
+      created_by: previous?.created_by || this.currentUser.id,
+      created_by_name: previous?.created_by_name || this.currentUser.full_name,
+      created_at: previous?.created_at || now,
+      updated_at: now
+    };
+    const index = all.findIndex(record => record.id === hire.id);
+    if (index >= 0) all[index] = hire; else all.push(hire);
+
+    const paymentRows = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment');
+    let advancePaymentId = previous?.advance_payment_id;
+    if (!previous && hire.advance_amount > 0) {
+      const payment: VehicleDealerPaymentRecord = {
+        id: `vdp-${generateUuid()}`,
+        company_id: project.company_id,
+        dealer_id: dealer.id,
+        hire_ids: [hire.id],
+        payment_date: input.start_at.slice(0, 10),
+        amount: hire.advance_amount,
+        payment_type: 'advance',
+        method: input.advance_payment_method || 'other',
+        transaction_reference: input.advance_transaction_reference?.trim() || undefined,
+        idempotency_key: `hire-advance-${hire.id}`,
+        created_by: this.currentUser.id,
+        created_by_name: this.currentUser.full_name,
+        created_at: now
+      };
+      paymentRows.push(payment);
+      advancePaymentId = payment.id;
+    }
+    const savedHire = { ...hire, advance_payment_id: advancePaymentId };
+    all[index >= 0 ? index : all.length - 1] = savedHire;
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, JSON.stringify(all));
+    if (paymentRows.length !== this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment').length) {
+      localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, JSON.stringify(paymentRows));
+    }
+    this.recordAuditLog(previous ? 'update_vehicle_hire_contract' : 'create_vehicle_hire_contract', 'vehicle_hire_contracts', savedHire.id, { hire_reference: savedHire.hire_reference, dealer_id: dealer.id, project_id: project.id });
+    return savedHire;
+  }
+
+  public async cancelVehicleHireContract(hireId: string): Promise<void> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to cancel vehicle hires.');
+    const all = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract');
+    const hire = all.find(record => record.id === hireId && record.company_id === this.currentUser.company_id);
+    if (!hire) throw new Error('Hire record was not found.');
+    await this.requireHireProject(hire.project_id);
+    if (this.readHireRecords<VehicleHireReturnRecord>(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, 'vehicle return').some(record => record.hire_id === hire.id)) throw new Error('A returned hire cannot be cancelled.');
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, JSON.stringify(all.map(record => record.id === hire.id ? { ...record, status: 'cancelled' as const, updated_at: new Date().toISOString() } : record)));
+    this.recordAuditLog('cancel_vehicle_hire_contract', 'vehicle_hire_contracts', hire.id, { hire_reference: hire.hire_reference });
+  }
+
+  public async deleteVehicleHireContractIfUnused(hireId: string): Promise<void> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to delete vehicle hires.');
+    const hires = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract');
+    const hire = hires.find(record => record.id === hireId && record.company_id === this.currentUser.company_id);
+    if (!hire) throw new Error('Hire record was not found.');
+    await this.requireHireProject(hire.project_id);
+    const hasReturn = this.readHireRecords<VehicleHireReturnRecord>(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, 'vehicle return')
+      .some(record => record.company_id === this.currentUser.company_id && record.hire_id === hire.id);
+    const hasPayment = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment')
+      .some(record => record.company_id === this.currentUser.company_id && record.hire_ids.includes(hire.id));
+    const hasFuel = this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel')
+      .some(record => record.company_id === this.currentUser.company_id && record.hire_id === hire.id);
+    const hasAdvance = this.readHireRecords<VehicleDriverFuelAdvanceRecord>(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, 'driver fuel advance')
+      .some(record => record.company_id === this.currentUser.company_id && record.hire_id === hire.id);
+    if (hasReturn || hasPayment || hasFuel || hasAdvance) {
+      throw new Error('This hire has return, payment, or fuel dependencies. Cancel the hire instead; linked financial records must remain in the audit trail.');
+    }
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, JSON.stringify(hires.filter(record => record.id !== hire.id)));
+    this.recordAuditLog('delete_vehicle_hire_contract', 'vehicle_hire_contracts', hire.id, { hire_reference: hire.hire_reference, project_id: hire.project_id });
+  }
+
+  public async finalizeVehicleHireReturn(input: Omit<VehicleHireReturnRecord, 'id' | 'company_id' | 'final_bill' | 'revision_history' | 'finalized_by' | 'finalized_by_name' | 'created_at' | 'updated_at'> & { id?: string; correction_reason?: string }): Promise<VehicleHireReturnRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to finalize vehicle returns.');
+    const hires = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract');
+    const hire = hires.find(record => record.id === input.hire_id && record.company_id === this.currentUser.company_id);
+    if (!hire) throw new Error('Hire record was not found.');
+    await this.requireHireProject(hire.project_id);
+    if (!this.validHireDateTime(input.actual_return_at) || input.actual_return_at < hire.start_at) throw new Error('Enter a valid actual return date and time after the hire started.');
+    for (const reading of [input.final_meter_reading, input.final_engine_hours]) {
+      if (reading !== undefined && (!Number.isFinite(reading) || reading < 0)) throw new Error('Final readings must be non-negative.');
+    }
+    if (input.final_meter_reading !== undefined && hire.initial_meter_reading !== undefined && input.final_meter_reading < hire.initial_meter_reading) throw new Error('Final meter reading cannot be below the initial reading.');
+    if (input.final_engine_hours !== undefined && hire.initial_engine_hours !== undefined && input.final_engine_hours < hire.initial_engine_hours) throw new Error('Final engine hours cannot be below the initial reading.');
+    const bill = calculateFinalVehicleHireBill({ billingMethod: hire.billing_method, agreedRate: hire.agreed_rate, billableUsage: input.billable_usage, additionalCharges: input.additional_charges, discount: input.discount });
+    const all = this.readHireRecords<VehicleHireReturnRecord>(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, 'vehicle return');
+    const previous = all.find(record => record.hire_id === hire.id);
+    if (previous && !input.correction_reason?.trim()) throw new Error('A correction reason is required to change a finalized return.');
+    const now = new Date().toISOString();
+    const priorValues = previous ? {
+      actual_return_at: previous.actual_return_at,
+      final_meter_reading: previous.final_meter_reading,
+      final_engine_hours: previous.final_engine_hours,
+      billable_usage: previous.billable_usage,
+      return_condition: previous.return_condition,
+      additional_charges: previous.additional_charges,
+      discount: previous.discount,
+      final_bill: previous.final_bill,
+      remarks: previous.remarks
+    } : undefined;
+    const revisionHistory = previous && priorValues ? [...previous.revision_history, {
+      id: `vhrrev-${generateUuid()}`,
+      changed_by: this.currentUser.id,
+      changed_by_name: this.currentUser.full_name,
+      changed_at: now,
+      reason: input.correction_reason!.trim(),
+      previous_values: priorValues
+    }] : [];
+    const record: VehicleHireReturnRecord = {
+      ...input,
+      id: previous?.id || input.id || `vhr-${generateUuid()}`,
+      company_id: hire.company_id,
+      final_bill: bill,
+      revision_history: revisionHistory,
+      finalized_by: this.currentUser.id,
+      finalized_by_name: this.currentUser.full_name,
+      created_at: previous?.created_at || now,
+      updated_at: now
+    };
+    const index = all.findIndex(item => item.hire_id === hire.id);
+    if (index >= 0) all[index] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, JSON.stringify(all));
+    this.recordAuditLog(previous ? 'correct_vehicle_hire_return' : 'finalize_vehicle_hire_return', 'vehicle_hire_returns', record.id, { hire_reference: hire.hire_reference, final_bill: bill, revision_reason: input.correction_reason });
+    return record;
+  }
+
+  private syncHireAdvanceBalances(hireIds: string[]): void {
+    const uniqueIds = new Set(hireIds);
+    if (!uniqueIds.size) return;
+    const payments = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment');
+    const hires = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract');
+    const updated = hires.map(hire => {
+      if (hire.company_id !== this.currentUser.company_id || !uniqueIds.has(hire.id)) return hire;
+      const advanceAmount = payments.reduce((sum, payment) => {
+        if (payment.company_id !== this.currentUser.company_id) return sum;
+        if (payment.payment_type === 'advance' && payment.hire_ids.includes(hire.id)) return sum + payment.amount;
+        if (payment.payment_type !== 'reversal' || !payment.reverses_payment_id) return sum;
+        const original = payments.find(row => row.id === payment.reverses_payment_id);
+        return original?.payment_type === 'advance' && original.hire_ids.includes(hire.id) ? sum - payment.amount : sum;
+      }, 0);
+      return { ...hire, advance_amount: Math.max(0, Math.round((advanceAmount + Number.EPSILON) * 100) / 100), updated_at: new Date().toISOString() };
+    });
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, JSON.stringify(updated));
+  }
+
+  public async recordVehicleDealerPayment(input: Omit<VehicleDealerPaymentRecord, 'id' | 'company_id' | 'created_by' | 'created_by_name' | 'created_at' | 'revision_history' | 'reverses_payment_id' | 'reversal_reason'> & {
+    id?: string;
+    correction_reason?: string;
+  }): Promise<VehicleDealerPaymentRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to record dealer payments.');
+    if (input.payment_type === 'reversal') throw new Error('Use the payment reversal workflow instead of recording a reversal as a new payment.');
+    const all = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment');
+    const previous = input.id ? all.find(record => record.id === input.id && record.company_id === this.currentUser.company_id) : undefined;
+    if (input.id && !previous) throw new Error('Payment record was not found.');
+    if (previous?.payment_type === 'reversal') throw new Error('A reversal is immutable. Record a new payment or request an authorized correction.');
+    if (previous && !['admin', 'project_manager'].includes(this.currentUser.role)) throw new Error('Only a Company Administrator or Project Manager can edit a payment.');
+    if (previous && all.some(record => record.payment_type === 'reversal' && record.reverses_payment_id === previous.id)) {
+      throw new Error('This payment has already been reversed and cannot be edited.');
+    }
+    if (previous && !input.correction_reason?.trim()) throw new Error('Enter a correction reason before editing this payment.');
+    if (previous?.payment_type === 'advance' && input.payment_type !== 'advance') throw new Error('An advance must remain classified as an advance; reverse it and record the corrected payment instead.');
+    if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error('Payment amount must be greater than zero.');
+    if (!isValidVehicleHireDate(input.payment_date)) throw new Error('Enter a valid payment date.');
+    if (this.currentUser.role === 'site_supervisor' && input.hire_ids.length === 0) throw new Error('Site Supervisors must link a dealer payment to an assigned hire record.');
+    const dealers = await this.getVehicleDealers();
+    if (!dealers.some(dealer => dealer.id === input.dealer_id)) throw new Error('Dealer was not found.');
+    const hires = await this.getVehicleHireContracts();
+    const related = input.hire_ids.map(id => hires.find(hire => hire.id === id));
+    if (related.some(hire => !hire || hire.dealer_id !== input.dealer_id)) throw new Error('Payments can only be linked to hires for the selected dealer.');
+    if (previous?.payment_type === 'advance' && previous.hire_ids.join('|') !== [...new Set(input.hire_ids)].join('|')) {
+      throw new Error('An advance payment cannot be reassigned to a different hire. Reverse it and record a new advance instead.');
+    }
+    const duplicateKey = all.find(record => record.company_id === this.currentUser.company_id
+      && record.idempotency_key === input.idempotency_key && record.id !== previous?.id);
+    if (duplicateKey) return duplicateKey;
+    const reference = input.transaction_reference?.trim().toLocaleLowerCase();
+    if (reference && all.some(record => record.company_id === this.currentUser.company_id && record.id !== previous?.id
+      && record.dealer_id === input.dealer_id && record.transaction_reference?.trim().toLocaleLowerCase() === reference)) {
+      throw new Error('That transaction reference has already been recorded for this dealer.');
+    }
+    const now = new Date().toISOString();
+    const previousValues = previous ? {
+      dealer_id: previous.dealer_id,
+      hire_ids: [...previous.hire_ids],
+      payment_date: previous.payment_date,
+      amount: previous.amount,
+      payment_type: previous.payment_type,
+      method: previous.method,
+      transaction_reference: previous.transaction_reference,
+      remarks: previous.remarks
+    } : undefined;
+    const revisionHistory = previous && previousValues ? [...(previous.revision_history || []), {
+      id: `vdprev-${generateUuid()}`,
+      changed_by: this.currentUser.id,
+      changed_by_name: this.currentUser.full_name,
+      changed_at: now,
+      reason: input.correction_reason!.trim(),
+      previous_values: previousValues
+    }] : [];
+    const record: VehicleDealerPaymentRecord = {
+      ...input,
+      id: previous?.id || input.id || `vdp-${generateUuid()}`,
+      company_id: previous?.company_id || this.currentUser.company_id,
+      hire_ids: previous?.payment_type === 'advance' ? [...previous.hire_ids] : [...new Set(input.hire_ids)],
+      transaction_reference: input.transaction_reference?.trim() || undefined,
+      remarks: input.remarks?.trim() || undefined,
+      idempotency_key: previous?.idempotency_key || input.idempotency_key,
+      revision_history: revisionHistory,
+      created_by: previous?.created_by || this.currentUser.id,
+      created_by_name: previous?.created_by_name || this.currentUser.full_name,
+      created_at: previous?.created_at || now
+    };
+    const index = all.findIndex(item => item.id === record.id);
+    if (index >= 0) all[index] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, JSON.stringify(all));
+    const advanceRelated = previous?.payment_type === 'advance' || record.payment_type === 'advance'
+      ? [...(previous?.hire_ids || []), ...record.hire_ids]
+      : [];
+    this.syncHireAdvanceBalances(advanceRelated);
+    this.recordAuditLog(previous ? 'correct_vehicle_dealer_payment' : 'record_vehicle_dealer_payment', 'vehicle_dealer_payments', record.id, {
+      dealer_id: record.dealer_id, amount: record.amount, payment_type: record.payment_type,
+      correction_reason: input.correction_reason
+    });
+    return record;
+  }
+
+  public async reverseVehicleDealerPayment(paymentId: string, reason: string): Promise<VehicleDealerPaymentRecord> {
+    if (!['admin', 'project_manager'].includes(this.currentUser.role)) throw new Error('Only a Company Administrator or Project Manager can reverse dealer payments.');
+    const all = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment');
+    const original = all.find(record => record.id === paymentId && record.company_id === this.currentUser.company_id);
+    if (!original) throw new Error('Payment record was not found.');
+    if (original.payment_type === 'reversal') throw new Error('A reversal cannot be reversed. Correct the original payment through the audit workflow.');
+    if (all.some(record => record.payment_type === 'reversal' && record.reverses_payment_id === original.id)) throw new Error('This payment has already been reversed.');
+    const cleanReason = reason.trim();
+    if (!cleanReason) throw new Error('A reversal reason is required.');
+    const now = new Date().toISOString();
+    const reversal: VehicleDealerPaymentRecord = {
+      id: `vdrev-${generateUuid()}`,
+      company_id: original.company_id,
+      dealer_id: original.dealer_id,
+      hire_ids: [...original.hire_ids],
+      payment_date: getLocalDateString(),
+      amount: original.amount,
+      payment_type: 'reversal',
+      method: 'other',
+      transaction_reference: `REV-${original.transaction_reference || original.id}`,
+      remarks: cleanReason,
+      idempotency_key: `reversal-${original.id}`,
+      reverses_payment_id: original.id,
+      reversal_reason: cleanReason,
+      revision_history: [],
+      created_by: this.currentUser.id,
+      created_by_name: this.currentUser.full_name,
+      created_at: now
+    };
+    all.push(reversal);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, JSON.stringify(all));
+    if (original.payment_type === 'advance') this.syncHireAdvanceBalances(original.hire_ids);
+    this.recordAuditLog('reverse_vehicle_dealer_payment', 'vehicle_dealer_payments', reversal.id, {
+      original_payment_id: original.id, amount: original.amount, reason: cleanReason
+    });
+    return reversal;
+  }
+
+  public async recordVehicleFuelEntry(input: Omit<VehicleFuelEntryRecord, 'id' | 'company_id' | 'project_name' | 'total_amount' | 'reimbursement_confirmed_by' | 'reimbursement_confirmed_by_name' | 'reimbursement_confirmed_at' | 'created_by' | 'created_by_name' | 'created_at' | 'revision_history' | 'status' | 'void_reason' | 'voided_by' | 'voided_by_name' | 'voided_at'> & {
+    id?: string;
+    confirm_dealer_reimbursement?: boolean;
+    correction_reason?: string;
+  }): Promise<VehicleFuelEntryRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to record fuel.');
+    const project = await this.requireHireProject(input.project_id);
+    await this.validateHireSite(input.project_id, input.site_id, input.site_name);
+    const amount = calculateVehicleFuelAmount(input.quantity_litres, input.price_per_litre);
+    if (!isValidVehicleHireDate(input.fuel_date)) throw new Error('Enter a valid fuel date.');
+    if (!input.supplier.trim() || !input.employee_name.trim()) throw new Error('Supplier and recording employee are required.');
+    if (input.meter_reading !== undefined && (!Number.isFinite(input.meter_reading) || input.meter_reading < 0)) throw new Error('Meter reading must be non-negative.');
+    if (input.payer === 'driver_advance' && !input.driver_advance_id) throw new Error('Select an existing driver fuel advance to reconcile this fuel purchase.');
+    if (input.payer !== 'driver_advance' && (input.driver_advance_id || input.driver_advance_amount !== 0)) throw new Error('A driver advance can only be linked to fuel bought with that advance.');
+    let dealer = undefined as VehicleDealerRecord | undefined;
+    if (input.dealer_id) dealer = (await this.getVehicleDealers()).find(record => record.id === input.dealer_id);
+    if (input.dealer_id && !dealer) throw new Error('Dealer was not found.');
+    if (input.payer === 'dealer_paid' && !dealer) throw new Error('Select the dealer that paid for this fuel.');
+    if (input.hire_id) {
+      const hire = (await this.getVehicleHireContracts([project.id])).find(record => record.id === input.hire_id);
+      if (!hire || hire.project_id !== project.id || hire.dealer_id !== input.dealer_id) throw new Error('Fuel entry does not match the selected hire, dealer, and project.');
+    }
+    const confirmReimbursement = input.payer === 'dealer_paid' && Boolean(input.confirm_dealer_reimbursement);
+    if (confirmReimbursement && !['admin', 'project_manager'].includes(this.currentUser.role)) throw new Error('Only a Company Administrator or Project Manager can confirm dealer fuel reimbursement.');
+    if (!input.idempotency_key?.trim()) throw new Error('Fuel entry submission reference is missing. Refresh the form and try again.');
+    const all = this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel');
+    const duplicate = input.id ? all.find(entry => entry.id === input.id && entry.company_id === this.currentUser.company_id) : undefined;
+    if (input.id && !duplicate) throw new Error('Fuel entry was not found.');
+    if (duplicate?.status === 'voided') throw new Error('A voided fuel entry is immutable. Record a new corrected fuel entry instead.');
+    if (duplicate && !input.correction_reason?.trim()) throw new Error('Enter a correction reason before editing this fuel entry.');
+    if (duplicate && (duplicate.driver_advance_id || (duplicate.payer === 'dealer_paid' && duplicate.reimbursement_confirmed))
+      && !['admin', 'project_manager'].includes(this.currentUser.role)) {
+      throw new Error('Only a Company Administrator or Project Manager can edit fuel linked to an advance or dealer settlement.');
+    }
+    const repeatedSubmission = all.find(entry => entry.company_id === this.currentUser.company_id
+      && entry.idempotency_key === input.idempotency_key && entry.id !== duplicate?.id);
+    if (repeatedSubmission) return repeatedSubmission;
+    if (input.payer === 'driver_advance' && input.driver_advance_id) {
+      const advances = this.readHireRecords<VehicleDriverFuelAdvanceRecord>(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, 'driver fuel advance');
+      const advance = advances.find(record => record.id === input.driver_advance_id && record.company_id === this.currentUser.company_id);
+      if (!advance || advance.project_id !== project.id || (advance.hire_id && advance.hire_id !== input.hire_id)) {
+        throw new Error('The selected fuel advance does not match this project or hire.');
+      }
+      const alreadyReconciled = all.filter(entry => entry.company_id === this.currentUser.company_id
+        && entry.status !== 'voided' && entry.driver_advance_id === advance.id && entry.id !== duplicate?.id)
+        .reduce((sum, entry) => sum + entry.total_amount, 0);
+      if (alreadyReconciled + amount > advance.amount + 0.005) throw new Error('Fuel expenses exceed the unreconciled driver advance. Record another advance or correct the expense amount.');
+    }
+    const now = new Date().toISOString();
+    const previousValues = duplicate ? {
+      project_id: duplicate.project_id,
+      site_id: duplicate.site_id,
+      site_name: duplicate.site_name,
+      fuel_date: duplicate.fuel_date,
+      fuel_type: duplicate.fuel_type,
+      quantity_litres: duplicate.quantity_litres,
+      price_per_litre: duplicate.price_per_litre,
+      total_amount: duplicate.total_amount,
+      meter_reading: duplicate.meter_reading,
+      supplier: duplicate.supplier,
+      payer: duplicate.payer,
+      driver_advance_id: duplicate.driver_advance_id,
+      reimbursement_confirmed: duplicate.reimbursement_confirmed,
+      notes: duplicate.notes
+    } : undefined;
+    const revisionHistory = duplicate && previousValues ? [...(duplicate.revision_history || []), {
+      id: `vfe-rev-${generateUuid()}`,
+      changed_by: this.currentUser.id,
+      changed_by_name: this.currentUser.full_name,
+      changed_at: now,
+      reason: input.correction_reason!.trim(),
+      previous_values: previousValues
+    }] : [];
+    const record: VehicleFuelEntryRecord = {
+      ...input,
+      id: duplicate?.id || input.id || `vfe-${generateUuid()}`,
+      company_id: project.company_id,
+      idempotency_key: duplicate?.idempotency_key || input.idempotency_key,
+      project_name: project.name,
+      total_amount: amount,
+      driver_advance_id: input.payer === 'driver_advance' ? input.driver_advance_id : undefined,
+      reimbursement_confirmed: confirmReimbursement,
+      reimbursement_confirmed_by: confirmReimbursement ? this.currentUser.id : undefined,
+      reimbursement_confirmed_by_name: confirmReimbursement ? this.currentUser.full_name : undefined,
+      reimbursement_confirmed_at: confirmReimbursement ? now : undefined,
+      status: duplicate?.status || 'active',
+      revision_history: revisionHistory,
+      supplier: input.supplier.trim(),
+      employee_id: input.employee_id.trim(),
+      employee_name: input.employee_name.trim(),
+      notes: input.notes?.trim() || undefined,
+      created_by: duplicate?.created_by || this.currentUser.id,
+      created_by_name: duplicate?.created_by_name || this.currentUser.full_name,
+      created_at: duplicate?.created_at || now
+    };
+    const index = all.findIndex(entry => entry.id === record.id);
+    if (index >= 0) all[index] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, JSON.stringify(all));
+    this.recordAuditLog(duplicate ? 'correct_vehicle_fuel_entry' : 'record_vehicle_fuel_entry', 'vehicle_fuel_entries', record.id, {
+      project_id: project.id, amount, payer: input.payer,
+      reimbursement_confirmed: confirmReimbursement, correction_reason: input.correction_reason
+    });
+    return record;
+  }
+
+  public async confirmVehicleFuelReimbursement(entryId: string, reason: string): Promise<VehicleFuelEntryRecord> {
+    if (!['admin', 'project_manager'].includes(this.currentUser.role)) throw new Error('Only a Company Administrator or Project Manager can confirm dealer fuel reimbursement.');
+    const cleanReason = reason.trim();
+    if (!cleanReason) throw new Error('A confirmation reason is required.');
+    const all = this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel');
+    const entry = all.find(record => record.id === entryId && record.company_id === this.currentUser.company_id);
+    if (!entry || entry.status === 'voided') throw new Error('Active fuel entry was not found.');
+    if (entry.payer !== 'dealer_paid') throw new Error('Only dealer-paid fuel can be applied to the dealer payable.');
+    if (entry.reimbursement_confirmed) throw new Error('This dealer reimbursement has already been confirmed.');
+    const now = new Date().toISOString();
+    const previousValues = {
+      project_id: entry.project_id,
+      site_id: entry.site_id,
+      site_name: entry.site_name,
+      fuel_date: entry.fuel_date,
+      fuel_type: entry.fuel_type,
+      quantity_litres: entry.quantity_litres,
+      price_per_litre: entry.price_per_litre,
+      total_amount: entry.total_amount,
+      meter_reading: entry.meter_reading,
+      supplier: entry.supplier,
+      payer: entry.payer,
+      driver_advance_id: entry.driver_advance_id,
+      reimbursement_confirmed: entry.reimbursement_confirmed,
+      notes: entry.notes
+    };
+    const updated: VehicleFuelEntryRecord = {
+      ...entry,
+      reimbursement_confirmed: true,
+      reimbursement_confirmed_by: this.currentUser.id,
+      reimbursement_confirmed_by_name: this.currentUser.full_name,
+      reimbursement_confirmed_at: now,
+      revision_history: [...(entry.revision_history || []), {
+        id: `vfe-rev-${generateUuid()}`,
+        changed_by: this.currentUser.id,
+        changed_by_name: this.currentUser.full_name,
+        changed_at: now,
+        reason: cleanReason,
+        previous_values: previousValues
+      }]
+    };
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, JSON.stringify(all.map(record => record.id === entry.id ? updated : record)));
+    this.recordAuditLog('confirm_vehicle_fuel_reimbursement', 'vehicle_fuel_entries', entry.id, { amount: entry.total_amount, reason: cleanReason });
+    return updated;
+  }
+
+  public async voidVehicleFuelEntry(entryId: string, reason: string): Promise<void> {
+    if (!['admin', 'project_manager'].includes(this.currentUser.role)) throw new Error('Only a Company Administrator or Project Manager can void fuel expenses.');
+    const cleanReason = reason.trim();
+    if (!cleanReason) throw new Error('A void reason is required.');
+    const all = this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel');
+    const entry = all.find(record => record.id === entryId && record.company_id === this.currentUser.company_id);
+    if (!entry || entry.status === 'voided') throw new Error('Active fuel entry was not found.');
+    if (entry.payer !== 'company_direct' || entry.driver_advance_id || entry.reimbursement_confirmed) {
+      throw new Error('This fuel entry is linked to a driver advance or dealer settlement. Correct it through the authorized fuel correction workflow instead of voiding it.');
+    }
+    await this.requireHireProject(entry.project_id);
+    const now = new Date().toISOString();
+    const voided: VehicleFuelEntryRecord = {
+      ...entry,
+      status: 'voided',
+      void_reason: cleanReason,
+      voided_by: this.currentUser.id,
+      voided_by_name: this.currentUser.full_name,
+      voided_at: now
+    };
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, JSON.stringify(all.map(record => record.id === entry.id ? voided : record)));
+    this.recordAuditLog('void_vehicle_fuel_entry', 'vehicle_fuel_entries', entry.id, { amount: entry.total_amount, reason: cleanReason });
   }
 
   public async getVehicleHireRecords(projectId: string): Promise<VehicleHireRecord[]> {

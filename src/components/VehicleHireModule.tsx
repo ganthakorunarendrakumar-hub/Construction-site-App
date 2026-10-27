@@ -10,6 +10,7 @@ import {
   VehicleRentalRecord, VehicleWorkingSession
 } from '../types';
 import { dataService } from '../services/dataService';
+import { VehicleHireOperations } from './VehicleHireOperations';
 import { getLocalDateString } from '../utils/dateUtils';
 import { AttachmentLinks, AttachmentSections, emptyTransactionAttachments } from './AttachmentSections';
 import { VEHICLE_TYPES, vehicleCategoryForType } from '../utils/hireCatalog';
@@ -124,7 +125,7 @@ const hireStatus = (record: VehicleRentalRecord, today: string): 'Upcoming' | 'C
 const rangesOverlap = (record: VehicleRentalRecord, from?: string, to?: string): boolean =>
   (!from || record.out_date >= from) && (!to || record.in_date <= to);
 
-export const VehicleHireModule: React.FC<VehicleHireModuleProps> = ({
+const VehicleHireLegacyWorkspace: React.FC<VehicleHireModuleProps> = ({
   project: currentProject,
   currentUser,
   onNavigateBack,
@@ -769,7 +770,7 @@ export const VehicleHireModule: React.FC<VehicleHireModuleProps> = ({
       <header className="flex flex-col gap-3 rounded-2xl border border-bp-border bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-bp-cyan-soft text-bp-navy"><Truck className="h-5 w-5" /></span>
-          <div><h1 className="text-xl font-bold tracking-tight text-bp-text sm:text-2xl">Vehicle Hire Management</h1><p className="mt-0.5 text-xs text-bp-muted">Fleet, rental periods, movements and working hours</p></div>
+          <div><h1 className="text-xl font-bold tracking-tight text-bp-text sm:text-2xl">Vehicle Hire</h1><p className="mt-0.5 text-xs text-bp-muted">Registered fleet, historic hire periods and movement hours</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={exportCurrent} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-bp-border bg-white px-3 text-xs font-semibold text-bp-text hover:bg-bp-background"><Download className="h-4 w-4" />Export CSV</button>
@@ -857,6 +858,26 @@ export const VehicleHireModule: React.FC<VehicleHireModuleProps> = ({
       {detailMovement && <MovementDetailsModal row={detailMovement} manager={manager} onClose={() => setDetailMovement(null)} onDelete={() => void removeMovement(detailMovement)} />}
     </div>
   );
+};
+
+export const VehicleHireModule: React.FC<VehicleHireModuleProps> = props => {
+  const [showLegacy, setShowLegacy] = useState(false);
+  if (showLegacy) {
+    return <div className="space-y-3">
+      <button type="button" onClick={() => setShowLegacy(false)} className="min-h-10 rounded-lg border border-bp-border bg-white px-3 text-xs font-semibold text-bp-text hover:bg-bp-background">
+        ← Back to Vehicle Hire
+      </button>
+      <VehicleHireLegacyWorkspace {...props} />
+    </div>;
+  }
+  return <VehicleHireOperations
+    currentProject={props.project}
+    currentUser={props.currentUser}
+    onNavigateBack={props.onNavigateBack}
+    onNavigateHome={props.onNavigateHome}
+    onShowLegacy={() => setShowLegacy(true)}
+    onUploadFile={props.onUploadFile}
+  />;
 };
 
 interface VehicleTableProps {

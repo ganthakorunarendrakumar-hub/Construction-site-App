@@ -1,4 +1,13 @@
-import { VehicleHireBillingBasis, VehicleHireDateRule } from '../types';
+import {
+  VehicleDealerPaymentRecord,
+  VehicleFuelEntryRecord,
+  VehicleHireBillingBasis,
+  VehicleHireBillingMethod,
+  VehicleHireContractRecord,
+  VehicleHireDateRule,
+  VehicleHireDisplayStatus,
+  VehicleHireReturnRecord
+} from '../types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -169,6 +178,80 @@ export const formatMinutesAsHours = (minutes: number): string => {
 
 export const formatIndianRupees = (amount: number): string =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(amount);
+
+export interface FinalVehicleHireBillInput {
+  billingMethod: VehicleHireBillingMethod;
+  agreedRate: number;
+  billableUsage: number;
+  additionalCharges?: number;
+  discount?: number;
+}
+
+/** Final charges use only the usage explicitly confirmed in the return workflow. */
+export const calculateFinalVehicleHireBill = (input: FinalVehicleHireBillInput): number => {
+  const rate = input.agreedRate;
+  const usage = input.billableUsage;
+  const additional = input.additionalCharges ?? 0;
+  const discount = input.discount ?? 0;
+  if (![rate, usage, additional, discount].every(Number.isFinite) || rate < 0 || usage < 0 || additional < 0 || discount < 0) {
+    throw new Error('Rates, usage, additional charges, and discounts must be valid non-negative numbers.');
+  }
+  const base = input.billingMethod === 'fixed_contract' ? rate : rate * usage;
+  if (input.billingMethod !== 'fixed_contract' && usage <= 0) {
+    throw new Error('Enter the confirmed billable usage before finalizing the return.');
+  }
+  if (input.billingMethod === 'fixed_contract' && rate <= 0) {
+    throw new Error('The fixed contract amount must be greater than zero.');
+  }
+  if (discount > base + additional) throw new Error('Discount cannot exceed the hire bill and additional charges.');
+  return Math.round((base + additional - discount + Number.EPSILON) * 100) / 100;
+};
+
+export const getVehicleHireDisplayStatus = (
+  hire: VehicleHireContractRecord,
+  returned: boolean,
+  nowLocal: string
+): VehicleHireDisplayStatus => {
+  if (returned) return 'Returned';
+  if (hire.status === 'cancelled') return 'Cancelled';
+  if (nowLocal > hire.expected_return_at) return 'Overdue';
+  const now = new Date(nowLocal).getTime();
+  const expected = new Date(hire.expected_return_at).getTime();
+  if (Number.isFinite(now) && Number.isFinite(expected) && expected - now <= 24 * 60 * 60 * 1000) return 'Return Due';
+  return 'Active';
+};
+
+export const getVehicleHireLocalDateTime = (date = new Date()): string => {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+export const calculateDealerOutstanding = (
+  dealerId: string,
+  hires: readonly VehicleHireContractRecord[],
+  returns: readonly VehicleHireReturnRecord[],
+  payments: readonly VehicleDealerPaymentRecord[],
+  fuelEntries: readonly VehicleFuelEntryRecord[]
+): number => {
+  const hireIds = new Set(hires.filter(hire => hire.dealer_id === dealerId).map(hire => hire.id));
+  const finalBills = returns.filter(record => hireIds.has(record.hire_id)).reduce((sum, record) => sum + record.final_bill, 0);
+  const confirmedFuelReimbursements = fuelEntries
+    .filter(entry => entry.status !== 'voided' && entry.dealer_id === dealerId && entry.payer === 'dealer_paid' && entry.reimbursement_confirmed)
+    .reduce((sum, entry) => sum + entry.total_amount, 0);
+  const settledPayments = payments.filter(payment => payment.dealer_id === dealerId)
+    .reduce((sum, payment) => sum + signedVehicleDealerPaymentAmount(payment), 0);
+  return Math.round((finalBills + confirmedFuelReimbursements - settledPayments + Number.EPSILON) * 100) / 100;
+};
+
+export const signedVehicleDealerPaymentAmount = (payment: VehicleDealerPaymentRecord): number =>
+  payment.payment_type === 'reversal' ? -payment.amount : payment.amount;
+
+export const calculateVehicleFuelAmount = (quantityLitres: number, pricePerLitre: number): number => {
+  if (!Number.isFinite(quantityLitres) || quantityLitres <= 0 || !Number.isFinite(pricePerLitre) || pricePerLitre < 0) {
+    throw new Error('Fuel quantity must be greater than zero and price per litre must be non-negative.');
+  }
+  return Math.round((quantityLitres * pricePerLitre + Number.EPSILON) * 100) / 100;
+};
 
 export const isDateInsideRange = (date: string, fromDate?: string, toDate?: string): boolean =>
   (!fromDate || date >= fromDate) && (!toDate || date <= toDate);

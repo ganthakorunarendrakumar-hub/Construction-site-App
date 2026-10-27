@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS public.companies (
 ALTER TABLE public.companies
     ADD COLUMN IF NOT EXISTS watermark_enabled BOOLEAN NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS watermark_opacity NUMERIC(4,2) NOT NULL DEFAULT 6,
-    ADD COLUMN IF NOT EXISTS watermark_size INTEGER NOT NULL DEFAULT 280;
+    ADD COLUMN IF NOT EXISTS watermark_size INTEGER NOT NULL DEFAULT 280,
+    ADD COLUMN IF NOT EXISTS stock_background_slideshow JSONB NOT NULL DEFAULT '{"enabled":false,"images":[],"transition_seconds":6,"overlay_opacity":32,"modules":["cement_module","steel_module","sand_module","bricks_module","aggregate_module"]}'::jsonb;
 
 -- 3. User Profiles table (Linked to auth.users in Supabase)
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -259,7 +260,7 @@ CREATE POLICY "Only admins can mark transaction reversals"
 -- ON storage.objects FOR INSERT TO authenticated
 -- WITH CHECK (bucket_id = 'construction-docs');
 
--- Company logos use a private, company-scoped bucket. Object paths begin with company_id.
+-- Company logos and stock backgrounds use private, company-scoped storage. Object paths begin with company_id.
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('company-branding', 'company-branding', false)
 ON CONFLICT (id) DO UPDATE SET public = false;
@@ -293,7 +294,8 @@ export const COMPANY_BRANDING_MIGRATION_SQL = `
 ALTER TABLE public.companies
     ADD COLUMN IF NOT EXISTS watermark_enabled BOOLEAN NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS watermark_opacity NUMERIC(4,2) NOT NULL DEFAULT 6,
-    ADD COLUMN IF NOT EXISTS watermark_size INTEGER NOT NULL DEFAULT 280;
+    ADD COLUMN IF NOT EXISTS watermark_size INTEGER NOT NULL DEFAULT 280,
+    ADD COLUMN IF NOT EXISTS stock_background_slideshow JSONB NOT NULL DEFAULT '{"enabled":false,"images":[],"transition_seconds":6,"overlay_opacity":32,"modules":["cement_module","steel_module","sand_module","bricks_module","aggregate_module"]}'::jsonb;
 
 ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
