@@ -1130,12 +1130,50 @@ class DataService {
       throw new Error(`Supabase authentication failed: ${message || 'The existing Auth account could not be verified.'}`);
     }
 
+    return this.loadCloudProfile(data.user);
+  }
+
+  /** Signs in by the company User ID without exposing the account email. */
+  public async signInWithSupabaseUserId(userId: string, password: string): Promise<UserProfile> {
+    if (!this.isCloudConfigured() || !this.supabase) {
+      throw new Error('Supabase authentication is not configured in this application.');
+    }
+
+    let response: Response;
+    try {
+      response = await fetch('/api/auth/login-by-user-id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId.trim().toUpperCase(), password })
+      });
+    } catch {
+      throw new Error('Could not reach the secure User ID sign-in service. Sign in with the registered email or contact the administrator.');
+    }
+
+    const result = await response.json().catch(() => ({})) as { access_token?: string; refresh_token?: string; error?: string };
+    if (!response.ok || !result.access_token || !result.refresh_token) {
+      throw new Error(result.error || 'Invalid User ID or password.');
+    }
+
+    const { data, error } = await this.supabase.auth.setSession({
+      access_token: result.access_token,
+      refresh_token: result.refresh_token
+    });
+    if (error || !data.user) {
+      throw new Error('User ID sign-in could not establish a Supabase session. Try signing in with email or contact the administrator.');
+    }
+    return this.loadCloudProfile(data.user);
+  }
+
+  private async loadCloudProfile(authUser: { id: string; email?: string | null }): Promise<UserProfile> {
+    if (!this.supabase) throw new Error('Supabase is not connected.');
+
     let profileResult: { data: Record<string, unknown> | null; error: { message: string; code?: string } | null };
     try {
       profileResult = await this.supabase
         .from('profiles')
         .select('*')
-        .eq('id', data.user.id)
+        .eq('id', authUser.id)
         .maybeSingle();
     } catch {
       await this.supabase.auth.signOut().catch(() => undefined);
@@ -1156,8 +1194,8 @@ class DataService {
       'site_engineer', 'storekeeper', 'management_viewer'
     ]);
     const profileEmail = typeof profile.email === 'string' ? profile.email.trim().toLocaleLowerCase() : '';
-    const authEmail = (data.user.email || normalizedEmail).trim().toLocaleLowerCase();
-    if (profile.id !== data.user.id || !profileEmail || profileEmail !== authEmail
+    const authEmail = (authUser.email || '').trim().toLocaleLowerCase();
+    if (profile.id !== authUser.id || !profileEmail || profileEmail !== authEmail
       || typeof profile.company_id !== 'string' || !profile.company_id.trim()
       || typeof profile.full_name !== 'string' || !profile.full_name.trim()
       || typeof profile.role !== 'string' || !supportedRoles.has(profile.role as UserRole)) {
@@ -1165,9 +1203,14 @@ class DataService {
       throw new Error('The Supabase profile does not match the authenticated Auth identity or has incomplete role/company data. Ask a Supabase administrator to correct the existing profile mapping.');
     }
 
+    if (profile.status === 'inactive') {
+      await this.supabase.auth.signOut().catch(() => undefined);
+      throw new Error('This account is inactive. Contact the company administrator.');
+    }
+
     const cloudUser: UserProfile = {
-      id: data.user.id,
-      auth_uid: data.user.id,
+      id: authUser.id,
+      auth_uid: authUser.id,
       user_id: typeof profile.user_id === 'string' && profile.user_id.trim() ? profile.user_id.trim().toLocaleUpperCase() : undefined,
       email: profileEmail,
       full_name: profile.full_name.trim(),
@@ -1176,7 +1219,10 @@ class DataService {
       company_id: profile.company_id,
       avatar_url: typeof profile.avatar_url === 'string' ? profile.avatar_url : undefined,
       phone: typeof profile.phone === 'string' ? profile.phone : undefined,
-      status: 'active'
+      assigned_projects: Array.isArray(profile.assigned_projects) ? profile.assigned_projects.filter((id): id is string => typeof id === 'string') : [],
+      employee_id: typeof profile.employee_id === 'string' ? profile.employee_id : undefined,
+      status: profile.status === 'inactive' ? 'inactive' : 'active',
+      must_change_password: profile.must_change_password === true
     };
 
     this.currentUser = cloudUser;
@@ -1189,6 +1235,35 @@ class DataService {
       this.cloudStateSyncWarning = 'Authentication succeeded, but shared application data could not be synchronized. Retry data refresh or contact the administrator.';
     }
     return cloudUser;
+  }
+
+  /** Calls the authenticated server-side account API; secret keys never enter the browser. */
+  public async requestCloudUserAdmin(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body?: Record<string, unknown>): Promise<any> {
+    if (!this.supabase || !this.isCloudConfigured()) throw new Error('Supabase is not connected.');
+    const { data: sessionData, error: sessionError } = await this.supabase.auth.getSession();
+    if (sessionError || !sessionData.session?.access_token) throw new Error('Sign in again to manage company accounts.');
+
+    const response = await fetch('/api/admin/users', {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionData.session.access_token}`
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const result = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) throw new Error(result.error || 'Cloud account request failed.');
+    return result;
+  }
+
+  public async completeRequiredCloudPasswordChange(newPassword: string): Promise<void> {
+    if (!this.supabase || !this.isCloudConfigured()) throw new Error('Supabase is not connected.');
+    const { data, error } = await this.supabase.auth.updateUser({ password: newPassword });
+    if (error || !data.user) throw new Error(error?.message || 'Supabase could not update this password.');
+    await this.requestCloudUserAdmin('PATCH', {
+      id: data.user.id,
+      action: 'complete_password_change'
+    });
   }
 
   public async signOutFromSupabase(): Promise<void> {
