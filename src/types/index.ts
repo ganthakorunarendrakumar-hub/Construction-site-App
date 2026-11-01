@@ -65,6 +65,23 @@ export interface UserSession {
   expires_at: number;
 }
 
+export type StockInventoryModuleId = 'cement_module' | 'steel_module' | 'sand_module' | 'bricks_module' | 'aggregate_module';
+
+export interface CompanyStockBackgroundImage {
+  id: string;
+  name: string;
+  url: string;
+  size_bytes: number;
+}
+
+export interface CompanyStockBackgroundSlideshow {
+  enabled: boolean;
+  images: CompanyStockBackgroundImage[];
+  transition_seconds: number;
+  overlay_opacity: number;
+  modules: StockInventoryModuleId[];
+}
+
 export interface Company {
   id: string;
   name: string;
@@ -72,6 +89,10 @@ export interface Company {
   address?: string;
   gstin?: string;
   logo_url?: string;
+  watermark_enabled?: boolean;
+  watermark_opacity?: number;
+  watermark_size?: number;
+  stock_background_slideshow?: CompanyStockBackgroundSlideshow;
   created_at: string;
   updated_at: string;
 }
@@ -123,6 +144,19 @@ export interface MaterialLocation {
 
 export type TransactionType = 'receipt' | 'usage' | 'damage' | 'return' | 'opening_stock';
 
+export interface TransactionAttachment {
+  url: string;
+  name: string;
+  size: number;
+  type?: string;
+}
+
+export interface TransactionAttachments {
+  invoice?: TransactionAttachment;
+  dc?: TransactionAttachment;
+  images: TransactionAttachment[];
+}
+
 export interface MaterialTransaction {
   id: string;
   company_id: string;
@@ -146,6 +180,7 @@ export interface MaterialTransaction {
   attachment_url?: string;
   attachment_name?: string;
   attachment_size?: number;
+  attachments?: TransactionAttachments;
   created_by: string;
   created_by_name: string;
   created_by_role: UserRole;
@@ -269,6 +304,7 @@ export interface GenericMaterialTransaction {
   attachment_url?: string;
   attachment_name?: string;
   attachment_size?: number;
+  attachments?: TransactionAttachments;
   idempotency_key?: string;
   created_by: string;
   created_by_name: string;
@@ -354,12 +390,347 @@ export interface AttendanceGroup {
   created_by?: string;
 }
 
+export interface VehicleHireRecord {
+  id: string;
+  company_id: string;
+  project_id: string;
+  project_name: string;
+  vehicle_category: string;
+  vehicle_type: string;
+  vehicle_identifier: string;
+  vendor: string;
+  operator?: string;
+  hire_date: string;
+  start_time: string;
+  stop_time: string;
+  idle_minutes: number;
+  idle_reason?: string;
+  fuel_type: 'petrol' | 'diesel';
+  fuel_litres?: number;
+  working_hours: number;
+  remarks?: string;
+  attachments?: TransactionAttachments;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type VehicleFuelType = 'diesel' | 'petrol' | 'electric' | 'other';
+export type VehicleHireBillingBasis = 'daily' | 'monthly';
+export type VehicleHireDateRule = 'inclusive' | 'exclusive';
+export type VehicleAssetCondition = 'available' | 'maintenance';
+
+export type VehicleHireBillingMethod = 'hour' | 'day' | 'trip' | 'month' | 'fixed_contract';
+export type VehicleHireOperationalStatus = 'active' | 'cancelled';
+export type VehicleHireDisplayStatus = 'Active' | 'Return Due' | 'Overdue' | 'Returned' | 'Cancelled';
+
+export interface VehicleDealerRecord {
+  id: string;
+  company_id: string;
+  dealer_id: string;
+  name: string;
+  contact_person: string;
+  phone: string;
+  address: string;
+  email?: string;
+  payment_details?: string;
+  remarks?: string;
+  status: 'active' | 'archived';
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** New dealer-backed hire contract; older VehicleRentalRecord entries remain readable unchanged. */
+export interface VehicleHireContractRecord {
+  id: string;
+  company_id: string;
+  hire_reference: string;
+  dealer_id: string;
+  project_id: string;
+  project_name: string;
+  site_id?: string;
+  site_name: string;
+  asset_id?: string;
+  vehicle_type: string;
+  registration_number?: string;
+  vehicle_description: string;
+  driver_name?: string;
+  driver_phone?: string;
+  start_at: string;
+  expected_return_at: string;
+  billing_method: VehicleHireBillingMethod;
+  agreed_rate: number;
+  initial_meter_reading?: number;
+  initial_engine_hours?: number;
+  advance_amount: number;
+  advance_payment_id?: string;
+  remarks?: string;
+  attachments?: TransactionAttachments;
+  status: VehicleHireOperationalStatus;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleHireReturnRecord {
+  id: string;
+  company_id: string;
+  hire_id: string;
+  actual_return_at: string;
+  final_meter_reading?: number;
+  final_engine_hours?: number;
+  billable_usage: number;
+  return_condition: string;
+  additional_charges: number;
+  discount: number;
+  final_bill: number;
+  remarks?: string;
+  attachments?: TransactionAttachments;
+  revision_history: Array<{
+    id: string;
+    changed_by: string;
+    changed_by_name: string;
+    changed_at: string;
+    reason: string;
+    previous_values: Pick<VehicleHireReturnRecord, 'actual_return_at' | 'final_meter_reading' | 'final_engine_hours' | 'billable_usage' | 'return_condition' | 'additional_charges' | 'discount' | 'final_bill' | 'remarks'>;
+  }>;
+  finalized_by: string;
+  finalized_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type VehicleDealerPaymentMethod = 'cash' | 'bank_transfer' | 'upi' | 'cheque' | 'other';
+export type VehicleDealerPaymentType = 'advance' | 'partial' | 'full' | 'reversal';
+
+export interface VehicleDealerPaymentRecord {
+  id: string;
+  company_id: string;
+  dealer_id: string;
+  hire_ids: string[];
+  payment_date: string;
+  amount: number;
+  payment_type: VehicleDealerPaymentType;
+  method: VehicleDealerPaymentMethod;
+  transaction_reference?: string;
+  receipt?: TransactionAttachments;
+  remarks?: string;
+  idempotency_key: string;
+  reverses_payment_id?: string;
+  reversal_reason?: string;
+  revision_history?: Array<{
+    id: string;
+    changed_by: string;
+    changed_by_name: string;
+    changed_at: string;
+    reason: string;
+    previous_values: Pick<VehicleDealerPaymentRecord, 'dealer_id' | 'hire_ids' | 'payment_date' | 'amount' | 'payment_type' | 'method' | 'transaction_reference' | 'remarks'>;
+  }>;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+}
+
+export type VehicleFuelPayer = 'company_direct' | 'driver_advance' | 'dealer_paid';
+
+export interface VehicleDriverFuelAdvanceRecord {
+  id: string;
+  company_id: string;
+  hire_id?: string;
+  asset_id?: string;
+  project_id: string;
+  project_name: string;
+  site_id?: string;
+  site_name: string;
+  driver_name: string;
+  advance_date: string;
+  amount: number;
+  method: VehicleDealerPaymentMethod;
+  transaction_reference?: string;
+  idempotency_key: string;
+  employee_id: string;
+  employee_name: string;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+}
+
+export interface VehicleFuelEntryRecord {
+  id: string;
+  company_id: string;
+  idempotency_key: string;
+  hire_id?: string;
+  asset_id?: string;
+  dealer_id?: string;
+  project_id: string;
+  project_name: string;
+  site_id?: string;
+  site_name: string;
+  fuel_date: string;
+  fuel_type: VehicleFuelType;
+  quantity_litres: number;
+  price_per_litre: number;
+  total_amount: number;
+  meter_reading?: number;
+  supplier: string;
+  payer: VehicleFuelPayer;
+  driver_advance_id?: string;
+  driver_advance_amount: number;
+  reimbursement_confirmed: boolean;
+  reimbursement_confirmed_by?: string;
+  reimbursement_confirmed_by_name?: string;
+  reimbursement_confirmed_at?: string;
+  status?: 'active' | 'voided';
+  void_reason?: string;
+  voided_by?: string;
+  voided_by_name?: string;
+  voided_at?: string;
+  revision_history?: Array<{
+    id: string;
+    changed_by: string;
+    changed_by_name: string;
+    changed_at: string;
+    reason: string;
+    previous_values: Pick<VehicleFuelEntryRecord, 'project_id' | 'site_id' | 'site_name' | 'fuel_date' | 'fuel_type' | 'quantity_litres' | 'price_per_litre' | 'total_amount' | 'meter_reading' | 'supplier' | 'payer' | 'driver_advance_id' | 'reimbursement_confirmed' | 'notes'>;
+  }>;
+  receipt?: TransactionAttachments;
+  employee_id: string;
+  employee_name: string;
+  notes?: string;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+}
+
+/** A registered company vehicle. New contract and movement records reference this stable asset ID. */
+export interface VehicleAssetRecord {
+  id: string;
+  company_id: string;
+  vehicle_equipment_id: string;
+  vehicle_type: string;
+  vehicle_category: string;
+  vendor: string;
+  model: string;
+  fuel_type: VehicleFuelType;
+  registration_number?: string;
+  project_id: string;
+  project_name: string;
+  site_id?: string;
+  site_name: string;
+  condition: VehicleAssetCondition;
+  remarks?: string;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleTypeRecord {
+  id: string;
+  company_id: string;
+  name: string;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+}
+
+/** A dated rental of a registered vehicle, with the chosen billing rule stored for auditability. */
+export interface VehicleRentalRecord {
+  id: string;
+  company_id: string;
+  asset_id: string;
+  project_id: string;
+  project_name: string;
+  site_id?: string;
+  site_name: string;
+  in_date: string;
+  out_date: string;
+  billing_basis: VehicleHireBillingBasis;
+  date_rule: VehicleHireDateRule;
+  rent_per_month?: number;
+  rent_per_day?: number;
+  total_months: number;
+  total_days: number;
+  billable_days: number;
+  estimated_hire_cost: number;
+  remarks?: string;
+  attachments?: TransactionAttachments;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleWorkingSession {
+  id: string;
+  start_time: string;
+  stop_time: string;
+  duration_minutes: number;
+}
+
+/** Append-only vehicle movement/work record. Session durations are actual working time. */
+export interface VehicleMovementRecord {
+  id: string;
+  company_id: string;
+  asset_id: string;
+  project_id: string;
+  project_name: string;
+  site_id?: string;
+  site_name: string;
+  operator_name: string;
+  work_date: string;
+  sessions: VehicleWorkingSession[];
+  total_working_minutes: number;
+  idle_minutes: number;
+  scheduled_minutes: number;
+  idle_reason?: string;
+  remarks?: string;
+  idempotency_key: string;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MachineryHireRecord {
+  id: string;
+  company_id: string;
+  project_id: string;
+  project_name: string;
+  machinery_category: string;
+  machinery_type: string;
+  equipment_identifier: string;
+  vendor: string;
+  location: string;
+  quantity: number;
+  received_date: string;
+  returned_date?: string;
+  rent_per_day: number;
+  remarks?: string;
+  attachments?: TransactionAttachments;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmployeeDocuments {
+  aadhaar_pdf?: TransactionAttachment;
+  aadhaar_front?: TransactionAttachment;
+  aadhaar_back?: TransactionAttachment;
+}
+
 export interface Employee {
   id: string;
   company_id: string;
   employee_code: string;
   full_name: string;
   photo_url?: string;
+  documents?: EmployeeDocuments;
   phone?: string;
   address?: string;
   job_type: EmployeeJobType | string;
@@ -420,6 +791,7 @@ export interface SalaryPaymentRecord {
   payment_type: 'salary' | 'advance' | 'bonus' | 'deduction';
   reference_no?: string;
   remarks?: string;
+  attachments?: TransactionAttachments;
   recorded_by: string;
   recorded_by_name: string;
   created_at: string;
