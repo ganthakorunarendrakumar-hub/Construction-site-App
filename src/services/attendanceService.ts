@@ -11,7 +11,7 @@ import {
   Project
 } from '../types';
 import { getLocalDateString } from '../utils/dateUtils';
-import { getNextEmployeeCode } from '../utils/employeeCode';
+import { getNextEmployeeCode, recordIssuedEmployeeCode } from '../utils/employeeCode';
 
 const STORAGE_KEYS = {
   GROUPS: 'buildpulse_attendance_groups_v1',
@@ -903,10 +903,7 @@ class AttendanceService {
     const employees = await this.getEmployees();
 
     // Individual and group onboarding share the same company-wide sequence.
-    let empCode = input.employee_code?.trim();
-    if (!empCode) {
-      empCode = getNextEmployeeCode(employees);
-    }
+    const empCode = getNextEmployeeCode(employees);
 
     // Verify code uniqueness
     if (employees.some(e => e.employee_code.toLowerCase() === empCode!.toLowerCase())) {
@@ -957,6 +954,7 @@ class AttendanceService {
 
     const updated = [newEmp, ...employees];
     localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(updated));
+    recordIssuedEmployeeCode(empCode);
     this.recordAudit('create_employee', newEmp.id, { name: newEmp.full_name, code: newEmp.employee_code, group: newEmp.group_name || 'Individual' });
     await dataService.persistCloudState();
     return newEmp;
