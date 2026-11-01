@@ -2136,6 +2136,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         editingEmployee={editingEmployee}
         groups={groups}
         projects={projects}
+        employees={employees}
         defaultGroupId={addEmployeeDefaultGroupId !== undefined ? addEmployeeDefaultGroupId : (selectedGroupId || undefined)}
         onUploadFile={(file) => dataService.uploadPrivateAttachment(file, selectedGroupId || 'attendance')}
       />

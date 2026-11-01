@@ -363,6 +363,7 @@ export type EmployeeJobType =
   | 'Barbender'
   | 'Painter'
   | 'Supervisor'
+  | 'Helper'
   | 'Other';
 
 export type SalaryType = 'daily_wage' | 'monthly_salary' | 'contract';

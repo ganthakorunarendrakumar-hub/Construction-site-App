@@ -11,6 +11,7 @@ import {
   Project
 } from '../types';
 import { getLocalDateString } from '../utils/dateUtils';
+import { getNextEmployeeCode } from '../utils/employeeCode';
 
 const STORAGE_KEYS = {
   GROUPS: 'buildpulse_attendance_groups_v1',
@@ -901,14 +902,10 @@ class AttendanceService {
 
     const employees = await this.getEmployees();
 
-    // Auto-generate unique code if not provided
+    // Individual and group onboarding share the same company-wide sequence.
     let empCode = input.employee_code?.trim();
     if (!empCode) {
-      const prefix = targetGroup
-        ? (targetGroup.name.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'EMP')
-        : 'IND';
-      const seq = (employees.length + 1).toString().padStart(3, '0');
-      empCode = `EMP-${prefix}-${seq}`;
+      empCode = getNextEmployeeCode(employees);
     }
 
     // Verify code uniqueness
@@ -931,7 +928,7 @@ class AttendanceService {
     const stdHours = Number(input.standard_hours_per_day) || 8;
     const otRate = input.overtime_rate_per_hour !== undefined
       ? Number(input.overtime_rate_per_hour)
-      : Math.round((wage / stdHours) * 1.5);
+      : 0;
 
     const newEmp: Employee = {
       id: `emp-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,

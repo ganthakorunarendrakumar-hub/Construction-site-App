@@ -3,6 +3,7 @@ import { X, Upload, User, DollarSign, Clock, ShieldCheck, AlertTriangle } from '
 import { Employee, AttendanceGroup, Project, SalaryType, EmployeeJobType, EmployeeDocuments, TransactionAttachment } from '../types';
 import { dataService } from '../services/dataService';
 import { getLocalDateString } from '../utils/dateUtils';
+import { getNextEmployeeCode } from '../utils/employeeCode';
 import { AttachmentFileLink } from './AttachmentSections';
 
 interface AddEmployeeModalProps {
@@ -30,6 +31,7 @@ interface AddEmployeeModalProps {
   groups: AttendanceGroup[];
   projects: Project[];
   defaultGroupId?: string;
+  employees: Employee[];
   onUploadFile: (file: File) => Promise<{ url: string; name: string; size: number; type?: string }>;
 }
 
@@ -43,6 +45,7 @@ const JOB_TYPES: EmployeeJobType[] = [
   'Barbender',
   'Painter',
   'Supervisor',
+  'Helper',
   'Other'
 ];
 
@@ -54,6 +57,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   groups,
   projects,
   defaultGroupId,
+  employees,
   onUploadFile
 }) => {
   const [employeeCode, setEmployeeCode] = useState('');
@@ -62,13 +66,14 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [jobType, setJobType] = useState<string>('Labourer');
+  const [otherJobType, setOtherJobType] = useState('');
   const [groupId, setGroupId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [joiningDate, setJoiningDate] = useState(getLocalDateString());
   const [salaryType, setSalaryType] = useState<SalaryType>('daily_wage');
   const [salaryAmount, setSalaryAmount] = useState('');
   const [standardHours, setStandardHours] = useState('8');
-  const [overtimeRate, setOvertimeRate] = useState('');
+  const [overtimeRate, setOvertimeRate] = useState('0');
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
   const [remarks, setRemarks] = useState('');
   const [aadhaarPdf, setAadhaarPdf] = useState<TransactionAttachment | null>(null);
@@ -101,7 +106,9 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       setAadhaarBack(editingEmployee.documents?.aadhaar_back || null);
       setPhone(editingEmployee.phone || '');
       setAddress(editingEmployee.address || '');
-      setJobType(editingEmployee.job_type);
+      const isStandardJobType = JOB_TYPES.includes(editingEmployee.job_type as EmployeeJobType);
+      setJobType(isStandardJobType ? editingEmployee.job_type : 'Other');
+      setOtherJobType(isStandardJobType || editingEmployee.job_type === 'Other' ? '' : editingEmployee.job_type);
       setGroupId(editingEmployee.group_id || '');
       setProjectId(editingEmployee.project_id || '');
       setJoiningDate(editingEmployee.joining_date || getLocalDateString());
@@ -116,10 +123,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       setGroupId(activeGroupId);
       
       const targetGroup = groups.find(g => g.id === activeGroupId);
-      const prefix = targetGroup
-        ? (targetGroup.name.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'EMP')
-        : 'IND';
-      setEmployeeCode(`EMP-${prefix}-${Math.floor(100 + Math.random() * 900)}`);
+      setEmployeeCode(getNextEmployeeCode(employees));
       
       setFullName('');
       setPhotoUrl('');
@@ -129,12 +133,13 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       setPhone('');
       setAddress('');
       setJobType('Labourer');
+      setOtherJobType('');
       setProjectId(targetGroup?.project_id || projects[0]?.id || '');
       setJoiningDate(getLocalDateString());
       setSalaryType('daily_wage');
       setSalaryAmount('');
       setStandardHours('8');
-      setOvertimeRate('');
+      setOvertimeRate('0');
       setStatus('active');
       setRemarks('');
     }
@@ -154,21 +159,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     }
   };
 
-  // Auto-calculate suggested overtime rate when wage or standard hours change
-  const handleSalaryChange = (newWage: string, type: SalaryType, stdH: string) => {
-    setSalaryAmount(newWage);
-    const numWage = Number(newWage);
-    const numH = Number(stdH) || 8;
-    if (!isNaN(numWage) && numWage > 0) {
-      if (type === 'daily_wage') {
-        const hourly = numWage / numH;
-        setOvertimeRate(String(Math.round(hourly * 1.5)));
-      } else if (type === 'monthly_salary') {
-        const hourly = (numWage / 30) / numH;
-        setOvertimeRate(String(Math.round(hourly * 1.5)));
-      }
-    }
-  };
+  const handleSalaryChange = (newWage: string) => setSalaryAmount(newWage);
 
   if (!isOpen) return null;
 
@@ -252,6 +243,10 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       setError('Employee full name is required.');
       return;
     }
+    if (jobType === 'Other' && !otherJobType.trim()) {
+      setError('Enter the worker type.');
+      return;
+    }
     const wageNum = Number(salaryAmount);
     if (isNaN(wageNum) || wageNum <= 0) {
       setError('Salary / wage amount must be a positive number.');
@@ -281,7 +276,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
         } : undefined,
         phone: phone.trim() || undefined,
         address: address.trim() || undefined,
-        job_type: jobType,
+        job_type: jobType === 'Other' ? otherJobType.trim() : jobType,
         group_id: groupId || '',
         project_id: projectId || undefined,
         joining_date: joiningDate,
@@ -391,6 +386,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                   <input
                     type="text"
                     required
+                    readOnly={!editingEmployee}
                     value={employeeCode}
                     onChange={(e) => setEmployeeCode(e.target.value)}
                     className="w-full px-3 py-1.5 text-xs text-bp-text font-mono font-bold rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
@@ -494,6 +490,17 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                   <option key={j} value={j}>{j}</option>
                 ))}
               </select>
+              {jobType === 'Other' && (
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={otherJobType}
+                  onChange={e => setOtherJobType(e.target.value)}
+                  placeholder="Enter worker type"
+                  className="mt-2 w-full px-3 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
+                />
+              )}
             </div>
 
             <div>
@@ -578,7 +585,6 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                   onChange={(e) => {
                     const st = e.target.value as SalaryType;
                     setSalaryType(st);
-                    handleSalaryChange(salaryAmount, st, standardHours);
                   }}
                   className="w-full px-3 py-2 text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan bg-white"
                 >
@@ -598,7 +604,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                   min="1"
                   step="1"
                   value={salaryAmount}
-                  onChange={(e) => handleSalaryChange(e.target.value, salaryType, standardHours)}
+                  onChange={(e) => handleSalaryChange(e.target.value)}
                   className="w-full px-3 py-2 text-xs font-mono font-bold text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                 />
               </div>
@@ -617,7 +623,6 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                   value={standardHours}
                   onChange={(e) => {
                     setStandardHours(e.target.value);
-                    handleSalaryChange(salaryAmount, salaryType, e.target.value);
                   }}
                   className="w-full px-3 py-2 text-xs font-mono text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                 />
