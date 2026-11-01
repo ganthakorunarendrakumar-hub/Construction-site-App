@@ -67,6 +67,7 @@ export default function App() {
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isCloudSetupOpen, setIsCloudSetupOpen] = useState(false);
+  const [cloudSyncVersion, setCloudSyncVersion] = useState(0);
 
   // Core Data state
   const [company, setCompany] = useState<Company>(() => ({
@@ -99,7 +100,15 @@ export default function App() {
           const u = authService.getCurrentUser();
           setCurrentUser(u);
           dataService.setCurrentUser(u);
+          try {
+            await dataService.ensureCloudReady();
+          } catch (err) {
+            console.error('Cloud startup synchronization failed:', err);
+          }
+        } else {
+          await dataService.checkLiveConnection();
         }
+        setSupabaseConfig(dataService.getConfig());
       } finally {
         setIsAuthChecking(false);
       }
@@ -113,6 +122,13 @@ export default function App() {
     setCurrentUser(u);
     dataService.setCurrentUser(u);
     setCurrentView('home');
+    void dataService.ensureCloudReady().then(() => {
+      setSupabaseConfig(dataService.getConfig());
+      setCloudSyncVersion(version => version + 1);
+    }).catch(err => {
+      console.error('Cloud startup synchronization failed:', err);
+      setSupabaseConfig(dataService.getConfig());
+    });
   };
 
   const handleLogout = async () => {
@@ -155,6 +171,7 @@ export default function App() {
 
   // Load all initial data
   const loadData = useCallback(async () => {
+    if (isAuthChecking) return;
     try {
       setIsRefreshing(true);
       const [comp, allProjects, allBrands] = await Promise.all([
@@ -190,16 +207,20 @@ export default function App() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [selectedProject, currentUser.company_id, resolveStockBackgroundImages]);
+  }, [selectedProject, currentUser.company_id, resolveStockBackgroundImages, isAuthChecking]);
 
   const handleRefreshData = useCallback(async () => {
-    await dataService.syncCloudState();
+    try {
+      await dataService.ensureCloudReady();
+    } finally {
+      setSupabaseConfig(dataService.getConfig());
+    }
     await loadData();
   }, [loadData]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, cloudSyncVersion]);
 
   // Derived lists
   const ongoingProjects = projects.filter(p => p.status !== 'completed');

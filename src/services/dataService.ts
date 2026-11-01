@@ -1092,6 +1092,17 @@ class DataService {
     return Boolean(this.config.url.trim() && this.config.anonKey.trim() && this.supabase);
   }
 
+  /** Verify the configured project, then restore the signed-in company's cloud snapshot. */
+  public async ensureCloudReady(): Promise<{ success: boolean; message: string }> {
+    if (!this.isCloudConfigured()) {
+      return { success: false, message: 'Supabase is not configured; using local browser storage.' };
+    }
+    const connection = await this.checkLiveConnection();
+    if (!connection.success) return connection;
+    if (this.currentUser.company_id) await this.syncCloudState();
+    return connection;
+  }
+
   public getCloudStateSyncWarning(): string | null {
     return this.cloudStateSyncWarning;
   }
@@ -1345,18 +1356,32 @@ class DataService {
     if (!this.supabase || !this.config.isConnected || this.isRestoringCloudState) return;
     if (this.cloudStateSyncTimer) clearTimeout(this.cloudStateSyncTimer);
     this.cloudStateSyncTimer = setTimeout(() => {
-      void this.pushCloudState();
+      void this.pushCloudState().catch(error => {
+        this.cloudStateSyncWarning = 'Shared application data could not be saved to Supabase. Check the cloud connection and retry.';
+        console.error('Cloud state sync failed:', error);
+      });
     }, 500);
   }
 
   private async pushCloudState(): Promise<void> {
-    if (!this.supabase || !this.config.isConnected || !this.currentUser.company_id) return;
+    if (!this.config.url.trim() && !this.config.anonKey.trim()) return;
+    if (!this.supabase) {
+      throw new Error('Supabase is configured but the client could not be initialized. Check the project URL and public key.');
+    }
+    if (!this.config.isConnected) {
+      throw new Error('Supabase is configured but not connected. Verify the cloud connection before saving changes.');
+    }
+    if (!this.currentUser.company_id) return;
     const { error } = await this.supabase.from('app_state').upsert({
       company_id: this.currentUser.company_id,
       state: this.getCloudStateSnapshot(),
       updated_at: new Date().toISOString()
     }, { onConflict: 'company_id' });
-    if (error) console.error('Cloud state sync failed:', error.message);
+    if (error) {
+      this.cloudStateSyncWarning = 'Shared application data could not be saved to Supabase. Check the cloud connection and retry.';
+      throw new Error(`Cloud state sync failed: ${error.message}`);
+    }
+    this.cloudStateSyncWarning = null;
   }
 
   public async syncCloudState(): Promise<void> {

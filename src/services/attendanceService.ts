@@ -1052,6 +1052,9 @@ class AttendanceService {
     if (currentUser.role !== 'admin') {
       throw new Error('Access Denied: Only Company Administrators can delete employees.');
     }
+    if (dataService.isCloudConfigured() && !dataService.isCloudConnected()) {
+      throw new Error('Supabase is not connected, so this employee cannot be deleted across devices yet. Restore the cloud connection and retry.');
+    }
 
     const employees = await this.getEmployees();
     const employee = employees.find(item => item.id === employeeId);
@@ -1078,13 +1081,23 @@ class AttendanceService {
       );
     }
 
+    const previousAuditLog = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
     localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees.filter(item => item.id !== employeeId)));
     this.recordAudit('delete_employee', employeeId, {
       employee_code: employee.employee_code,
       name: employee.full_name,
       deleted_by: currentUser.full_name
     });
-    await dataService.persistCloudState();
+    try {
+      await dataService.persistCloudState();
+    } catch (error) {
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+      if (previousAuditLog === null) localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
+      else localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, previousAuditLog);
+      throw new Error(error instanceof Error
+        ? `Employee deletion was not saved to Supabase. The employee has been restored locally. ${error.message}`
+        : 'Employee deletion was not saved to Supabase. The employee has been restored locally.');
+    }
   }
 
   /**

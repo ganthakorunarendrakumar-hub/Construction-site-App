@@ -114,7 +114,7 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
               {config.isConnected
                 ? 'Supabase Auth and database reachable'
                 : cloudCredentialsConfigured
-                  ? 'Supabase Auth required (connection not verified)'
+                  ? 'Supabase connection not verified'
                   : 'Local Storage Mode Active (local authentication)'}
             </span>
           </div>
@@ -223,9 +223,15 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
                 </div>
               </div>
 
+        {!config.isConnected && config.error && (
+          <div className="px-6 py-3 border-b border-bp-border bg-rose-50 text-xs text-rose-700" role="status">
+            {config.error}
+          </div>
+        )}
+
               <div className="pt-3 border-t border-bp-border flex items-center justify-between">
                 <span className="text-[11px] text-bp-muted">
-                  Settings are saved in this browser only; other browser profiles need their own configuration.
+                  Values entered here are saved in this browser only. Production deployments should use Vercel environment variables.
                 </span>
                 <button
                   type="submit"
