@@ -1,7 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateVehicleRental, calculateWorkingSessions, formatMinutesAsHours, isValidVehicleHireDate, sumValidVehicleMovementMinutes, vehicleHirePeriodsOverlap } from '../src/utils/vehicleHire.ts';
+import {
+  calculateDealerOutstanding,
+  calculateFinalizedVehicleHireCost,
+  calculateVehicleRental,
+  calculateWorkingSessions,
+  formatMinutesAsHours,
+  isValidVehicleHireDate,
+  sumValidVehicleMovementMinutes,
+  vehicleHirePeriodsOverlap
+} from '../src/utils/vehicleHire.ts';
 import { mergeVehicleTypeOptions, VEHICLE_TYPES } from '../src/utils/hireCatalog.ts';
+import type { VehicleHireContractRecord, VehicleHireReturnRecord } from '../src/types/index.ts';
 
 const localStorageValues = new Map<string, string>();
 Object.defineProperty(globalThis, 'localStorage', {
@@ -16,6 +26,59 @@ Object.defineProperty(globalThis, 'localStorage', {
   }
 });
 const { dataService, PRESET_USERS } = await import('../src/services/dataService.ts');
+
+const costHire = (id: string, status: 'active' | 'cancelled' = 'active') => ({ id, status } as Pick<VehicleHireContractRecord, 'id' | 'status'>);
+const finalHireReturn = (
+  id: string,
+  hireId: string,
+  bill: number,
+  updatedAt: string,
+  status?: string
+) => ({ id, hire_id: hireId, final_bill: bill, created_at: updatedAt, updated_at: updatedAt, status } as unknown as VehicleHireReturnRecord);
+
+test('current hire cost is zero for an empty ledger and ignores legacy estimates', () => {
+  const legacyEstimate = {
+    id: 'legacy-rental-1', hire_id: 'hire-legacy', estimated_hire_cost: 63333.33
+  } as unknown as VehicleHireReturnRecord;
+  assert.equal(calculateFinalizedVehicleHireCost([], []), 0);
+  assert.equal(calculateFinalizedVehicleHireCost([costHire('hire-legacy')], [legacyEstimate]), 0);
+  assert.equal(calculateDealerOutstanding('dealer-1', [], [], [], []), 0);
+});
+
+test('current hire cost sums genuine finalized bills once per non-cancelled hire', () => {
+  const hires = [costHire('hire-1'), costHire('hire-2'), costHire('hire-cancelled', 'cancelled')];
+  const returns = [
+    finalHireReturn('return-1', 'hire-1', 63333.33, '2026-10-20T10:00:00.000Z'),
+    finalHireReturn('return-2', 'hire-2', 1250.50, '2026-10-21T10:00:00.000Z'),
+    finalHireReturn('return-cancelled', 'hire-cancelled', 700, '2026-10-21T10:00:00.000Z'),
+    finalHireReturn('return-unrelated', 'missing-hire', 900, '2026-10-21T10:00:00.000Z')
+  ];
+  assert.equal(calculateFinalizedVehicleHireCost(hires, returns), 64583.83);
+});
+
+test('the latest correction for one hire replaces duplicate stored return rows instead of double-counting', () => {
+  const hires = [costHire('hire-1')];
+  const returns = [
+    finalHireReturn('old-return-row', 'hire-1', 5000, '2026-10-20T10:00:00.000Z'),
+    finalHireReturn('corrected-return-row', 'hire-1', 4750.25, '2026-10-22T10:00:00.000Z')
+  ];
+  assert.equal(calculateFinalizedVehicleHireCost(hires, returns), 4750.25);
+  assert.equal(calculateDealerOutstanding('dealer-1', [
+    { id: 'hire-1', dealer_id: 'dealer-1', status: 'active' } as VehicleHireContractRecord
+  ], returns, [], []), 4750.25);
+});
+
+test('voided, reversed, draft, negative, and invalid bills do not contribute to current hire cost', () => {
+  const hires = [costHire('hire-1'), costHire('hire-2'), costHire('hire-3'), costHire('hire-4'), costHire('hire-5')];
+  const returns = [
+    finalHireReturn('voided', 'hire-1', 800, '2026-10-21T10:00:00.000Z', 'voided'),
+    finalHireReturn('reversed', 'hire-2', 800, '2026-10-21T10:00:00.000Z', 'reversed'),
+    finalHireReturn('draft', 'hire-3', 800, '2026-10-21T10:00:00.000Z', 'draft'),
+    finalHireReturn('negative', 'hire-4', -1, '2026-10-21T10:00:00.000Z'),
+    finalHireReturn('invalid', 'hire-5', Number.NaN, '2026-10-21T10:00:00.000Z')
+  ];
+  assert.equal(calculateFinalizedVehicleHireCost(hires, returns), 0);
+});
 
 test('vehicle dropdown catalog contains the requested 18 unique vehicle types', () => {
   assert.deepEqual(VEHICLE_TYPES, [

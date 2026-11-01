@@ -11,8 +11,14 @@ const __dirname = path.dirname(__filename);
 export default defineConfig(({ command, mode }) => {
   const localRecoveryMode = command === 'serve' && mode === 'local-recovery' && process.env.NODE_ENV !== 'production';
   const recoveryPort = Number(process.env.BP_RECOVERY_PORT || '3001');
+  // Multiple local app/recovery servers can run from this checkout at once.
+  // Vite's default node_modules/.vite cache is shared by all of them, so an
+  // optimizer refresh in one server can leave another serving mixed React
+  // module versions. Give each process an isolated dependency cache.
+  const viteCacheDir = path.resolve(__dirname, 'node_modules', `.vite-buildpulse-${mode}-${process.pid}`);
 
   return {
+    cacheDir: viteCacheDir,
     plugins: [
       react(),
       tailwindcss(),
@@ -22,6 +28,10 @@ export default defineConfig(({ command, mode }) => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+      dedupe: ['react', 'react-dom'],
+    },
+    optimizeDeps: {
+      include: ['react', 'react-dom/client'],
     },
     server: {
       ...(localRecoveryMode ? {

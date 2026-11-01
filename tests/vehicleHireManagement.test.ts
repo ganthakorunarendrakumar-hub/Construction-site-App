@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   calculateDealerOutstanding,
   calculateFinalVehicleHireBill,
+  calculateFinalizedVehicleHireCost,
   calculateVehicleFuelAmount,
   getVehicleHireDisplayStatus
 } from '../src/utils/vehicleHire.ts';
@@ -149,6 +150,32 @@ test('finalized returns calculate from confirmed usage and retain an audit trail
   assert.equal((await dataService.getVehicleHireReturns())[0].id, returned.id);
 });
 
+test('the current hire-cost summary changes with finalized bills and an in-place return correction', async () => {
+  setup();
+  const dealer = await createDealer();
+  const hire = await dataService.saveVehicleHireContract(hireInput(dealer.id, { advance_amount: 0 }));
+  const currentCost = async () => calculateFinalizedVehicleHireCost(
+    await dataService.getVehicleHireContracts(),
+    await dataService.getVehicleHireReturns()
+  );
+
+  assert.equal(await currentCost(), 0);
+  const returned = await dataService.finalizeVehicleHireReturn({
+    hire_id: hire.id, actual_return_at: '2026-10-26T17:00', billable_usage: 3.5,
+    return_condition: 'Good', additional_charges: 0, discount: 0, attachments: { images: [] }
+  });
+  assert.equal(returned.final_bill, 1400);
+  assert.equal(await currentCost(), 1400);
+
+  await dataService.finalizeVehicleHireReturn({
+    id: returned.id, hire_id: hire.id, actual_return_at: '2026-10-26T17:00', billable_usage: 3.5,
+    return_condition: 'Good', additional_charges: 0, discount: 100,
+    correction_reason: 'Approved final bill correction', attachments: { images: [] }
+  });
+  assert.equal((await dataService.getVehicleHireReturns()).length, 1);
+  assert.equal(await currentCost(), 1300);
+});
+
 test('dealer payments are idempotent and duplicate transaction references are rejected', async () => {
   setup();
   const dealer = await createDealer();
@@ -282,10 +309,16 @@ test('dealer-paid fuel affects payable only after authorized explicit confirmati
   const unconfirmed = await dataService.recordVehicleFuelEntry(baseFuel);
   assert.equal(unconfirmed.reimbursement_confirmed, false);
   assert.equal(calculateDealerOutstanding(dealer.id, await dataService.getVehicleHireContracts(), await dataService.getVehicleHireReturns(), await dataService.getVehicleDealerPayments(), [unconfirmed]), 800);
-  const confirmed = await dataService.recordVehicleFuelEntry({ ...baseFuel, id: unconfirmed.id, confirm_dealer_reimbursement: true });
+  const confirmed = await dataService.recordVehicleFuelEntry({
+    ...baseFuel, id: unconfirmed.id, confirm_dealer_reimbursement: true,
+    correction_reason: 'Confirmed dealer reimbursement after approval'
+  });
   assert.equal(confirmed.reimbursement_confirmed, true);
   assert.equal(calculateDealerOutstanding(dealer.id, await dataService.getVehicleHireContracts(), await dataService.getVehicleHireReturns(), await dataService.getVehicleDealerPayments(), [confirmed]), 1300);
   dataService.setCurrentUser({ ...PRESET_USERS.admin, role: 'site_supervisor' });
-  await assert.rejects(dataService.recordVehicleFuelEntry({ ...baseFuel, id: confirmed.id, confirm_dealer_reimbursement: true }), /Only a Company Administrator or Project Manager/i);
+  await assert.rejects(dataService.recordVehicleFuelEntry({
+    ...baseFuel, id: confirmed.id, confirm_dealer_reimbursement: true,
+    correction_reason: 'Attempted unauthorized reimbursement confirmation'
+  }), /Only a Company Administrator or Project Manager/i);
   dataService.setCurrentUser(PRESET_USERS.admin);
 });

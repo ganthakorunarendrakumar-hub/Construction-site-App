@@ -13,7 +13,7 @@ import {
 import { dataService } from '../services/dataService';
 import { getLocalDateString } from '../utils/dateUtils';
 import {
-  calculateDealerOutstanding, calculateFinalVehicleHireBill, calculateVehicleFuelAmount,
+  calculateDealerOutstanding, calculateFinalVehicleHireBill, calculateFinalizedVehicleHireCost, calculateVehicleFuelAmount,
   calculateWorkingSessions, formatIndianRupees, getVehicleHireDisplayStatus,
   getVehicleHireLocalDateTime, isDateInsideRange, isValidVehicleHireDate,
   signedVehicleDealerPaymentAmount, sumValidVehicleMovementMinutes
@@ -285,7 +285,6 @@ export const VehicleHireOperations: React.FC<VehicleHireOperationsProps> = ({ cu
   const dueHires = filteredHires.filter(hire => statusForHire(hire) === 'Return Due');
   const upcomingHires = filteredHires.filter(hire => ['Active', 'Return Due'].includes(statusForHire(hire)))
     .sort((a, b) => a.expected_return_at.localeCompare(b.expected_return_at));
-  const completedCharges = visibleReturns.reduce((sum, record) => sum + record.final_bill, 0);
   const legacyCurrentRentals = filteredLegacyRentals.filter(record => getLocalDateString() >= record.in_date
     && (record.date_rule === 'inclusive' ? getLocalDateString() <= record.out_date : getLocalDateString() < record.out_date));
   const activeVehicleKeys = new Set([
@@ -311,14 +310,6 @@ export const VehicleHireOperations: React.FC<VehicleHireOperationsProps> = ({ cu
   const availableVehicles = filteredRegisteredVehicles.filter(asset => asset.condition === 'available'
     && !activeVehicleKeys.has(asset.id)
     && !activeVehicleKeys.has(`${asset.vehicle_type}|${asset.registration_number || asset.model}`)).length;
-  const legacyEstimatedCost = filteredLegacyRentals.reduce((sum, record) => {
-    const replacedByFinal = hires.some(hire => {
-      const sameVehicle = hire.asset_id === record.asset_id
-        || Boolean(hire.registration_number && assets.find(asset => asset.id === record.asset_id)?.registration_number?.toLocaleLowerCase() === hire.registration_number.toLocaleLowerCase());
-      return sameVehicle && hire.start_at.slice(0, 10) <= record.out_date && record.in_date <= hire.expected_return_at.slice(0, 10);
-    });
-    return sum + (replacedByFinal ? 0 : record.estimated_hire_cost);
-  }, 0);
   const movementCandidates = movements.filter(record =>
     (projectFilter === 'all' || record.project_id === projectFilter)
       && (siteFilter === 'all' || record.site_name === siteFilter)
@@ -333,7 +324,7 @@ export const VehicleHireOperations: React.FC<VehicleHireOperationsProps> = ({ cu
     && (!query.trim() || `${record.vehicle_type} ${record.vehicle_identifier} ${record.vendor} ${record.project_name}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
   ).map(record => ({ id: record.id, workDate: record.hire_date, totalWorkingMinutes: Math.round(record.working_hours * 60), legacy: true }));
   const totalWorkingHours = sumValidVehicleMovementMinutes([...movementCandidates, ...legacyWorkCandidates], new Set(assets.map(asset => asset.id)), fromDate || undefined, toDate || undefined) / 60;
-  const totalHireCost = completedCharges + legacyEstimatedCost;
+  const totalHireCost = calculateFinalizedVehicleHireCost(filteredHires, visibleReturns);
   const totalPayments = visiblePayments.reduce((sum, record) => sum + signedVehicleDealerPaymentAmount(record), 0);
   const activeFuelEntries = fuel.filter(entry => entry.status !== 'voided');
   const activeVisibleFuel = visibleFuel.filter(entry => entry.status !== 'voided');
@@ -374,7 +365,7 @@ export const VehicleHireOperations: React.FC<VehicleHireOperationsProps> = ({ cu
     { label: 'Total Registered Vehicles', value: filteredRegisteredVehicles.length, detail: 'Saved fleet records', icon: Truck },
     { label: 'Currently Hired Vehicles', value: currentlyHiredVehicles, detail: 'Distinct active vehicles', icon: Clock3 },
     { label: 'Available Vehicles', value: availableVehicles, detail: 'Registered and available', icon: CheckCircle2 },
-    { label: 'Total Hire Cost', value: money(totalHireCost), detail: 'Final bills + legacy estimates', icon: CircleDollarSign },
+    { label: 'Total Hire Cost', value: money(totalHireCost), detail: 'Finalized hire bills', icon: CircleDollarSign },
     { label: 'Total Working Hours', value: totalWorkingHours.toFixed(2), detail: 'Validated movement records', icon: Clock3 },
     { label: 'Payments Recorded', value: money(totalPayments), detail: 'Dealer payments in range', icon: CheckCircle2 },
     { label: 'Fuel Expenses', value: money(totalFuel), detail: 'Actual purchase amounts', icon: Fuel },
@@ -667,7 +658,7 @@ export const VehicleHireOperations: React.FC<VehicleHireOperationsProps> = ({ cu
   const exportHires = () => downloadCsv([
     ['Hire Reference', 'Status', 'Dealer', 'Project', 'Site', 'Vehicle Type', 'Registration', 'Driver', 'Start', 'Expected Return', 'Billing Method', 'Rate', 'Final Bill', 'Payments', 'Outstanding'],
     ...filteredHires.map(hire => {
-      const finalBill = returnByHire.get(hire.id)?.final_bill || 0;
+      const finalBill = calculateFinalizedVehicleHireCost([hire], returns.filter(record => record.hire_id === hire.id));
       const paid = payments.filter(payment => payment.hire_ids.includes(hire.id)).reduce((sum, payment) => sum + signedVehicleDealerPaymentAmount(payment), 0);
       return [hire.hire_reference, statusForHire(hire), dealerName(hire.dealer_id), hire.project_name, hire.site_name, hire.vehicle_type, hire.registration_number, hire.driver_name, hire.start_at, hire.expected_return_at, hire.billing_method, hire.agreed_rate, finalBill, paid, round(finalBill - paid)];
     })
@@ -686,7 +677,7 @@ export const VehicleHireOperations: React.FC<VehicleHireOperationsProps> = ({ cu
           (hire.asset_id === record.asset_id || Boolean(hire.registration_number && assets.find(asset => asset.id === record.asset_id)?.registration_number?.toLocaleLowerCase() === hire.registration_number.toLocaleLowerCase()))
             && hire.start_at.slice(0, 10) <= record.out_date && record.in_date <= hire.expected_return_at.slice(0, 10)
         )).reduce((sum, record) => sum + record.estimated_hire_cost, 0);
-        const charges = projectReturns.reduce((sum, record) => sum + record.final_bill, projectLegacyCost);
+        const charges = calculateFinalizedVehicleHireCost(projectHires, projectReturns) + projectLegacyCost;
         const paid = projectPayments.reduce((sum, record) => sum + signedVehicleDealerPaymentAmount(record), 0);
         const fuelCost = projectFuel.reduce((sum, record) => sum + record.total_amount, 0);
         const reimbursement = projectFuel.filter(record => record.payer === 'dealer_paid' && record.reimbursement_confirmed).reduce((sum, record) => sum + record.total_amount, 0);
@@ -793,7 +784,7 @@ export const VehicleHireOperations: React.FC<VehicleHireOperationsProps> = ({ cu
           return sum + (Number.isFinite(elapsed) && elapsed > 0 ? elapsed / (24 * 60 * 60 * 1000) : 0);
         }, 0);
         const recordedDays = actualDays + legacyNotReplaced.reduce((sum, rental) => sum + rental.total_days, 0);
-        return [group.type, group.identifier, related.length + legacyNotReplaced.length + group.legacyLogs.length, recordedDays.toFixed(2), (minutes / 60).toFixed(2), ((movementIdle + legacyIdle) / 60).toFixed(2), (bills.reduce((sum, record) => sum + record.final_bill, 0) + groupLegacyCost).toFixed(2), paid.toFixed(2), fuelCost.toFixed(2)];
+        return [group.type, group.identifier, related.length + legacyNotReplaced.length + group.legacyLogs.length, recordedDays.toFixed(2), (minutes / 60).toFixed(2), ((movementIdle + legacyIdle) / 60).toFixed(2), (calculateFinalizedVehicleHireCost(related, bills) + groupLegacyCost).toFixed(2), paid.toFixed(2), fuelCost.toFixed(2)];
       })
     ], 'vehicle-hire-vehicle-costs.csv');
   };

@@ -207,6 +207,43 @@ export const calculateFinalVehicleHireBill = (input: FinalVehicleHireBillInput):
   return Math.round((base + additional - discount + Number.EPSILON) * 100) / 100;
 };
 
+/**
+ * Sum finalized bills once per eligible hire. Legacy VehicleRentalRecord
+ * estimates intentionally do not belong in the current hire-cost total.
+ */
+export const calculateFinalizedVehicleHireCost = (
+  hires: readonly Pick<VehicleHireContractRecord, 'id' | 'status'>[],
+  returns: readonly VehicleHireReturnRecord[]
+): number => {
+  const eligibleHireIds = new Set(hires.filter(hire => hire.status !== 'cancelled').map(hire => hire.id));
+  const finalReturnByHire = new Map<string, VehicleHireReturnRecord>();
+
+  for (const record of returns) {
+    if (!record.hire_id || !eligibleHireIds.has(record.hire_id)) continue;
+    const recordStatus = (record as VehicleHireReturnRecord & { status?: string }).status?.toLocaleLowerCase();
+    if (recordStatus && ['void', 'voided', 'reversed', 'cancelled', 'deleted', 'draft'].includes(recordStatus)) continue;
+    const finalBill = Number(record.final_bill);
+    if (!Number.isFinite(finalBill) || finalBill < 0) continue;
+
+    const previous = finalReturnByHire.get(record.hire_id);
+    if (!previous) {
+      finalReturnByHire.set(record.hire_id, record);
+      continue;
+    }
+    const candidateTimestamp = Date.parse(record.updated_at || record.created_at || '');
+    const previousTimestamp = Date.parse(previous.updated_at || previous.created_at || '');
+    const candidateIsCurrent = Number.isFinite(candidateTimestamp)
+      ? !Number.isFinite(previousTimestamp) || candidateTimestamp >= previousTimestamp
+      : !Number.isFinite(previousTimestamp);
+    if (candidateIsCurrent) {
+      finalReturnByHire.set(record.hire_id, record);
+    }
+  }
+
+  const total = [...finalReturnByHire.values()].reduce((sum, record) => sum + Number(record.final_bill), 0);
+  return Math.round((total + Number.EPSILON) * 100) / 100;
+};
+
 export const getVehicleHireDisplayStatus = (
   hire: VehicleHireContractRecord,
   returned: boolean,
@@ -234,7 +271,10 @@ export const calculateDealerOutstanding = (
   fuelEntries: readonly VehicleFuelEntryRecord[]
 ): number => {
   const hireIds = new Set(hires.filter(hire => hire.dealer_id === dealerId).map(hire => hire.id));
-  const finalBills = returns.filter(record => hireIds.has(record.hire_id)).reduce((sum, record) => sum + record.final_bill, 0);
+  const finalBills = calculateFinalizedVehicleHireCost(
+    hires.filter(hire => hireIds.has(hire.id)),
+    returns
+  );
   const confirmedFuelReimbursements = fuelEntries
     .filter(entry => entry.status !== 'voided' && entry.dealer_id === dealerId && entry.payer === 'dealer_paid' && entry.reimbursement_confirmed)
     .reduce((sum, entry) => sum + entry.total_amount, 0);
