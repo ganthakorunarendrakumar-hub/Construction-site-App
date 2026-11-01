@@ -1,35 +1,50 @@
 # BuildPulse local administrator recovery
 
-This is a one-time, local-development recovery procedure for a locked-out owner. It does not change Supabase, cloud data, projects, stock, attendance, or other application records. The new account is stored in the same browser origin's existing local account store.
+This is the existing local-development recovery flow. It can restore the known Company Administrator account in place, or create that same identity once if its local account is absent. It does not create a Supabase Auth user or change cloud data, projects, inventory, attendance, payments, or other application records.
 
 ## Authorization boundary
 
-The owner must start the dedicated recovery server from the project terminal and approve the account creation by typing `CREATE ADMIN` in that terminal after submitting the form. This verifies control of the local OS account, project workspace, and active development-server terminal. It does not independently verify a person's legal identity. Do not use this procedure on a shared workstation or if another person can control the same OS account and terminal.
+The recovery page is not enabled in the normal app. The owner must start the dedicated recovery server from the project terminal and confirm the exact action there. Type `RESTORE ADMIN` to reset the existing local administrator's password and reactivate that account, or `CREATE ADMIN` to create the missing local account. After account creation, the one-time marker permanently blocks another creation; only an owner-confirmed restore of the exact existing administrator identity remains available. Any other response cancels the request.
 
-The recovery server binds to `localhost`, rejects non-loopback requests, requires a matching browser origin, and is only installed for the explicit `local-recovery` development mode. The ordinary login page has no recovery button. A per-workspace completion marker in the current OS user's application-data directory disables recovery after success. No password or recovery grant is printed to the terminal.
+This verifies control of the local OS account, project workspace, and active development-server terminal. It does not independently verify legal identity. Do not use it on a shared workstation or if another person can control the same OS account and terminal. The recovery server binds to loopback, requires a matching browser origin, and is installed only for the explicit `local-recovery` development mode.
 
-## Steps
+## Current local environment
 
-1. Stop the ordinary BuildPulse development server so the recovery server can use the **same host and port** as the browser profile containing the existing app data. Local storage is origin-specific.
-2. In PowerShell at the project root, set the port to the port used by the existing app. This project is currently shared at `localhost:3001`:
+The active page at `http://localhost:3005/` has no local account store. A read-only check found the one existing account—Uma Mahesh, `CHEN-ADM-01`, `admin@cheninfra.com`, Company Administrator—in the browser origin `http://localhost:3000/`. The origins on ports 3001 and 3005 have no local account store. Supabase is not configured in these browser origins.
+
+The workspace's one-time account-creation marker is already present (completed October 24, 2026). That older marker predates the action field, and the prior protocol supported account creation only. The updated existing flow allows a password reset only when it finds the exact known administrator account at the selected origin and the owner types `RESTORE ADMIN` in the terminal. It continues to block account creation.
+
+## Steps to restore the existing account
+
+Use **port 3000**, where the existing account is stored. Do not run recovery on port 3005; that origin has no account store and must not be used to create a second local account.
+
+1. Stop the ordinary development server using port 3000 by pressing **Ctrl+C in the terminal that started it**. Do not terminate an unknown process. The recovery server uses strict port binding and will stop if port 3000 is occupied.
+2. In PowerShell, run:
 
    ```powershell
-   $env:BP_RECOVERY_PORT = '3001'
+   Set-Location 'C:\construction app\Construction-site-App'
+   $env:BP_RECOVERY_PORT = '3000'
    npm.cmd run recover:admin
    ```
 
-   Keep this terminal open. If the existing app uses a different port, use that port instead. The recovery server fails to start if the chosen port is already occupied; it will not silently move to a different origin.
+   Keep this terminal open and interactive.
+3. Open **`http://localhost:3000/#local-admin-recovery`** in the same browser profile as the existing app data.
+4. Confirm the read-only identity is **Uma Mahesh**, **CHEN-ADM-01**, **admin@cheninfra.com**. Set and confirm a private password of 12–128 characters. The password is PBKDF2-hashed in the browser and is never sent to the recovery server.
+5. Select **Restore administrator access**. Verify the action and identity shown in the terminal, then type **`RESTORE ADMIN`**. Any other input cancels. The flow updates the existing local account in place; it does not create a second account.
+6. After success, stop the recovery server with **Ctrl+C**, then start the normal app on the same port:
 
-3. Open `http://localhost:3001/#local-admin-recovery` in the same browser profile and keep `localhost` and the port unchanged. The recovery screen is only rendered in the dedicated development mode.
-4. Enter the administrator's full name, a unique User ID, email, and a new password of at least 12 characters. The password is entered in masked fields and is hashed in the browser with the existing PBKDF2 implementation; it is not sent to the recovery server.
-5. Submit the form. Check that the request is yours, then type `CREATE ADMIN` in the project terminal. Any other response cancels the request. The recovery server does not log the form password or grant.
-6. After success, return to the normal sign-in page and log in with the new User ID or email and password. The new account has the existing `admin` role, so the normal User Accounts interface and administrator permissions apply.
-7. Stop the recovery server. Run the ordinary app again on the **same origin** to see the same local account store. Do not clear browser site data. Recovery cannot be used again for this workspace and OS account after its completion marker is written.
+   ```powershell
+   Remove-Item Env:BP_RECOVERY_PORT -ErrorAction SilentlyContinue
+   npm.cmd run dev
+   ```
+
+7. Open **`http://localhost:3000/`** and sign in with **CHEN-ADM-01** or **admin@cheninfra.com** and the password you just set.
 
 ## Safeguards and limitations
 
-- Recovery refuses to run if Supabase is connected or any Supabase URL/key is configured. It does not create a cloud Auth user.
-- Recovery mode never seeds preset users. It appends to a valid existing local account store, creates the first local account only when the store is genuinely missing or empty, and refuses to overwrite a corrupt store.
-- The PBKDF2 hash uses the same algorithm and parameters as normal login. The password is never stored in plaintext.
-- A person with access to the same OS account, project workspace, and terminal shares the local trust boundary. This flow is not suitable as identity verification for a shared or remote machine.
-- The account only exists in the browser's local storage for the chosen origin. This is not cross-device recovery or account synchronization.
+- Recovery refuses to run if Supabase is connected or a Supabase URL/key is configured. It does not reset a Supabase password or create a cloud Auth account.
+- Restore is restricted to the exact known Company Administrator identity. It preserves the existing auth ID, company, role, creation date, and assigned projects while updating the password and lockout state. An ID/email collision with another account blocks recovery without changing records.
+- Creation is restricted to that same identity, occurs only when no matching account exists, and is allowed only before the per-workspace creation marker is written. A corrupt account store is left untouched and blocks recovery.
+- The password is stored only as the app's PBKDF2 hash. No plaintext password or recovery grant is logged or sent to the recovery server.
+- This local account is scoped to the browser origin. It is not cross-device access and does not prove that a matching Supabase Auth identity/profile exists. Cloud sign-in remains unavailable until the existing cloud authentication is configured and the administrator has a valid cloud Auth identity/profile.
+- `Forgot Password` is not a trusted identity check in this local-only setup because its current code is displayed in the UI rather than delivered through a verified email service. Use only the terminal-approved recovery described above.

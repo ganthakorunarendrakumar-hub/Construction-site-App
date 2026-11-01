@@ -9,10 +9,17 @@ import type { Plugin } from 'vite';
 const RECOVERY_BASE_PATH = '/__buildpulse_local_admin_recovery';
 const MAX_REQUEST_BYTES = 8 * 1024;
 const GRANT_TTL_MS = 3 * 60 * 1000;
+const RECOVERY_ADMIN_IDENTITY = {
+  fullName: 'Uma Mahesh',
+  userId: 'CHEN-ADM-01',
+  email: 'admin@cheninfra.com'
+};
 
 interface PendingGrant {
   value: string;
   expiresAt: number;
+  operation: 'create' | 'restore';
+  restoreAfterCreation: boolean;
 }
 
 function isLoopbackAddress(address: string | undefined): boolean {
@@ -65,20 +72,27 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
   return parsed as Record<string, unknown>;
 }
 
-function sameGrant(provided: unknown, expected: PendingGrant | null): boolean {
-  if (typeof provided !== 'string' || !expected || expected.expiresAt <= Date.now()) return false;
+function sameGrant(provided: unknown, operation: unknown, expected: PendingGrant | null): boolean {
+  if (typeof provided !== 'string' || !expected || expected.expiresAt <= Date.now() || operation !== expected.operation) return false;
   const providedBytes = Buffer.from(provided, 'utf8');
   const expectedBytes = Buffer.from(expected.value, 'utf8');
   return providedBytes.length === expectedBytes.length && timingSafeEqual(providedBytes, expectedBytes);
 }
 
-function promptOwnerForApproval(account: { fullName: string; userId: string; email: string }): Promise<boolean> {
+function promptOwnerForApproval(
+  account: { fullName: string; userId: string; email: string },
+  operation: 'create' | 'restore'
+): Promise<boolean> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) return Promise.resolve(false);
 
   const terminal = createInterface({ input: process.stdin, output: process.stdout });
+  const confirmation = operation === 'restore' ? 'RESTORE ADMIN' : 'CREATE ADMIN';
+  const description = operation === 'restore'
+    ? 'reset and reactivate the existing local administrator account'
+    : 'create the local administrator account';
   return terminal.question(
-    `\nLocal administrator recovery request:\n  Name: ${account.fullName}\n  User ID: ${account.userId}\n  Email: ${account.email}\nConfirm these details match your request, then type CREATE ADMIN (anything else cancels): `
-  ).then(answer => answer.trim() === 'CREATE ADMIN').finally(() => terminal.close());
+    `\nLocal administrator recovery request:\n  Action: ${description}\n  Name: ${account.fullName}\n  User ID: ${account.userId}\n  Email: ${account.email}\nConfirm these details and action match your request, then type ${confirmation} (anything else cancels): `
+  ).then(answer => answer.trim() === confirmation).finally(() => terminal.close());
 }
 
 function createRecoveryMarkerPath(projectRoot: string): { directory: string; marker: string } {
@@ -100,6 +114,19 @@ function readCompletedGrantDigest(markerPath: string): string | null {
     }
   } catch {
     // A malformed marker remains fail-closed because its presence still blocks recovery.
+  }
+  return null;
+}
+
+function readCompletedGrantOperation(markerPath: string): 'create' | 'restore' | null {
+  try {
+    const marker: unknown = JSON.parse(readFileSync(markerPath, 'utf8'));
+    if (marker && typeof marker === 'object' && 'operation' in marker &&
+      (marker.operation === 'create' || marker.operation === 'restore')) {
+      return marker.operation;
+    }
+  } catch {
+    // The marker remains fail-closed when its contents cannot be read.
   }
   return null;
 }
@@ -133,16 +160,22 @@ function isSameLocalOrigin(req: IncomingMessage, requireOrigin: boolean): boolea
 }
 
 function validAccountRequest(body: Record<string, unknown>): boolean {
-  return typeof body.full_name === 'string' && body.full_name.trim().length > 0 && body.full_name.length <= 120 &&
+  const validFields = typeof body.full_name === 'string' && body.full_name.trim().length > 0 && body.full_name.length <= 120 &&
     !/[\u0000-\u001f\u007f]/.test(body.full_name) &&
     typeof body.user_id === 'string' && /^[A-Za-z0-9._-]{3,40}$/.test(body.user_id) &&
-    typeof body.email === 'string' && body.email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email);
+    typeof body.email === 'string' && body.email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email) &&
+    (body.operation === 'create' || body.operation === 'restore');
+  return validFields &&
+    (body.full_name as string).trim().toLocaleLowerCase() === RECOVERY_ADMIN_IDENTITY.fullName.toLocaleLowerCase() &&
+    (body.user_id as string).trim().toLocaleUpperCase() === RECOVERY_ADMIN_IDENTITY.userId &&
+    (body.email as string).trim().toLocaleLowerCase() === RECOVERY_ADMIN_IDENTITY.email;
 }
 
 export function localAdminRecoveryPlugin(projectRoot: string): Plugin {
   const markerPaths = createRecoveryMarkerPath(projectRoot);
   let pendingGrant: PendingGrant | null = null;
   let completedGrantDigest = readCompletedGrantDigest(markerPaths.marker);
+  let completedGrantOperation: 'create' | 'restore' | null = readCompletedGrantOperation(markerPaths.marker);
   let ownerConfirmationInProgress = false;
 
   return {
@@ -171,7 +204,9 @@ export function localAdminRecoveryPlugin(projectRoot: string): Plugin {
 
         void (async () => {
           if (req.method === 'GET' && pathname === `${RECOVERY_BASE_PATH}/status`) {
-            sendJson(res, 200, { available: !existsSync(markerPaths.marker) });
+            const operation = new URL(req.url || '/', 'http://localhost').searchParams.get('operation');
+            const markerExists = existsSync(markerPaths.marker);
+            sendJson(res, 200, { available: operation === 'restore' || (operation === 'create' && !markerExists) });
             return;
           }
 
@@ -189,12 +224,13 @@ export function localAdminRecoveryPlugin(projectRoot: string): Plugin {
           }
 
           if (pathname === `${RECOVERY_BASE_PATH}/authorize`) {
-            if (existsSync(markerPaths.marker)) {
+            const markerAlreadyUsed = existsSync(markerPaths.marker);
+            if (markerAlreadyUsed && body.operation !== 'restore') {
               sendJson(res, 410, { message: 'The one-time local recovery has already been used.' });
               return;
             }
             if (!validAccountRequest(body)) {
-              sendJson(res, 400, { message: 'Enter a valid name, User ID, and email address.' });
+              sendJson(res, 400, { message: 'Enter a valid administrator identity and recovery action.' });
               return;
             }
             if (ownerConfirmationInProgress || (pendingGrant && pendingGrant.expiresAt > Date.now())) {
@@ -204,22 +240,28 @@ export function localAdminRecoveryPlugin(projectRoot: string): Plugin {
 
             ownerConfirmationInProgress = true;
             try {
+              const operation = body.operation as 'create' | 'restore';
               const approved = await promptOwnerForApproval({
                 fullName: (body.full_name as string).replace(/[\r\n\t]/g, ' '),
                 userId: body.user_id as string,
                 email: (body.email as string).replace(/[\r\n\t]/g, ' ')
-              });
+              }, operation);
               if (!approved) {
                 sendJson(res, 403, { message: 'The local owner did not approve this recovery request.' });
                 return;
               }
-              if (existsSync(markerPaths.marker)) {
+              if (existsSync(markerPaths.marker) && operation !== 'restore') {
                 sendJson(res, 410, { message: 'The one-time local recovery has already been used.' });
                 return;
               }
 
               const value = randomBytes(32).toString('hex');
-              pendingGrant = { value, expiresAt: Date.now() + GRANT_TTL_MS };
+              pendingGrant = {
+                value,
+                expiresAt: Date.now() + GRANT_TTL_MS,
+                operation,
+                restoreAfterCreation: markerAlreadyUsed
+              };
               sendJson(res, 200, { grant: value });
             } finally {
               ownerConfirmationInProgress = false;
@@ -231,19 +273,29 @@ export function localAdminRecoveryPlugin(projectRoot: string): Plugin {
             if (existsSync(markerPaths.marker)) {
               const submittedGrant = typeof body.grant === 'string' ? body.grant : '';
               const submittedDigest = createHash('sha256').update(submittedGrant).digest('hex');
-              if (completedGrantDigest && submittedGrant && timingSafeEqual(
+              if (completedGrantDigest && body.operation === completedGrantOperation && submittedGrant && timingSafeEqual(
                 Buffer.from(submittedDigest, 'hex'),
                 Buffer.from(completedGrantDigest, 'hex')
               )) {
                 sendJson(res, 200, { completed: true });
                 return;
               }
+              const approvedRestore = pendingGrant;
+              if (!approvedRestore?.restoreAfterCreation || approvedRestore.operation !== 'restore' ||
+                !sameGrant(body.grant, body.operation, approvedRestore)) {
+                pendingGrant = null;
+                sendJson(res, 410, { message: 'The one-time local recovery has already been used. Only an owner-approved reset of the existing administrator is available.' });
+                return;
+              }
+              const restoreGrantDigest = createHash('sha256').update(approvedRestore.value).digest('hex');
+              completedGrantDigest = restoreGrantDigest;
+              completedGrantOperation = 'restore';
               pendingGrant = null;
-              sendJson(res, 410, { message: 'The one-time local recovery has already been used.' });
+              sendJson(res, 200, { completed: true });
               return;
             }
             const approvedGrant = pendingGrant;
-            if (!approvedGrant || !sameGrant(body.grant, approvedGrant)) {
+            if (!approvedGrant || !sameGrant(body.grant, body.operation, approvedGrant)) {
               sendJson(res, 403, { message: 'The owner approval has expired. Start the recovery flow again.' });
               return;
             }
@@ -253,11 +305,16 @@ export function localAdminRecoveryPlugin(projectRoot: string): Plugin {
               const grantDigest = createHash('sha256').update(approvedGrant.value).digest('hex');
               const descriptor = openSync(markerPaths.marker, 'wx', 0o600);
               try {
-                writeFileSync(descriptor, JSON.stringify({ completedAt: new Date().toISOString(), grantDigest }), 'utf8');
+                writeFileSync(descriptor, JSON.stringify({
+                  completedAt: new Date().toISOString(),
+                  grantDigest,
+                  operation: approvedGrant.operation
+                }), 'utf8');
               } finally {
                 closeSync(descriptor);
               }
               completedGrantDigest = grantDigest;
+              completedGrantOperation = approvedGrant.operation;
               pendingGrant = null;
               sendJson(res, 200, { completed: true });
             } catch (error) {
@@ -274,19 +331,20 @@ export function localAdminRecoveryPlugin(projectRoot: string): Plugin {
           if (pathname === `${RECOVERY_BASE_PATH}/status`) {
             const submittedGrant = typeof body.grant === 'string' ? body.grant : '';
             const submittedDigest = submittedGrant ? createHash('sha256').update(submittedGrant).digest('hex') : '';
-            const completedForThisGrant = !!completedGrantDigest && !!submittedDigest && timingSafeEqual(
+            const completedForThisGrant = body.operation === completedGrantOperation && !!completedGrantDigest && !!submittedDigest && timingSafeEqual(
               Buffer.from(submittedDigest, 'hex'),
               Buffer.from(completedGrantDigest, 'hex')
             );
+            const markerExists = existsSync(markerPaths.marker);
             sendJson(res, 200, {
-              available: !existsSync(markerPaths.marker),
+              available: body.operation === 'restore' || (body.operation === 'create' && !markerExists),
               completedForThisGrant
             });
             return;
           }
 
           if (pathname === `${RECOVERY_BASE_PATH}/cancel`) {
-            if (sameGrant(body.grant, pendingGrant)) pendingGrant = null;
+            if (sameGrant(body.grant, body.operation, pendingGrant)) pendingGrant = null;
             sendJson(res, 200, { cancelled: true });
             return;
           }

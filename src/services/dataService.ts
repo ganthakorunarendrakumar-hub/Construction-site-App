@@ -267,6 +267,26 @@ const LOCAL_ONLY_CLOUD_STATE_KEYS = new Set([
   STORAGE_KEYS.COMPANY
 ]);
 
+export const resolveSupabaseClientSettings = (
+  environment: {
+    VITE_SUPABASE_URL?: string;
+    VITE_SUPABASE_ANON_KEY?: string;
+    VITE_SUPABASE_PUBLISHABLE_KEY?: string;
+  },
+  storedConfig: Partial<Pick<SupabaseConfig, 'url' | 'anonKey'>> = {}
+): Pick<SupabaseConfig, 'url' | 'anonKey'> => {
+  const clean = (value: string | undefined) => value?.trim() || '';
+  return {
+    url: clean(environment.VITE_SUPABASE_URL) || clean(storedConfig.url),
+    anonKey: clean(environment.VITE_SUPABASE_PUBLISHABLE_KEY)
+      || clean(environment.VITE_SUPABASE_ANON_KEY)
+      || clean(storedConfig.anonKey)
+  };
+};
+
+export const shouldQueueCloudStateSync = (key: string): boolean =>
+  key.startsWith('buildpulse_') && !LOCAL_ONLY_CLOUD_STATE_KEYS.has(key);
+
 const DEFAULT_COMPANY_WATERMARK_OPACITY = 6;
 const DEFAULT_COMPANY_WATERMARK_SIZE = 280;
 const UNCONFIGURED_COMPANY_NAMES = new Set([
@@ -924,6 +944,7 @@ class DataService {
   private cloudStateSyncTimer: ReturnType<typeof setTimeout> | null = null;
   private isRestoringCloudState = false;
   private storageSyncInstalled = false;
+  private cloudStateSyncWarning: string | null = null;
 
   constructor() {
     this.initSupabaseClient();
@@ -935,9 +956,9 @@ class DataService {
   // CONFIG & CONNECTION MANAGEMENT
   // ==========================================
   private initSupabaseClient() {
-    // Check env vars first, then localStorage
-    const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-    const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+    // Prefer the current publishable key, retain legacy anon-key support, then
+    // use the existing browser-local Cloud Settings value.
+    const environment = (import.meta as any).env || {};
 
     let storedConfig: Partial<SupabaseConfig> = {};
     try {
@@ -947,8 +968,7 @@ class DataService {
       console.warn('Could not read stored Supabase config', e);
     }
 
-    const url = envUrl || storedConfig.url || '';
-    const anonKey = envKey || storedConfig.anonKey || '';
+    const { url, anonKey } = resolveSupabaseClientSettings(environment, storedConfig);
 
     this.config = {
       url,
@@ -963,59 +983,86 @@ class DataService {
       try {
         this.supabase = createClient(url, anonKey);
         this.checkLiveConnection();
-      } catch (err: any) {
-        console.error('Failed to instantiate Supabase client', err);
-        this.config.error = err.message || 'Invalid Supabase credentials';
+      } catch {
+        this.config.error = 'Could not initialize Supabase client. Check the project URL and public key format.';
       }
     }
   }
 
   public async checkLiveConnection(): Promise<{ success: boolean; message: string }> {
-    if (!this.config.url || !this.config.anonKey) {
+    const url = this.config.url.trim().replace(/\/+$/, '');
+    const apiKey = this.config.anonKey.trim();
+    if (!url || !apiKey) {
       this.config.isConnected = false;
-      return { success: false, message: 'Supabase credentials not configured yet.' };
+      this.config.error = 'Enter the existing Supabase project URL and a publishable or legacy anon public key.';
+      return { success: false, message: this.config.error };
+    }
+
+    const setFailure = (message: string) => {
+      this.config.isConnected = false;
+      this.config.lastChecked = new Date().toISOString();
+      this.config.error = message;
+      this.saveConfigToStorage();
+      return { success: false, message };
+    };
+
+    this.config.isConnected = false;
+    try {
+      if (!this.supabase) {
+        this.supabase = createClient(url, apiKey);
+      }
+    } catch {
+      return setFailure('Supabase client setup failed. Check the project URL and public key format.');
     }
 
     try {
-      if (!this.supabase) {
-        this.supabase = createClient(this.config.url, this.config.anonKey);
+      const authResponse = await fetch(`${url}/auth/v1/health`, {
+        method: 'GET',
+        headers: { apikey: apiKey, Accept: 'application/json' },
+        cache: 'no-store'
+      });
+      if (!authResponse.ok) {
+        return setFailure(`Supabase Auth health check failed (HTTP ${authResponse.status}). Check the project URL and publishable key.`);
       }
-      
-      // Probe table or auth health check
-      const { data, error } = await this.supabase.from('companies').select('id').limit(1);
+    } catch {
+      return setFailure('Could not reach the Supabase Auth endpoint. Check the project URL and browser network access.');
+    }
 
-      if (error && error.code !== 'PGRST116') {
-        // Even if table doesn't exist yet, we check error code
-        const isConnected = !error.message.includes('FetchError') && !error.message.includes('network');
-        this.config.isConnected = isConnected;
-        this.config.lastChecked = new Date().toISOString();
-        if (!isConnected) {
-          this.config.error = error.message;
-          return { success: false, message: `Connection failed: ${error.message}` };
-        }
+    try {
+      const { error } = await this.supabase!.from('companies').select('id').limit(1);
+      if (error) {
+        const code = error.code ? ` (${error.code})` : '';
+        return setFailure(`Supabase Auth is reachable, but the companies database query failed${code}. Check the existing schema, table grants, and RLS policies.`);
       }
-
       this.config.isConnected = true;
       this.config.lastChecked = new Date().toISOString();
       this.config.error = undefined;
+      this.installCloudStateSync();
       this.saveConfigToStorage();
-      return { success: true, message: 'Successfully connected to Supabase PostgreSQL!' };
-    } catch (err: any) {
-      this.config.isConnected = false;
-      this.config.error = err.message || 'Unknown network error';
-      this.saveConfigToStorage();
-      return { success: false, message: `Connection test failed: ${err.message}` };
+      return { success: true, message: 'Supabase Auth and the companies database query are reachable. User credentials and profile permissions were not tested.' };
+    } catch {
+      return setFailure('Supabase Auth is reachable, but the companies database request could not be completed.');
     }
   }
 
   public saveConfig(url: string, anonKey: string): Promise<{ success: boolean; message: string }> {
     this.config.url = url.trim();
     this.config.anonKey = anonKey.trim();
+    this.config.isConnected = false;
+    this.config.error = undefined;
     this.saveConfigToStorage();
 
     if (this.config.url && this.config.anonKey) {
-      this.supabase = createClient(this.config.url, this.config.anonKey);
-      return this.checkLiveConnection();
+      try {
+        this.supabase = createClient(this.config.url, this.config.anonKey);
+        return this.checkLiveConnection();
+      } catch {
+        this.supabase = null;
+        this.config.isConnected = false;
+        this.config.error = 'Could not initialize Supabase client. Check the project URL and public key format.';
+        this.saveConfigToStorage();
+        return Promise.resolve({ success: false, message: this.config.error });
+      }
     } else {
       this.supabase = null;
       this.config.isConnected = false;
@@ -1039,46 +1086,108 @@ class DataService {
     return this.config.isConnected;
   }
 
+  /** True when the existing project has endpoint credentials, even if the
+   * asynchronous connection probe has not completed yet. */
+  public isCloudConfigured(): boolean {
+    return Boolean(this.config.url.trim() && this.config.anonKey.trim() && this.supabase);
+  }
+
+  public getCloudStateSyncWarning(): string | null {
+    return this.cloudStateSyncWarning;
+  }
+
   /**
    * Signs the current browser into Supabase Auth so RLS policies can identify
    * the user that is reading or writing shared company data.
    */
   public async signInWithSupabase(email: string, password: string): Promise<UserProfile> {
-    if (!this.supabase || !this.config.isConnected) {
-      throw new Error('Supabase is not connected. Configure the cloud database first.');
+    if (!this.isCloudConfigured() || !this.supabase) {
+      throw new Error('Supabase authentication is not configured in this application. Restore the existing Supabase project URL and public anon key, then try again.');
     }
 
-    const { data, error } = await this.supabase.auth.signInWithPassword({ email, password });
+    const normalizedEmail = email.trim().toLocaleLowerCase();
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      throw new Error('Enter the registered email address, or use a User ID linked to a local account mapping.');
+    }
+
+    let authResult: Awaited<ReturnType<NonNullable<typeof this.supabase>['auth']['signInWithPassword']>>;
+    try {
+      authResult = await this.supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+    } catch {
+      throw new Error('Could not reach the configured Supabase authentication service. Check the project connection and try again.');
+    }
+    const { data, error } = authResult;
     if (error || !data.user) {
-      throw new Error(error?.message || 'Supabase authentication failed.');
+      const message = error?.message || '';
+      if (/invalid login credentials|invalid credentials|email not confirmed/i.test(message)) {
+        throw new Error(/email not confirmed/i.test(message)
+          ? 'This Supabase account email has not been confirmed. Ask the Supabase administrator to verify its existing Auth user.'
+          : 'Invalid email or password. Supabase Auth did not authenticate this account. This browser is configured for Supabase Auth, so its local BuildPulse password is not checked. Use the password for the existing Supabase Auth account, or ask the Supabase administrator to reset that same account; no account was changed.');
+      }
+      if (/fetch|network|timeout|connection/i.test(message)) {
+        throw new Error('Could not reach the configured Supabase authentication service. Check the project connection and try again.');
+      }
+      throw new Error(`Supabase authentication failed: ${message || 'The existing Auth account could not be verified.'}`);
     }
 
-    const { data: profile, error: profileError } = await this.supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', data.user.id)
-      .single();
+    let profileResult: { data: Record<string, unknown> | null; error: { message: string; code?: string } | null };
+    try {
+      profileResult = await this.supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .maybeSingle();
+    } catch {
+      await this.supabase.auth.signOut().catch(() => undefined);
+      throw new Error('Supabase authenticated the account, but its profile could not be read. Check the profiles table and self-profile SELECT policy.');
+    }
+    const { data: profile, error: profileError } = profileResult;
 
     if (profileError || !profile) {
-      await this.supabase.auth.signOut();
-      throw new Error(profileError?.message || 'No Supabase profile exists for this user.');
+      await this.supabase.auth.signOut().catch(() => undefined);
+      if (profileError?.code === '42501' || /permission|row.level security|rls/i.test(profileError?.message || '')) {
+        throw new Error('Supabase authenticated the account, but the profile lookup was blocked by row-level security. Ask the Supabase administrator to restore the self-profile SELECT policy.');
+      }
+      throw new Error('Supabase Auth accepted this account, but no matching profile exists. A Supabase administrator must link the existing Auth UUID to its existing company profile; do not create a duplicate Auth user or grant a role by email alone.');
+    }
+
+    const supportedRoles = new Set<UserRole>([
+      'admin', 'site_supervisor', 'accountant', 'worker', 'project_manager',
+      'site_engineer', 'storekeeper', 'management_viewer'
+    ]);
+    const profileEmail = typeof profile.email === 'string' ? profile.email.trim().toLocaleLowerCase() : '';
+    const authEmail = (data.user.email || normalizedEmail).trim().toLocaleLowerCase();
+    if (profile.id !== data.user.id || !profileEmail || profileEmail !== authEmail
+      || typeof profile.company_id !== 'string' || !profile.company_id.trim()
+      || typeof profile.full_name !== 'string' || !profile.full_name.trim()
+      || typeof profile.role !== 'string' || !supportedRoles.has(profile.role as UserRole)) {
+      await this.supabase.auth.signOut().catch(() => undefined);
+      throw new Error('The Supabase profile does not match the authenticated Auth identity or has incomplete role/company data. Ask a Supabase administrator to correct the existing profile mapping.');
     }
 
     const cloudUser: UserProfile = {
-      id: profile.id,
-      auth_uid: profile.id,
-      email: profile.email,
-      full_name: profile.full_name,
-      role: profile.role,
-      role_title: profile.role_title || 'Team Member',
+      id: data.user.id,
+      auth_uid: data.user.id,
+      user_id: typeof profile.user_id === 'string' && profile.user_id.trim() ? profile.user_id.trim().toLocaleUpperCase() : undefined,
+      email: profileEmail,
+      full_name: profile.full_name.trim(),
+      role: profile.role as UserRole,
+      role_title: typeof profile.role_title === 'string' && profile.role_title.trim() ? profile.role_title.trim() : 'Team Member',
       company_id: profile.company_id,
-      avatar_url: profile.avatar_url,
-      phone: profile.phone,
+      avatar_url: typeof profile.avatar_url === 'string' ? profile.avatar_url : undefined,
+      phone: typeof profile.phone === 'string' ? profile.phone : undefined,
       status: 'active'
     };
 
     this.currentUser = cloudUser;
-    await this.syncCloudState();
+    this.cloudStateSyncWarning = null;
+    try {
+      await this.syncCloudState();
+    } catch {
+      // A state-snapshot outage must not discard a valid Auth session/profile.
+      // The warning contains no endpoint, key, token, or database error details.
+      this.cloudStateSyncWarning = 'Authentication succeeded, but shared application data could not be synchronized. Retry data refresh or contact the administrator.';
+    }
     return cloudUser;
   }
 
@@ -1151,7 +1260,7 @@ class DataService {
     const originalSetItem = storage.setItem.bind(storage);
     storage.setItem = (key: string, value: string) => {
       originalSetItem(key, value);
-      if (!this.isRestoringCloudState && key.startsWith('buildpulse_')) {
+      if (!this.isRestoringCloudState && shouldQueueCloudStateSync(key)) {
         this.queueCloudStateSync();
       }
     };

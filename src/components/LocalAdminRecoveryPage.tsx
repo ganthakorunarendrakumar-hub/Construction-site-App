@@ -5,6 +5,8 @@ import { authService } from '../services/authService';
 interface RecoveryStatus {
   available: boolean;
   message?: string;
+  operation?: 'create' | 'restore';
+  identity?: { full_name: string; user_id: string; email: string };
 }
 
 export const LocalAdminRecoveryPage: React.FC = () => {
@@ -16,12 +18,22 @@ export const LocalAdminRecoveryPage: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [createdIdentity, setCreatedIdentity] = useState<{ userId: string; email: string } | null>(null);
+  const [recoveredIdentity, setRecoveredIdentity] = useState<{
+    userId: string;
+    email: string;
+    action: 'created' | 'restored';
+  } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
     void authService.getLocalAdminRecoveryStatus().then(result => {
-      if (isMounted) setStatus(result);
+      if (!isMounted) return;
+      setStatus(result);
+      if (result.identity) {
+        setFullName(result.identity.full_name);
+        setUserId(result.identity.user_id);
+        setEmail(result.identity.email);
+      }
     });
     return () => { isMounted = false; };
   }, []);
@@ -40,13 +52,17 @@ export const LocalAdminRecoveryPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const account = await authService.recoverLocalAdministrator({
+      const result = await authService.recoverLocalAdministrator({
         full_name: fullName,
         user_id: userId,
         email,
         password
       });
-      setCreatedIdentity({ userId: account.user_id, email: account.email });
+      setRecoveredIdentity({
+        userId: result.account.user_id,
+        email: result.account.email,
+        action: result.action
+      });
       setPassword('');
       setConfirmPassword('');
     } catch (error) {
@@ -66,7 +82,7 @@ export const LocalAdminRecoveryPage: React.FC = () => {
           <p className="text-sm font-bold tracking-[0.18em] text-bp-navy">BUILDPULSE</p>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-bp-text">Local administrator recovery</h1>
           <p className="mt-2 text-sm text-bp-muted">
-            Create one local administrator account after confirming the request in the project terminal.
+            Restore the existing administrator identity locally, or create its local account if it is missing, after confirming the request in the project terminal.
           </p>
         </header>
 
@@ -99,14 +115,14 @@ export const LocalAdminRecoveryPage: React.FC = () => {
           </div>
         )}
 
-        {createdIdentity ? (
+        {recoveredIdentity ? (
           <div role="status" className="space-y-5">
             <div className="flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" aria-hidden="true" />
               <div>
-                <p className="font-semibold">Administrator account created</p>
-                <p className="mt-1">User ID: {createdIdentity.userId}</p>
-                <p>Email: {createdIdentity.email}</p>
+                <p className="font-semibold">{recoveredIdentity.action === 'restored' ? 'Administrator access restored' : 'Local administrator account created'}</p>
+                <p className="mt-1">User ID: {recoveredIdentity.userId}</p>
+                <p>Email: {recoveredIdentity.email}</p>
                 <p className="mt-2">Return to the normal sign-in page and use the password you just set.</p>
               </div>
             </div>
@@ -130,9 +146,9 @@ export const LocalAdminRecoveryPage: React.FC = () => {
                   autoComplete="name"
                   maxLength={120}
                   required
+                  readOnly
                   value={fullName}
-                  onChange={event => setFullName(event.target.value)}
-                  className="min-h-12 w-full rounded-xl border border-bp-border-strong bg-white px-3.5 py-3 text-sm text-bp-text focus:border-bp-blue focus:outline-none focus:ring-2 focus:ring-bp-blue/15"
+                  className="min-h-12 w-full rounded-xl border border-bp-border-strong bg-bp-background px-3.5 py-3 text-sm text-bp-text"
                 />
               </div>
               <div>
@@ -145,9 +161,9 @@ export const LocalAdminRecoveryPage: React.FC = () => {
                   maxLength={40}
                   pattern="[A-Za-z0-9._-]{3,40}"
                   required
+                  readOnly
                   value={userId}
-                  onChange={event => setUserId(event.target.value.toUpperCase())}
-                  className="min-h-12 w-full rounded-xl border border-bp-border-strong bg-white px-3.5 py-3 text-sm text-bp-text focus:border-bp-blue focus:outline-none focus:ring-2 focus:ring-bp-blue/15"
+                  className="min-h-12 w-full rounded-xl border border-bp-border-strong bg-bp-background px-3.5 py-3 text-sm text-bp-text"
                 />
               </div>
             </div>
@@ -160,9 +176,9 @@ export const LocalAdminRecoveryPage: React.FC = () => {
                 autoComplete="email"
                 maxLength={254}
                 required
+                readOnly
                 value={email}
-                onChange={event => setEmail(event.target.value)}
-                className="min-h-12 w-full rounded-xl border border-bp-border-strong bg-white px-3.5 py-3 text-sm text-bp-text focus:border-bp-blue focus:outline-none focus:ring-2 focus:ring-bp-blue/15"
+                className="min-h-12 w-full rounded-xl border border-bp-border-strong bg-bp-background px-3.5 py-3 text-sm text-bp-text"
               />
             </div>
 
@@ -204,7 +220,7 @@ export const LocalAdminRecoveryPage: React.FC = () => {
               className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-bp-navy px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-bp-navy-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bp-cyan focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ShieldCheck className="h-4 w-4" aria-hidden="true" />}
-              {isSubmitting ? 'Waiting for terminal approval…' : 'Create one administrator account'}
+              {isSubmitting ? 'Waiting for terminal approval…' : status?.operation === 'restore' ? 'Restore administrator access' : 'Create local administrator access'}
             </button>
           </form>
         )}

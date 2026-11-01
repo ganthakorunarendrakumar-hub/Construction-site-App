@@ -157,6 +157,7 @@ export class AuthService {
   private accounts: AuthAccount[] = [];
   private currentSession: UserSession | null = null;
   private isInitialized = false;
+  private localAccountStorePresent = false;
 
   constructor() {
     this.initSession();
@@ -231,6 +232,7 @@ export class AuthService {
 
     if (stored === null) {
       this.accounts = [];
+      this.localAccountStorePresent = false;
       this.isInitialized = true;
       return;
     }
@@ -301,6 +303,7 @@ export class AuthService {
     }
 
     this.accounts = accounts;
+    this.localAccountStorePresent = true;
     if (sessionChanged && updatedSession) {
       this.currentSession = updatedSession;
       this.syncDataServiceUser(updatedSession);
@@ -353,6 +356,34 @@ export class AuthService {
     (dataService as any).currentUser = profile;
   }
 
+  private findLoginAccount(identifier: string): AuthAccount | undefined {
+    const emailKey = identifier.trim().toLocaleLowerCase();
+    const userIdKey = identifier.trim().toLocaleUpperCase();
+    return this.accounts.find(account =>
+      account.email.trim().toLocaleLowerCase() === emailKey
+      || account.user_id.trim().toLocaleUpperCase() === userIdKey
+    );
+  }
+
+  private isEmailLoginIdentifier(identifier: string): boolean {
+    const normalized = identifier.trim().toLocaleLowerCase();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+  }
+
+  private async finishLogin(session: UserSession, auditUserId: string, metadata: Record<string, unknown>, cloudAuthenticated = false): Promise<UserSession> {
+    this.currentSession = session;
+    try {
+      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(session));
+    } catch {
+      this.currentSession = null;
+      if (cloudAuthenticated) await dataService.signOutFromSupabase().catch(() => undefined);
+      throw new Error('Authentication succeeded, but this browser could not save the sign-in session. Check browser storage permissions and try again.');
+    }
+    this.syncDataServiceUser(session);
+    this.recordAuditLog('login_success', auditUserId, metadata);
+    return session;
+  }
+
   // ==========================================
   // 1. AUTHENTICATION & LOGIN WORKFLOW
   // ==========================================
@@ -372,17 +403,80 @@ export class AuthService {
       throw new Error('Please enter your account password.');
     }
 
-    // Match by email or User ID (case-insensitive)
-    const lowerId = cleanId.toLowerCase();
-    const accountIndex = this.accounts.findIndex(
-      a => a.email.toLowerCase() === lowerId || a.user_id.toLowerCase() === lowerId
-    );
+    const account = this.findLoginAccount(cleanId);
+    const supabaseConfig = dataService.getConfig();
+    const hasAnySupabaseConfig = Boolean(supabaseConfig.url.trim() || supabaseConfig.anonKey.trim());
 
-    if (accountIndex === -1) {
-      throw new Error('Invalid credentials. No account found matching that Email or User ID.');
+    if (dataService.isCloudConfigured()) {
+      if (!this.isEmailLoginIdentifier(cleanId) && !account) {
+        throw new Error('This User ID is not linked to a local email mapping on this browser. Sign in with the registered email, or ask the administrator to securely provision the User ID mapping. Cloud profiles are self-readable only, so the app cannot look up another user’s email before authentication.');
+      }
+      if (account?.status === 'inactive') {
+        throw new Error('Account Deactivated: This user account has been disabled by the Company Administrator.');
+      }
+
+      // Supabase Auth is authoritative in cloud mode. A local PBKDF account
+      // must not be required just to reach Auth; a local account, when present,
+      // is used only to translate a User ID to its registered email.
+      const loginEmail = account?.email.trim().toLocaleLowerCase() || cleanId.toLocaleLowerCase();
+      const cloudProfile = await dataService.signInWithSupabase(loginEmail, password);
+      if (account && account.email.trim().toLocaleLowerCase() !== cloudProfile.email.trim().toLocaleLowerCase()) {
+        await dataService.signOutFromSupabase().catch(() => undefined);
+        throw new Error('The authenticated Supabase email does not match the registered User ID mapping. Ask the administrator to correct the existing mapping; no account was changed.');
+      }
+      const resolvedByUserId = !this.isEmailLoginIdentifier(cleanId);
+      if (account && resolvedByUserId && account.company_id !== cloudProfile.company_id) {
+        await dataService.signOutFromSupabase().catch(() => undefined);
+        throw new Error('This User ID mapping belongs to a different company than the authenticated Supabase profile. Ask the administrator to correct the existing mapping; the cloud profile and account were not changed.');
+      }
+      const localMappingMatchesTenant = Boolean(account && account.company_id === cloudProfile.company_id);
+
+      if (account) {
+        account.failed_attempts = 0;
+        account.lockout_until = null;
+        account.last_login_at = new Date().toISOString();
+        this.saveAccountsToStorage();
+      }
+      const sessionDurationMs = rememberMe ? 24 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
+      const session: UserSession = {
+        token: AuthCrypto.generateSessionToken(),
+        auth_uid: cloudProfile.auth_uid || cloudProfile.id,
+        user_id: cloudProfile.user_id || (localMappingMatchesTenant ? account?.user_id : undefined) || cloudProfile.email,
+        email: cloudProfile.email.trim().toLocaleLowerCase(),
+        full_name: cloudProfile.full_name,
+        role: cloudProfile.role,
+        role_title: cloudProfile.role_title,
+        company_id: cloudProfile.company_id,
+        assigned_projects: cloudProfile.assigned_projects || (localMappingMatchesTenant ? account?.assigned_projects : undefined) || [],
+        employee_id: cloudProfile.employee_id || (localMappingMatchesTenant ? account?.employee_id : undefined),
+        login_at: new Date().toISOString(),
+        expires_at: Date.now() + sessionDurationMs
+      };
+      return this.finishLogin(session, cloudProfile.auth_uid || cloudProfile.id, {
+        user_id: session.user_id,
+        role: cloudProfile.role,
+        company_id: cloudProfile.company_id,
+        auth_provider: 'supabase',
+        remember_me: rememberMe
+      }, true);
     }
 
-    const account = this.accounts[accountIndex];
+    if (hasAnySupabaseConfig) {
+      if (!supabaseConfig.url.trim() || !supabaseConfig.anonKey.trim()) {
+        const missingValue = !supabaseConfig.url.trim()
+          ? 'project URL'
+          : 'publishable API key (or legacy anon key)';
+        throw new Error(`Supabase configuration is incomplete: the ${missingValue} is missing. Add both values for the existing project; no local authentication fallback was attempted.`);
+      }
+      throw new Error('Supabase client could not be initialized from the configured project URL and public key; no local authentication fallback was attempted.');
+    }
+
+    if (!account) {
+      if (!this.localAccountStorePresent) {
+        throw new Error('No local account store exists in this browser and Supabase is not configured here. Connect the existing Supabase project and sign in with the registered email, or use the owner-authorized local recovery procedure. No account or password was changed.');
+      }
+      throw new Error('No local account matches this Email or User ID. If this is a Supabase account, restore the existing Supabase configuration and sign in with its registered email.');
+    }
 
     // Check account status
     if (account.status === 'inactive') {
@@ -439,13 +533,6 @@ export class AuthService {
       );
     }
 
-    // When cloud sync is configured, require a real Supabase Auth session so
-    // database RLS policies can identify this user across devices.
-    let cloudProfile: UserProfile | null = null;
-    if (dataService.isCloudConnected()) {
-      cloudProfile = await dataService.signInWithSupabase(account.email, password);
-    }
-
     // Login successful: reset attempts, update last login
     account.failed_attempts = 0;
     account.lockout_until = null;
@@ -456,30 +543,24 @@ export class AuthService {
     const sessionDurationMs = rememberMe ? 24 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
     const session: UserSession = {
       token: AuthCrypto.generateSessionToken(),
-      auth_uid: cloudProfile?.auth_uid || account.auth_uid,
+      auth_uid: account.auth_uid,
       user_id: account.user_id,
       email: account.email,
-      full_name: cloudProfile?.full_name || account.full_name,
-      role: cloudProfile?.role || account.role,
-      role_title: cloudProfile?.role_title || account.role_title,
-      company_id: cloudProfile?.company_id || account.company_id,
+      full_name: account.full_name,
+      role: account.role,
+      role_title: account.role_title,
+      company_id: account.company_id,
       assigned_projects: account.assigned_projects || [],
       employee_id: account.employee_id,
       login_at: new Date().toISOString(),
       expires_at: Date.now() + sessionDurationMs
     };
 
-    this.currentSession = session;
-    localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(session));
-    this.syncDataServiceUser(session);
-
-    this.recordAuditLog('login_success', account.auth_uid, {
+    return this.finishLogin(session, account.auth_uid, {
       user_id: account.user_id,
       role: account.role,
       remember_me: rememberMe
     });
-
-    return session;
   }
 
   /**
@@ -832,8 +913,13 @@ export class AuthService {
    * development server's terminal. This deliberately avoids account seeding,
    * cloud auth, and the ordinary admin-session-gated account-creation path.
    */
-  public async getLocalAdminRecoveryStatus(): Promise<{ available: boolean; message?: string }> {
-    if (import.meta.env.DEV !== true || import.meta.env.MODE !== 'local-recovery') {
+  public async getLocalAdminRecoveryStatus(): Promise<{
+    available: boolean;
+    message?: string;
+    operation?: 'create' | 'restore';
+    identity?: { full_name: string; user_id: string; email: string };
+  }> {
+    if (!this.isLocalAdminRecoveryMode()) {
       return { available: false, message: 'Start the dedicated local recovery command to continue.' };
     }
 
@@ -842,14 +928,64 @@ export class AuthService {
       return { available: false, message: 'Recovery is disabled while cloud authentication or configuration is present.' };
     }
 
+    const identity = {
+      full_name: LEGACY_COMPANY_ADMIN.current_name,
+      user_id: LEGACY_COMPANY_ADMIN.user_id,
+      email: LEGACY_COMPANY_ADMIN.email
+    };
+    const storedAccounts = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
+    let existingAccounts: AuthAccount[] = [];
+    if (storedAccounts !== null) {
+      try {
+        const parsed: unknown = JSON.parse(storedAccounts);
+        if (!Array.isArray(parsed) || parsed.some(account =>
+          !account || typeof account !== 'object' ||
+          typeof account.auth_uid !== 'string' || typeof account.user_id !== 'string' ||
+          typeof account.email !== 'string' || typeof account.company_id !== 'string' ||
+          typeof account.role !== 'string' || typeof account.full_name !== 'string'
+        )) throw new Error('Invalid account store.');
+        existingAccounts = parsed as AuthAccount[];
+      } catch {
+        return { available: false, message: 'The local account store could not be validated. No recovery changes were made.' };
+      }
+    }
+
+    const normalizeName = (value: string) => value.trim().toLocaleLowerCase();
+    const normalizeUserId = (value: string) => value.trim().toLocaleUpperCase();
+    const normalizeEmail = (value: string) => value.trim().toLocaleLowerCase();
+    const knownNames = [LEGACY_COMPANY_ADMIN.current_name, ...LEGACY_COMPANY_ADMIN.previous_names]
+      .map(normalizeName);
+    const matchingAdministrator = existingAccounts.find(account =>
+      normalizeUserId(account.user_id) === LEGACY_COMPANY_ADMIN.user_id &&
+      normalizeEmail(account.email) === LEGACY_COMPANY_ADMIN.email &&
+      account.company_id === LEGACY_COMPANY_ADMIN.company_id &&
+      account.role === 'admin' &&
+      knownNames.includes(normalizeName(account.full_name))
+    );
+    const identityCollision = existingAccounts.some(account =>
+      (normalizeUserId(account.user_id) === LEGACY_COMPANY_ADMIN.user_id ||
+        normalizeEmail(account.email) === LEGACY_COMPANY_ADMIN.email) &&
+      account !== matchingAdministrator
+    );
+    const authIdCollision = matchingAdministrator && existingAccounts.some(account =>
+      account !== matchingAdministrator && account.auth_uid === matchingAdministrator.auth_uid
+    );
+    if (identityCollision || authIdCollision) {
+      return {
+        available: false,
+        message: 'The known administrator identity conflicts with an existing local account. No account was changed; review the account store before recovery.'
+      };
+    }
+    const operation = matchingAdministrator ? 'restore' : 'create';
+
     try {
-      const response = await fetch('/__buildpulse_local_admin_recovery/status', { cache: 'no-store' });
+      const response = await fetch(`/__buildpulse_local_admin_recovery/status?operation=${operation}`, { cache: 'no-store' });
       const result = await response.json().catch(() => ({})) as { available?: unknown };
       if (!response.ok || typeof result.available !== 'boolean') {
         return { available: false, message: 'The local recovery server could not verify one-time availability.' };
       }
       return result.available
-        ? { available: true }
+        ? { available: true, operation, identity }
         : { available: false, message: 'The one-time local recovery has already been used for this workspace on this OS account.' };
     } catch {
       return { available: false, message: 'The local recovery server is unavailable. Start it from the project terminal.' };
@@ -861,8 +997,8 @@ export class AuthService {
     user_id: string;
     email: string;
     password: string;
-  }): Promise<AuthAccount> {
-    if (import.meta.env.DEV !== true || import.meta.env.MODE !== 'local-recovery') {
+  }): Promise<{ account: AuthAccount; action: 'created' | 'restored' }> {
+    if (!this.isLocalAdminRecoveryMode()) {
       throw new Error('Local administrator recovery is available only in the dedicated development recovery mode.');
     }
 
@@ -878,12 +1014,9 @@ export class AuthService {
     const fullName = input.full_name.trim();
     const email = input.email.trim().toLowerCase();
     const userId = input.user_id.trim().toUpperCase();
-    if (!fullName || fullName.length > 120) throw new Error('Enter a valid full name.');
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new Error('Enter a valid email address.');
-    }
-    if (!/^[A-Z0-9._-]{3,40}$/.test(userId)) {
-      throw new Error('User ID must be 3 to 40 letters, numbers, dots, underscores, or hyphens.');
+    if (fullName.toLocaleLowerCase() !== LEGACY_COMPANY_ADMIN.current_name.toLocaleLowerCase() ||
+      email !== LEGACY_COMPANY_ADMIN.email || userId !== LEGACY_COMPANY_ADMIN.user_id) {
+      throw new Error('Recovery is restricted to the existing Company Administrator identity.');
     }
     if (input.password.length < 12 || input.password.length > 128) {
       throw new Error('Use a password between 12 and 128 characters.');
@@ -897,7 +1030,8 @@ export class AuthService {
         if (!Array.isArray(parsed) || parsed.some(account =>
           !account || typeof account !== 'object' ||
           typeof account.auth_uid !== 'string' || typeof account.user_id !== 'string' ||
-          typeof account.email !== 'string' || typeof account.company_id !== 'string'
+          typeof account.email !== 'string' || typeof account.company_id !== 'string' ||
+          typeof account.role !== 'string' || typeof account.full_name !== 'string'
         )) {
           throw new Error('Invalid account store.');
         }
@@ -906,12 +1040,27 @@ export class AuthService {
         throw new Error('The existing local account store could not be validated. No recovery changes were made.');
       }
     }
-    if (existingAccounts.some(account => account.email.toLowerCase() === email)) {
-      throw new Error('An account with that email already exists.');
+    const knownNames = [LEGACY_COMPANY_ADMIN.current_name, ...LEGACY_COMPANY_ADMIN.previous_names]
+      .map(name => name.trim().toLocaleLowerCase());
+    const existingAdmin = existingAccounts.find(account =>
+      account.user_id.trim().toLocaleUpperCase() === LEGACY_COMPANY_ADMIN.user_id &&
+      account.email.trim().toLocaleLowerCase() === LEGACY_COMPANY_ADMIN.email &&
+      account.company_id === LEGACY_COMPANY_ADMIN.company_id &&
+      account.role === 'admin' &&
+      knownNames.includes(account.full_name.trim().toLocaleLowerCase())
+    );
+    const identityCollision = existingAccounts.some(account =>
+      (account.user_id.trim().toLocaleUpperCase() === LEGACY_COMPANY_ADMIN.user_id ||
+        account.email.trim().toLocaleLowerCase() === LEGACY_COMPANY_ADMIN.email) &&
+      account !== existingAdmin
+    );
+    const authIdCollision = existingAdmin && existingAccounts.some(account =>
+      account !== existingAdmin && account.auth_uid === existingAdmin.auth_uid
+    );
+    if (identityCollision || authIdCollision) {
+      throw new Error('The known administrator identity conflicts with an existing local account. No account was changed.');
     }
-    if (existingAccounts.some(account => account.user_id.toUpperCase() === userId)) {
-      throw new Error('That User ID is already in use.');
-    }
+    const operation: 'create' | 'restore' = existingAdmin ? 'restore' : 'create';
 
     const salt = AuthCrypto.generateSalt(16);
     const passwordHash = await AuthCrypto.hashPassword(input.password, salt);
@@ -930,7 +1079,8 @@ export class AuthService {
       const authorizationResponse = await sendRecoveryRequest('authorize', {
         full_name: fullName,
         user_id: userId,
-        email
+        email,
+        operation
       });
       const authorizationResult = await authorizationResponse.json().catch(() => ({})) as {
         grant?: unknown;
@@ -948,43 +1098,65 @@ export class AuthService {
         throw new Error('Local account data changed during recovery. Reload and try again.');
       }
 
-      const companyId = existingAccounts.find(account => account.role === 'admin')?.company_id ||
-        existingAccounts[0]?.company_id || 'comp-apex-01';
       const now = new Date().toISOString();
-      const newAccount: AuthAccount = {
-        auth_uid: `auth-usr-local-${AuthCrypto.generateSessionToken()}`,
-        user_id: userId,
-        email,
-        full_name: fullName,
-        role: 'admin',
-        role_title: ROLE_TITLES.admin,
-        company_id: companyId,
-        assigned_projects: [],
-        status: 'active',
-        password_hash: passwordHash,
-        password_salt: salt,
-        failed_attempts: 0,
-        lockout_until: null,
-        must_change_password: false,
-        created_at: now,
-        updated_at: now,
-        created_by: 'local_owner_recovery'
-      };
-      const updatedAccounts = [...existingAccounts, newAccount];
+      const recoveredAccount: AuthAccount = existingAdmin
+        ? {
+          ...existingAdmin,
+          user_id: LEGACY_COMPANY_ADMIN.user_id,
+          email: LEGACY_COMPANY_ADMIN.email,
+          full_name: LEGACY_COMPANY_ADMIN.current_name,
+          role_title: ROLE_TITLES.admin,
+          status: 'active',
+          password_hash: passwordHash,
+          password_salt: salt,
+          failed_attempts: 0,
+          lockout_until: null,
+          must_change_password: false,
+          password_reset_code: undefined,
+          password_reset_expires: undefined,
+          updated_at: now
+        }
+        : {
+          auth_uid: `auth-usr-local-${AuthCrypto.generateSessionToken()}`,
+          user_id: userId,
+          email,
+          full_name: fullName,
+          role: 'admin',
+          role_title: ROLE_TITLES.admin,
+          company_id: LEGACY_COMPANY_ADMIN.company_id,
+          assigned_projects: [],
+          status: 'active',
+          password_hash: passwordHash,
+          password_salt: salt,
+          failed_attempts: 0,
+          lockout_until: null,
+          must_change_password: false,
+          created_at: now,
+          updated_at: now,
+          created_by: 'local_owner_recovery'
+        };
+      const updatedAccounts = [...existingAccounts];
+      if (existingAdmin) {
+        const existingAdminIndex = existingAccounts.indexOf(existingAdmin);
+        updatedAccounts[existingAdminIndex] = recoveredAccount;
+      } else {
+        updatedAccounts.push(recoveredAccount);
+      }
       const serializedAccounts = JSON.stringify(updatedAccounts);
 
       try {
         localStorage.setItem(STORAGE_KEYS.ACCOUNTS, serializedAccounts);
       } catch {
-        throw new Error('The new account could not be saved in browser storage. No existing accounts were replaced.');
+        throw new Error('The administrator recovery could not be saved in browser storage. No existing accounts were replaced.');
       }
 
       this.accounts = updatedAccounts;
       this.isInitialized = true;
+      this.localAccountStorePresent = true;
 
       let completionSucceeded = false;
       try {
-        const completionResponse = await sendRecoveryRequest('complete', { grant: approvedGrant });
+        const completionResponse = await sendRecoveryRequest('complete', { grant: approvedGrant, operation });
         completionSucceeded = completionResponse.ok;
       } catch {
         completionSucceeded = false;
@@ -993,7 +1165,7 @@ export class AuthService {
       if (!completionSucceeded) {
         let completionVerified: boolean | null = null;
         try {
-          const statusResponse = await sendRecoveryRequest('status', { grant: approvedGrant });
+          const statusResponse = await sendRecoveryRequest('status', { grant: approvedGrant, operation });
           const status = await statusResponse.json() as { completedForThisGrant?: unknown };
           if (statusResponse.ok && typeof status.completedForThisGrant === 'boolean') {
             completionVerified = status.completedForThisGrant;
@@ -1013,7 +1185,7 @@ export class AuthService {
           }
           this.accounts = existingAccounts;
           try {
-            await sendRecoveryRequest('cancel', { grant: approvedGrant });
+            await sendRecoveryRequest('cancel', { grant: approvedGrant, operation });
           } catch {
             // The grant expires automatically if cancellation cannot reach the server.
           }
@@ -1021,17 +1193,17 @@ export class AuthService {
         }
       }
 
-      this.recordAuditLog('local_admin_recovery', newAccount.auth_uid, {
-        user_id: newAccount.user_id,
-        email: newAccount.email,
-        authorization: 'local_development_terminal_confirmation'
+      this.recordAuditLog(operation === 'restore' ? 'local_admin_recovery_restored' : 'local_admin_recovery_created', recoveredAccount.auth_uid, {
+        user_id: recoveredAccount.user_id,
+        email: recoveredAccount.email,
+        authorization: `local_development_terminal_confirmation_${operation}`
       });
-      return newAccount;
+      return { account: recoveredAccount, action: operation === 'restore' ? 'restored' : 'created' };
     } catch (error) {
       const grantToCancel = grant;
       if (grantToCancel && localStorage.getItem(STORAGE_KEYS.ACCOUNTS) === storedAccounts) {
         try {
-          await sendRecoveryRequest('cancel', { grant: grantToCancel });
+          await sendRecoveryRequest('cancel', { grant: grantToCancel, operation });
         } catch {
           // The grant expires automatically if cancellation cannot reach the server.
         }

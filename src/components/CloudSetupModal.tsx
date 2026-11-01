@@ -80,6 +80,8 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
     onClose();
   };
 
+  const cloudCredentialsConfigured = Boolean(config.url.trim() && config.anonKey.trim());
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="relative bg-white rounded-2xl shadow-xl border border-bp-border w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -109,7 +111,11 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${config.isConnected ? 'bg-bp-cyan' : 'bg-bp-navy'}`} />
             <span className="font-semibold">
-              {config.isConnected ? 'Live Supabase Cloud Connected' : 'Local Storage Mode Active (Optional Cloud Sync)'}
+              {config.isConnected
+                ? 'Supabase Auth and database reachable'
+                : cloudCredentialsConfigured
+                  ? 'Supabase Auth required (connection not verified)'
+                  : 'Local Storage Mode Active (local authentication)'}
             </span>
           </div>
           <span className="text-[11px] text-bp-muted">
@@ -170,10 +176,13 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
             <form onSubmit={handleTestAndSave} className="space-y-4">
               <div className="space-y-1">
                 <p className="text-xs text-bp-muted leading-relaxed">
-                  Enter your Supabase Project URL and Anon Public Key below from your Supabase Dashboard under <strong>Settings &rarr; API</strong>.
+                  Enter the existing Supabase Project URL and its Publishable API Key (or a still-active legacy anon key) from your Supabase Dashboard under <strong>Settings &rarr; API Keys</strong>.
                 </p>
                 <p className="text-[11px] text-bp-muted">
-                  Do not paste your service-role secret key. Only use the public <code>anon</code> key.
+                  Do not paste a secret or service-role key. Only use the public publishable or legacy anon key.
+                </p>
+                <p className="rounded-lg border border-bp-cyan-border bg-bp-cyan-soft px-3 py-2 text-[11px] leading-relaxed text-bp-navy">
+                  Configuring a Supabase URL and public key also makes Supabase Auth the login provider. Local BuildPulse passwords are used only when no Supabase configuration is present; sign-in does not fall back between providers.
                 </p>
               </div>
 
@@ -203,7 +212,7 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
-                    Supabase Anon Public API Key
+                    Supabase Publishable API Key / Legacy Anon Key
                   </label>
                   <textarea
                     rows={3}
@@ -216,7 +225,7 @@ export const CloudSetupModal: React.FC<CloudSetupModalProps> = ({
 
               <div className="pt-3 border-t border-bp-border flex items-center justify-between">
                 <span className="text-[11px] text-bp-muted">
-                  Credentials are preserved locally in browser storage.
+                  Settings are saved in this browser only; other browser profiles need their own configuration.
                 </span>
                 <button
                   type="submit"
