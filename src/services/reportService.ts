@@ -680,7 +680,7 @@ class ReportService {
   /**
    * Generates CSV for Date Range Report (Option 1)
    */
-  public generateDateRangeCsv(report: DateRangeReportResult, companyName = 'CHEN INFRA'): string {
+  public generateDateRangeCsv(report: DateRangeReportResult, companyName = 'BuildPulse'): string {
     const lines: string[] = [];
     const escapeCsv = (str?: string | number | null) => {
       if (str === undefined || str === null) return '""';
@@ -764,7 +764,7 @@ class ReportService {
   /**
    * Generates CSV for Total Report Up To Date (Option 2)
    */
-  public generateCumulativeCsv(report: CumulativeReportResult, companyName = 'CHEN INFRA'): string {
+  public generateCumulativeCsv(report: CumulativeReportResult, companyName = 'BuildPulse'): string {
     const lines: string[] = [];
     const escapeCsv = (str?: string | number | null) => {
       if (str === undefined || str === null) return '""';

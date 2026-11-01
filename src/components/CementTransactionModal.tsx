@@ -25,6 +25,13 @@ import {
   MaterialTransaction,
   ProjectStockMetrics
 } from '../types';
+import { getLocalDateString } from '../utils/dateUtils';
+import { AttachmentSections, emptyTransactionAttachments, hasTransactionAttachments } from './AttachmentSections';
+import { TransactionAttachments } from '../types';
+import { dataService, PossibleDuplicateStockEntryError } from '../services/dataService';
+import { DuplicateStockEntryDialog } from './DuplicateStockEntryDialog';
+import type { DuplicateStockEntryDetails } from '../utils/stockDuplicate';
+import { DuplicateStockEntryConfirmation } from '../utils/stockDuplicate';
 
 interface CementTransactionModalProps {
   isOpen: boolean;
@@ -37,6 +44,7 @@ interface CementTransactionModalProps {
   preselectedBrandId?: string;
   onSaveTransaction: (txData: {
     projectId: string;
+    projectName?: string;
     locationId: string;
     locationName: string;
     brandId: string;
@@ -51,6 +59,8 @@ interface CementTransactionModalProps {
     attachmentUrl?: string;
     attachmentName?: string;
     attachmentSize?: number;
+    attachments?: TransactionAttachments;
+    allowPossibleDuplicate?: boolean;
   }) => Promise<MaterialTransaction>;
   onUploadFile: (file: File) => Promise<{ url: string; name: string; size: number }>;
 }
@@ -71,8 +81,8 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
   const [selectedBrandId, setSelectedBrandId] = useState<string>(preselectedBrandId || brands[0]?.id || '');
   const [customBrandName, setCustomBrandName] = useState('');
   const [locationId, setLocationId] = useState(locations[0]?.id || 'main-site');
-  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
-  const [quantityBags, setQuantityBags] = useState<string>('50');
+  const [transactionDate, setTransactionDate] = useState(getLocalDateString());
+  const [quantityBags, setQuantityBags] = useState<string>('');
   
   // Commercial & Audit Metadata
   const [supplierName, setSupplierName] = useState('');
@@ -81,15 +91,15 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
   const [remarks, setRemarks] = useState('');
 
   // Attachment state
-  const [attachment, setAttachment] = useState<{ url: string; name: string; size: number } | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<TransactionAttachments>(emptyTransactionAttachments());
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successSaved, setSuccessSaved] = useState<MaterialTransaction | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [duplicateEntry, setDuplicateEntry] = useState<DuplicateStockEntryDetails | null>(null);
+  const [pendingDuplicateTransaction, setPendingDuplicateTransaction] = useState<Parameters<CementTransactionModalProps['onSaveTransaction']>[0] | null>(null);
+  const duplicateConfirmation = useRef(new DuplicateStockEntryConfirmation<Parameters<CementTransactionModalProps['onSaveTransaction']>[0]>());
+  const [isContinuingDuplicate, setIsContinuingDuplicate] = useState(false);
 
   if (!isOpen) return null;
 
@@ -108,22 +118,6 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
     if (transactionType === 'receipt' || transactionType === 'opening_stock') return canPerformReceipt;
     if (transactionType === 'usage' || transactionType === 'damage') return canPerformUsageOrDamage;
     return true;
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsUploading(true);
-      setUploadError(null);
-      const uploaded = await onUploadFile(file);
-      setAttachment(uploaded);
-    } catch (err: any) {
-      setUploadError(err.message || 'File upload failed');
-    } finally {
-      setIsUploading(false);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,61 +162,121 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
 
     const selectedLoc = locations.find(l => l.id === locationId);
     const locName = selectedLoc ? selectedLoc.name : 'Main Site Cement Yard';
+    const transactionInput: Parameters<CementTransactionModalProps['onSaveTransaction']>[0] = {
+      projectId: project.id,
+      projectName: project.name,
+      locationId,
+      locationName: locName,
+      brandId: selectedBrandId,
+      brandName: finalBrandName,
+      transactionDate,
+      transactionType,
+      quantityBags: qty,
+      supplierName: supplierName.trim(),
+      invoiceNumber: invoiceNumber.trim(),
+      challanNumber: challanNumber.trim(),
+      remarks: remarks.trim(),
+      attachmentUrl: attachments.invoice?.url || attachments.dc?.url,
+      attachmentName: attachments.invoice?.name || attachments.dc?.name,
+      attachmentSize: attachments.invoice?.size || attachments.dc?.size,
+      attachments
+    };
 
     try {
       setIsSubmitting(true);
-      const saved = await onSaveTransaction({
-        projectId: project.id,
-        locationId,
-        locationName: locName,
-        brandId: selectedBrandId,
-        brandName: finalBrandName,
-        transactionDate,
-        transactionType,
-        quantityBags: qty,
-        supplierName: supplierName.trim(),
-        invoiceNumber: invoiceNumber.trim(),
-        challanNumber: challanNumber.trim(),
-        remarks: remarks.trim(),
-        attachmentUrl: attachment?.url,
-        attachmentName: attachment?.name,
-        attachmentSize: attachment?.size
-      });
+      const duplicate = await dataService.checkCementTransactionDuplicate(transactionInput);
+      if (duplicate) {
+        duplicateConfirmation.current.setPending(transactionInput);
+        setPendingDuplicateTransaction(transactionInput);
+        setDuplicateEntry(duplicate);
+        return;
+      }
+      if (!hasTransactionAttachments(attachments) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
+
+      const saved = await onSaveTransaction(transactionInput);
 
       setSuccessSaved(saved);
     } catch (err: any) {
+      if (err instanceof PossibleDuplicateStockEntryError) {
+        duplicateConfirmation.current.setPending(transactionInput);
+        setPendingDuplicateTransaction(transactionInput);
+        setDuplicateEntry(err.duplicate);
+        return;
+      }
       setFormError(err.message || 'Failed to record transaction.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleContinueDuplicate = async () => {
+    if (!pendingDuplicateTransaction) return;
+    setIsContinuingDuplicate(true);
+    setIsSubmitting(true);
+    setFormError(null);
+    try {
+      if (!hasTransactionAttachments(pendingDuplicateTransaction.attachments ?? emptyTransactionAttachments()) && !window.confirm('No supporting documents or images have been attached. Select Cancel to upload files, or OK to Skip & Continue.')) return;
+      const saved = await duplicateConfirmation.current.continue(input => onSaveTransaction(input));
+      if (!saved) return;
+      setDuplicateEntry(null);
+      setPendingDuplicateTransaction(null);
+      setSuccessSaved(saved);
+    } catch (err: any) {
+      duplicateConfirmation.current.cancel();
+      setDuplicateEntry(null);
+      setPendingDuplicateTransaction(null);
+      setFormError(err.message || 'Failed to record transaction.');
+    } finally {
+      setIsContinuingDuplicate(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelDuplicate = () => {
+    duplicateConfirmation.current.cancel();
+    setDuplicateEntry(null);
+    setPendingDuplicateTransaction(null);
+  };
+
   const handleClose = () => {
+    if (isSubmitting || isContinuingDuplicate) return;
     setSuccessSaved(null);
     setFormError(null);
+    handleCancelDuplicate();
+    setTransactionType('receipt');
+    setSelectedBrandId(preselectedBrandId || brands[0]?.id || '');
+    setCustomBrandName('');
+    setLocationId(locations[0]?.id || 'main-site');
+    setTransactionDate(getLocalDateString());
+    setQuantityBags('');
+    setSupplierName('');
+    setInvoiceNumber('');
+    setChallanNumber('');
+    setRemarks('');
+    setAttachments(emptyTransactionAttachments());
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#111111]/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="relative bg-white rounded-2xl shadow-xl border border-[#E8E8E8] w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-bp-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="relative bg-white rounded-2xl shadow-xl border border-bp-border w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header */}
-        <div className="bg-[#111111] text-white px-6 py-4 flex items-center justify-between border-b border-[#222222]">
+        <div className="bg-bp-navy text-white px-6 py-4 flex items-center justify-between border-b border-bp-navy-border">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#FFC400] text-[#111111] flex items-center justify-center font-bold text-xs">
+            <div className="w-8 h-8 rounded-xl bg-bp-cyan text-bp-text flex items-center justify-center font-bold text-xs">
               01
             </div>
             <div>
               <h3 className="text-base font-bold text-white">Record Cement Transaction</h3>
-              <p className="text-xs text-[#AAAAAA]">
+              <p className="text-xs text-bp-border-strong">
                 Site: {project.name} ({project.code})
               </p>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="text-[#AAAAAA] hover:text-white p-1 rounded-lg transition-colors"
+            className="text-bp-border-strong hover:text-white p-1 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -231,16 +285,16 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
         {/* Confirmation Screen */}
         {successSaved ? (
           <div className="p-8 text-center space-y-4">
-            <div className="w-16 h-16 bg-[#FFC400] text-[#111111] rounded-2xl flex items-center justify-center mx-auto shadow-xs">
+            <div className="w-16 h-16 bg-bp-cyan text-bp-text rounded-2xl flex items-center justify-center mx-auto shadow-xs">
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <div className="space-y-1">
-              <h4 className="text-xl font-bold text-[#111111]">Transaction Confirmed</h4>
-              <p className="text-xs text-[#666666]">
-                Recorded <strong className="text-[#111111]">{successSaved.quantity_bags} bags</strong> of {successSaved.brand_name} as <span className="uppercase font-semibold text-[#111111]">{successSaved.transaction_type}</span>.
+              <h4 className="text-xl font-bold text-bp-text">Transaction Confirmed</h4>
+              <p className="text-xs text-bp-muted">
+                Recorded <strong className="text-bp-text">{successSaved.quantity_bags} bags</strong> of {successSaved.brand_name} as <span className="uppercase font-semibold text-bp-text">{successSaved.transaction_type}</span>.
               </p>
               <div className="pt-2">
-                <span className="px-3 py-1 bg-[#F7F7F7] text-[#111111] font-mono text-xs font-semibold rounded-lg border border-[#E8E8E8]">
+                <span className="px-3 py-1 bg-bp-background text-bp-text font-mono text-xs font-semibold rounded-lg border border-bp-border">
                   Available Stock: {successSaved.running_balance ?? 'Updated'} bags
                 </span>
               </div>
@@ -249,7 +303,7 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-6 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] text-xs font-bold rounded-xl transition-colors shadow-xs"
+                className="px-6 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-bold rounded-xl transition-colors shadow-xs"
               >
                 Close & View Ledger
               </button>
@@ -260,26 +314,26 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
             
             {/* RBAC Warning Banner if restricted */}
             {!isTypeAllowed() && (
-              <div className="p-3 bg-[#F7F7F7] border border-[#E8E8E8] rounded-xl flex items-start gap-2.5 text-xs text-[#111111]">
-                <ShieldAlert className="w-4 h-4 text-[#111111] shrink-0 mt-0.5" />
+              <div className="p-3 bg-bp-background border border-bp-border rounded-xl flex items-start gap-2.5 text-xs text-bp-text">
+                <ShieldAlert className="w-4 h-4 text-bp-text shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold">Role Restriction</p>
-                  <p className="text-[#666666]">Your current role ({currentUser.role_title}) is not authorized to submit <strong>{transactionType}</strong> entries.</p>
+                  <p className="text-bp-muted">Your current role ({currentUser.role_title}) is not authorized to submit <strong>{transactionType}</strong> entries.</p>
                 </div>
               </div>
             )}
 
             {formError && (
-              <div className="p-3 bg-[#F7F7F7] border border-[#E8E8E8] rounded-xl flex items-start gap-2.5 text-xs text-[#111111]">
-                <AlertCircle className="w-4 h-4 text-[#111111] shrink-0 mt-0.5" />
+              <div className="p-3 bg-bp-background border border-bp-border rounded-xl flex items-start gap-2.5 text-xs text-bp-text">
+                <AlertCircle className="w-4 h-4 text-bp-text shrink-0 mt-0.5" />
                 <span className="font-medium">{formError}</span>
               </div>
             )}
 
             {/* Transaction Type Segmented Control */}
             <div>
-              <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
-                Transaction Type <span className="text-[#111111] font-bold">*</span>
+              <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
+                Transaction Type <span className="text-bp-text font-bold">*</span>
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
@@ -287,8 +341,8 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                   onClick={() => setTransactionType('receipt')}
                   className={`py-2 px-3 text-xs font-semibold rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all ${
                     transactionType === 'receipt'
-                      ? 'bg-[#FFC400] border-[#FFC400] text-[#111111] shadow-xs'
-                      : 'border-[#E8E8E8] text-[#666666] hover:bg-[#F7F7F7] hover:text-[#111111]'
+                      ? 'bg-bp-cyan border-bp-cyan text-bp-text shadow-xs'
+                      : 'border-bp-border text-bp-muted hover:bg-bp-background hover:text-bp-text'
                   }`}
                 >
                   <span className="font-bold">Receive Stock</span>
@@ -300,8 +354,8 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                   onClick={() => setTransactionType('usage')}
                   className={`py-2 px-3 text-xs font-semibold rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all ${
                     transactionType === 'usage'
-                      ? 'bg-[#FFC400] border-[#FFC400] text-[#111111] shadow-xs'
-                      : 'border-[#E8E8E8] text-[#666666] hover:bg-[#F7F7F7] hover:text-[#111111]'
+                      ? 'bg-bp-cyan border-bp-cyan text-bp-text shadow-xs'
+                      : 'border-bp-border text-bp-muted hover:bg-bp-background hover:text-bp-text'
                   }`}
                 >
                   <span className="font-bold">Record Usage</span>
@@ -313,8 +367,8 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                   onClick={() => setTransactionType('damage')}
                   className={`py-2 px-3 text-xs font-semibold rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all ${
                     transactionType === 'damage'
-                      ? 'bg-[#111111] border-[#111111] text-white shadow-xs'
-                      : 'border-[#E8E8E8] text-[#666666] hover:bg-[#F7F7F7] hover:text-[#111111]'
+                      ? 'bg-bp-navy border-bp-navy text-white shadow-xs'
+                      : 'border-bp-border text-bp-muted hover:bg-bp-background hover:text-bp-text'
                   }`}
                 >
                   <span className="font-bold">Damaged / Wet</span>
@@ -326,8 +380,8 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                   onClick={() => setTransactionType('opening_stock')}
                   className={`py-2 px-3 text-xs font-semibold rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all ${
                     transactionType === 'opening_stock'
-                      ? 'bg-[#111111] border-[#111111] text-white shadow-xs'
-                      : 'border-[#E8E8E8] text-[#666666] hover:bg-[#F7F7F7] hover:text-[#111111]'
+                      ? 'bg-bp-navy border-bp-navy text-white shadow-xs'
+                      : 'border-bp-border text-bp-muted hover:bg-bp-background hover:text-bp-text'
                   }`}
                 >
                   <span className="font-bold">Opening Balance</span>
@@ -341,13 +395,13 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
               
               {/* Cement Brand Dropdown */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
-                  Cement Brand <span className="text-[#111111] font-bold">*</span>
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
+                  Cement Brand <span className="text-bp-text font-bold">*</span>
                 </label>
                 <select
                   value={selectedBrandId}
                   onChange={(e) => setSelectedBrandId(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400] font-medium"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan font-medium"
                 >
                   {brands.map((b, idx) => (
                     <option key={b.id} value={b.id}>
@@ -363,16 +417,15 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                       required
                       value={customBrandName}
                       onChange={(e) => setCustomBrandName(e.target.value)}
-                      placeholder="Specify custom manufacturer/brand name"
-                      className="w-full text-xs px-3.5 py-2 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] focus:bg-white focus:outline-none focus:border-[#FFC400]"
+                      className="w-full text-xs px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background focus:bg-white focus:outline-none focus:border-bp-cyan"
                     />
                   </div>
                 )}
 
                 {/* Available Stock Indicator */}
-                <div className="mt-1.5 flex items-center justify-between text-[11px] text-[#666666] font-mono">
+                <div className="mt-1.5 flex items-center justify-between text-[11px] text-bp-muted font-mono">
                   <span>Available Stock:</span>
-                  <span className="font-bold text-[#111111]">
+                  <span className="font-bold text-bp-text">
                     {currentAvailableBags} bags
                   </span>
                 </div>
@@ -380,15 +433,15 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
 
               {/* Storage Location */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
                   Storage Location
                 </label>
                 <div className="relative">
-                  <MapPin className="w-3.5 h-3.5 text-[#666666] absolute left-3 top-3" />
+                  <MapPin className="w-3.5 h-3.5 text-bp-muted absolute left-3 top-3" />
                   <select
                     value={locationId}
                     onChange={(e) => setLocationId(e.target.value)}
-                    className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400]"
+                    className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
                   >
                     {locations.length > 0 ? (
                       locations.map((loc) => (
@@ -405,25 +458,25 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
 
               {/* Transaction Date */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
-                  Date <span className="text-[#111111] font-bold">*</span>
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
+                  Date <span className="text-bp-text font-bold">*</span>
                 </label>
                 <div className="relative">
-                  <Calendar className="w-3.5 h-3.5 text-[#666666] absolute left-3 top-3" />
+                  <Calendar className="w-3.5 h-3.5 text-bp-muted absolute left-3 top-3" />
                   <input
                     type="date"
                     required
                     value={transactionDate}
                     onChange={(e) => setTransactionDate(e.target.value)}
-                    className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400]"
+                    className="w-full text-xs pl-8 pr-3.5 py-2.5 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
                   />
                 </div>
               </div>
 
               {/* Quantity in Bags */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
-                  Quantity (Bags) <span className="text-[#111111] font-bold">*</span>
+                <label className="block text-xs font-semibold text-bp-text uppercase tracking-wider mb-1.5">
+                  Quantity (Bags) <span className="text-bp-text font-bold">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -433,10 +486,9 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
                     required
                     value={quantityBags}
                     onChange={(e) => setQuantityBags(e.target.value)}
-                    placeholder="e.g. 100"
-                    className="w-full text-sm font-mono font-bold px-3.5 py-2 rounded-xl border border-[#E8E8E8] bg-[#F7F7F7] text-[#111111] focus:bg-white focus:outline-none focus:border-[#FFC400] focus:ring-1 focus:ring-[#FFC400]"
+                    className="w-full text-sm font-mono font-bold px-3.5 py-2 rounded-xl border border-bp-border bg-bp-background text-bp-text focus:bg-white focus:outline-none focus:border-bp-cyan focus:ring-1 focus:ring-bp-cyan"
                   />
-                  <span className="absolute right-3.5 top-2.5 text-xs text-[#666666] font-normal">
+                  <span className="absolute right-3.5 top-2.5 text-xs text-bp-muted font-normal">
                     Bags (50kg)
                   </span>
                 </div>
@@ -445,141 +497,90 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
             </div>
 
             {/* Commercial Details */}
-            <div className="p-4 bg-[#F7F7F7] rounded-xl border border-[#E8E8E8] space-y-3">
-              <div className="text-[11px] font-bold text-[#111111] uppercase tracking-wider">
+            <div className="p-4 bg-bp-background rounded-xl border border-bp-border space-y-3">
+              <div className="text-[11px] font-bold text-bp-text uppercase tracking-wider">
                 Commercial & Verification Reference
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[11px] font-medium text-[#666666] mb-1">
+                  <label className="block text-[11px] font-medium text-bp-muted mb-1">
                     {transactionType === 'receipt' ? 'Supplier / Depot' : 'Subcontractor / Gang'}
                   </label>
                   <input
                     type="text"
                     value={supplierName}
                     onChange={(e) => setSupplierName(e.target.value)}
-                    placeholder="e.g. Sri Balaji Materials"
-                    className="w-full text-xs px-3 py-2 rounded-xl border border-[#E8E8E8] bg-white text-[#111111] focus:outline-none focus:border-[#FFC400]"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-bp-border bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-[#666666] mb-1">
+                  <label className="block text-[11px] font-medium text-bp-muted mb-1">
                     Invoice Number
                   </label>
                   <input
                     type="text"
                     value={invoiceNumber}
                     onChange={(e) => setInvoiceNumber(e.target.value)}
-                    placeholder="INV-2026-901"
-                    className="w-full text-xs px-3 py-2 rounded-xl border border-[#E8E8E8] bg-white text-[#111111] font-mono focus:outline-none focus:border-[#FFC400]"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-bp-border bg-white text-bp-text font-mono focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-[#666666] mb-1">
+                  <label className="block text-[11px] font-medium text-bp-muted mb-1">
                     Delivery Challan #
                   </label>
                   <input
                     type="text"
                     value={challanNumber}
                     onChange={(e) => setChallanNumber(e.target.value)}
-                    placeholder="DC-BLR-4019"
-                    className="w-full text-xs px-3 py-2 rounded-xl border border-[#E8E8E8] bg-white text-[#111111] font-mono focus:outline-none focus:border-[#FFC400]"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-bp-border bg-white text-bp-text font-mono focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-[#666666] mb-1">
+                <label className="block text-[11px] font-medium text-bp-muted mb-1">
                   Site Remarks & Pouring Location
                 </label>
                 <input
                   type="text"
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="e.g. 53-grade OPC cement batch. Poured on 4th floor slab."
-                  className="w-full text-xs px-3 py-2 rounded-xl border border-[#E8E8E8] bg-white text-[#111111] focus:outline-none focus:border-[#FFC400]"
+                  className="w-full text-xs px-3 py-2 rounded-xl border border-bp-border bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
                 />
               </div>
 
-              {/* Supporting Document Upload */}
-              <div>
-                <label className="block text-[11px] font-medium text-[#666666] mb-1">
-                  Attach Delivery Challan / Invoice / Photo
-                </label>
-
-                {attachment ? (
-                  <div className="flex items-center justify-between p-2.5 bg-white border border-[#E8E8E8] rounded-xl text-xs">
-                    <div className="flex items-center gap-2 truncate">
-                      <FileCheck className="w-4 h-4 text-[#111111] shrink-0" />
-                      <span className="font-semibold text-[#111111] truncate">{attachment.name}</span>
-                      <span className="text-[10px] text-[#666666] font-mono">
-                        ({(attachment.size / 1024).toFixed(0)} KB)
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAttachment(null)}
-                      className="text-[#666666] hover:text-[#111111] p-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="px-3 py-1.5 bg-white border border-[#E8E8E8] hover:bg-[#F7F7F7] text-[#111111] text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
-                    >
-                      <Upload className="w-3.5 h-3.5 text-[#666666]" />
-                      {isUploading ? 'Uploading...' : 'Upload File / Photo (Max 10MB)'}
-                    </button>
-                    <span className="text-[11px] text-[#666666]">
-                      PDF challans, JPG/PNG site photos
-                    </span>
-                  </div>
-                )}
-                {uploadError && <p className="text-[11px] text-[#111111] mt-1">{uploadError}</p>}
-              </div>
+              <AttachmentSections value={attachments} onChange={setAttachments} onUploadFile={onUploadFile} />
 
             </div>
 
             {/* Audit Information */}
-            <div className="text-[11px] text-[#666666] bg-[#F7F7F7] p-2.5 rounded-xl border border-[#E8E8E8] flex items-center justify-between">
+            <div className="text-[11px] text-bp-muted bg-bp-background p-2.5 rounded-xl border border-bp-border flex items-center justify-between">
               <div>
-                Recorded By: <strong className="text-[#111111]">{currentUser.full_name}</strong> ({currentUser.role_title})
+                Recorded By: <strong className="text-bp-text">{currentUser.full_name}</strong> ({currentUser.role_title})
               </div>
               <div>
-                Time: <strong className="text-[#111111] font-mono">{new Date().toLocaleTimeString()}</strong>
+                Time: <strong className="text-bp-text font-mono">{new Date().toLocaleTimeString()}</strong>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="pt-3 border-t border-[#E8E8E8] flex items-center justify-end gap-3">
+            <div className="pt-3 border-t border-bp-border flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-4 py-2 text-xs font-semibold text-[#666666] hover:bg-[#F7F7F7] rounded-xl transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || !isTypeAllowed()}
-                className="px-5 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] text-xs font-bold rounded-xl shadow-xs flex items-center gap-2 transition-all disabled:opacity-50"
+                className="px-5 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-bold rounded-xl shadow-xs flex items-center gap-2 transition-all disabled:opacity-50"
               >
-                <PlusCircle className="w-4 h-4 text-[#111111]" />
+                <PlusCircle className="w-4 h-4 text-bp-text" />
                 {isSubmitting ? 'Recording...' : 'Commit to Stock Ledger'}
               </button>
             </div>
@@ -588,6 +589,14 @@ export const CementTransactionModal: React.FC<CementTransactionModalProps> = ({
         )}
 
       </div>
+      {duplicateEntry && (
+        <DuplicateStockEntryDialog
+          duplicate={duplicateEntry}
+          isContinuing={isContinuingDuplicate}
+          onCancel={handleCancelDuplicate}
+          onContinue={handleContinueDuplicate}
+        />
+      )}
     </div>
   );
 };

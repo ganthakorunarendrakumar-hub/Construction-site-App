@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   Company,
+  CompanyStockBackgroundImage,
   UserProfile,
   UserRole,
   Project,
@@ -19,7 +20,24 @@ import {
   ItemStockSummary,
   CategoryStockMetrics,
   ExtendedTransactionType,
-  StandardCategoryKey
+  StandardCategoryKey,
+  VehicleHireRecord,
+  MachineryHireRecord,
+  VehicleAssetRecord,
+  VehicleRentalRecord,
+  VehicleMovementRecord,
+  VehicleHireBillingBasis,
+  VehicleHireDateRule,
+  VehicleTypeRecord,
+  VehicleDealerRecord,
+  VehicleHireContractRecord,
+  VehicleHireReturnRecord,
+  VehicleDealerPaymentRecord,
+  VehicleFuelEntryRecord,
+  VehicleDriverFuelAdvanceRecord,
+  VehicleDealerPaymentMethod,
+  VehicleDealerPaymentType,
+  VehicleFuelPayer
 } from '../types';
 import {
   INITIAL_STEEL_BRANDS,
@@ -31,6 +49,63 @@ import {
   INITIAL_ITEMS_BY_CATEGORY,
   REGULAR_SITE_USE_DETAILED_ITEMS
 } from './materialCatalog';
+import { getLocalDateString } from '../utils/dateUtils';
+import {
+  calculateFinalVehicleHireBill,
+  calculateVehicleFuelAmount,
+  calculateVehicleRental,
+  calculateWorkingSessions,
+  isValidVehicleHireDate,
+  signedVehicleDealerPaymentAmount,
+  vehicleHirePeriodsOverlap
+} from '../utils/vehicleHire';
+import { mergeVehicleTypeOptions, VEHICLE_TYPES } from '../utils/hireCatalog';
+import {
+  DEFAULT_STOCK_BACKGROUND_SLIDESHOW,
+  MAX_LOCAL_STOCK_BACKGROUND_BYTES,
+  MAX_STOCK_BACKGROUND_IMAGE_BYTES,
+  MAX_STOCK_BACKGROUND_IMAGES,
+  normalizeStockBackgroundSlideshow
+} from '../utils/stockBackground';
+import {
+  DuplicateStockEntryDetails,
+  isPotentialDuplicateStockEntry,
+  loadDuplicateCheckCandidates,
+  StockEntryDuplicateCheckError
+} from '../utils/stockDuplicate';
+
+export class PossibleDuplicateStockEntryError extends Error {
+  constructor(public readonly duplicate: DuplicateStockEntryDetails) {
+    super('A different user recently recorded the same stock item and quantity at this site.');
+    this.name = 'PossibleDuplicateStockEntryError';
+  }
+}
+
+interface GenericDuplicateCheckInput {
+  projectId: string;
+  projectName?: string;
+  category: StandardCategoryKey;
+  transactionType: ExtendedTransactionType;
+  itemId?: string;
+  itemName: string;
+  brandName?: string;
+  diameterOrSize?: string;
+  unit: string;
+  quantity: number;
+}
+
+const generateUuid = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
 
 // Default standard Indian Cement Brands specified in Section 8:
 export const INITIAL_CEMENT_BRANDS = [
@@ -53,7 +128,7 @@ export const PRESET_USERS: Record<UserRole, UserProfile> = {
     auth_uid: 'auth-usr-admin-01',
     user_id: 'CHEN-ADM-01',
     email: 'admin@cheninfra.com',
-    full_name: 'Rajesh Sharma',
+    full_name: 'Uma Mahesh',
     role: 'admin',
     role_title: 'Company Administrator',
     company_id: 'comp-apex-01',
@@ -154,6 +229,8 @@ export const PRESET_USERS: Record<UserRole, UserProfile> = {
 const STORAGE_KEYS = {
   SUPABASE_CONFIG: 'buildpulse_supabase_config_v1',
   CURRENT_USER_ROLE: 'buildpulse_current_role_v1',
+  AUTH_ACCOUNTS: 'buildpulse_auth_accounts_v1',
+  AUTH_SESSION: 'buildpulse_auth_session_v1',
   COMPANY: 'buildpulse_company_v1',
   PROJECTS: 'buildpulse_projects_v1',
   CEMENT_BRANDS: 'buildpulse_cement_brands_v1',
@@ -168,6 +245,62 @@ const STORAGE_KEYS = {
   AGGREGATE_SIZES: 'buildpulse_aggregate_sizes_v2',
   CATEGORY_ITEMS: 'buildpulse_category_items_v2',
   GENERIC_TRANSACTIONS: 'buildpulse_generic_transactions_v2',
+  VEHICLE_HIRE: 'buildpulse_vehicle_hire_v1',
+  VEHICLE_ASSETS: 'buildpulse_vehicle_assets_v1',
+  VEHICLE_RENTALS: 'buildpulse_vehicle_rentals_v1',
+  VEHICLE_MOVEMENTS: 'buildpulse_vehicle_movements_v1',
+  VEHICLE_TYPES: 'buildpulse_vehicle_types_v1',
+  VEHICLE_DEALERS: 'buildpulse_vehicle_dealers_v1',
+  VEHICLE_HIRE_CONTRACTS: 'buildpulse_vehicle_hire_contracts_v1',
+  VEHICLE_HIRE_RETURNS: 'buildpulse_vehicle_hire_returns_v1',
+  VEHICLE_DEALER_PAYMENTS: 'buildpulse_vehicle_dealer_payments_v1',
+  VEHICLE_FUEL_ENTRIES: 'buildpulse_vehicle_fuel_entries_v1',
+  VEHICLE_FUEL_ADVANCES: 'buildpulse_vehicle_fuel_advances_v1',
+  MACHINERY_HIRE: 'buildpulse_machinery_hire_v1',
+};
+
+const LOCAL_ONLY_CLOUD_STATE_KEYS = new Set([
+  STORAGE_KEYS.SUPABASE_CONFIG,
+  STORAGE_KEYS.CURRENT_USER_ROLE,
+  STORAGE_KEYS.AUTH_ACCOUNTS,
+  STORAGE_KEYS.AUTH_SESSION,
+  STORAGE_KEYS.COMPANY
+]);
+
+export const resolveSupabaseClientSettings = (
+  environment: {
+    VITE_SUPABASE_URL?: string;
+    VITE_SUPABASE_ANON_KEY?: string;
+    VITE_SUPABASE_PUBLISHABLE_KEY?: string;
+  },
+  storedConfig: Partial<Pick<SupabaseConfig, 'url' | 'anonKey'>> = {}
+): Pick<SupabaseConfig, 'url' | 'anonKey'> => {
+  const clean = (value: string | undefined) => value?.trim() || '';
+  return {
+    url: clean(environment.VITE_SUPABASE_URL) || clean(storedConfig.url),
+    anonKey: clean(environment.VITE_SUPABASE_PUBLISHABLE_KEY)
+      || clean(environment.VITE_SUPABASE_ANON_KEY)
+      || clean(storedConfig.anonKey)
+  };
+};
+
+export const shouldQueueCloudStateSync = (key: string): boolean =>
+  key.startsWith('buildpulse_') && !LOCAL_ONLY_CLOUD_STATE_KEYS.has(key);
+
+const DEFAULT_COMPANY_WATERMARK_OPACITY = 6;
+const DEFAULT_COMPANY_WATERMARK_SIZE = 280;
+const UNCONFIGURED_COMPANY_NAMES = new Set([
+  'apex horizon builders & infrastructure'
+]);
+
+export const restoreCloudStateSnapshot = (
+  snapshot: Record<string, unknown>,
+  storage: Pick<Storage, 'setItem'>
+): void => {
+  Object.entries(snapshot).forEach(([key, value]) => {
+    if (!key.startsWith('buildpulse_') || LOCAL_ONLY_CLOUD_STATE_KEYS.has(key) || typeof value !== 'string') return;
+    storage.setItem(key, value);
+  });
 };
 
 export const INITIAL_REGULAR_SITE_USE_TRANSACTIONS: GenericMaterialTransaction[] = [
@@ -808,6 +941,10 @@ class DataService {
   };
 
   private currentUser: UserProfile = PRESET_USERS.admin;
+  private cloudStateSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  private isRestoringCloudState = false;
+  private storageSyncInstalled = false;
+  private cloudStateSyncWarning: string | null = null;
 
   constructor() {
     this.initSupabaseClient();
@@ -819,9 +956,9 @@ class DataService {
   // CONFIG & CONNECTION MANAGEMENT
   // ==========================================
   private initSupabaseClient() {
-    // Check env vars first, then localStorage
-    const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-    const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+    // Prefer the current publishable key, retain legacy anon-key support, then
+    // use the existing browser-local Cloud Settings value.
+    const environment = (import.meta as any).env || {};
 
     let storedConfig: Partial<SupabaseConfig> = {};
     try {
@@ -831,8 +968,7 @@ class DataService {
       console.warn('Could not read stored Supabase config', e);
     }
 
-    const url = envUrl || storedConfig.url || '';
-    const anonKey = envKey || storedConfig.anonKey || '';
+    const { url, anonKey } = resolveSupabaseClientSettings(environment, storedConfig);
 
     this.config = {
       url,
@@ -843,62 +979,90 @@ class DataService {
     };
 
     if (url && anonKey) {
+      this.installCloudStateSync();
       try {
         this.supabase = createClient(url, anonKey);
         this.checkLiveConnection();
-      } catch (err: any) {
-        console.error('Failed to instantiate Supabase client', err);
-        this.config.error = err.message || 'Invalid Supabase credentials';
+      } catch {
+        this.config.error = 'Could not initialize Supabase client. Check the project URL and public key format.';
       }
     }
   }
 
   public async checkLiveConnection(): Promise<{ success: boolean; message: string }> {
-    if (!this.config.url || !this.config.anonKey) {
+    const url = this.config.url.trim().replace(/\/+$/, '');
+    const apiKey = this.config.anonKey.trim();
+    if (!url || !apiKey) {
       this.config.isConnected = false;
-      return { success: false, message: 'Supabase credentials not configured yet.' };
+      this.config.error = 'Enter the existing Supabase project URL and a publishable or legacy anon public key.';
+      return { success: false, message: this.config.error };
+    }
+
+    const setFailure = (message: string) => {
+      this.config.isConnected = false;
+      this.config.lastChecked = new Date().toISOString();
+      this.config.error = message;
+      this.saveConfigToStorage();
+      return { success: false, message };
+    };
+
+    this.config.isConnected = false;
+    try {
+      if (!this.supabase) {
+        this.supabase = createClient(url, apiKey);
+      }
+    } catch {
+      return setFailure('Supabase client setup failed. Check the project URL and public key format.');
     }
 
     try {
-      if (!this.supabase) {
-        this.supabase = createClient(this.config.url, this.config.anonKey);
+      const authResponse = await fetch(`${url}/auth/v1/health`, {
+        method: 'GET',
+        headers: { apikey: apiKey, Accept: 'application/json' },
+        cache: 'no-store'
+      });
+      if (!authResponse.ok) {
+        return setFailure(`Supabase Auth health check failed (HTTP ${authResponse.status}). Check the project URL and publishable key.`);
       }
-      
-      // Probe table or auth health check
-      const { data, error } = await this.supabase.from('companies').select('id').limit(1);
+    } catch {
+      return setFailure('Could not reach the Supabase Auth endpoint. Check the project URL and browser network access.');
+    }
 
-      if (error && error.code !== 'PGRST116') {
-        // Even if table doesn't exist yet, we check error code
-        const isConnected = !error.message.includes('FetchError') && !error.message.includes('network');
-        this.config.isConnected = isConnected;
-        this.config.lastChecked = new Date().toISOString();
-        if (!isConnected) {
-          this.config.error = error.message;
-          return { success: false, message: `Connection failed: ${error.message}` };
-        }
+    try {
+      const { error } = await this.supabase!.from('companies').select('id').limit(1);
+      if (error) {
+        const code = error.code ? ` (${error.code})` : '';
+        return setFailure(`Supabase Auth is reachable, but the companies database query failed${code}. Check the existing schema, table grants, and RLS policies.`);
       }
-
       this.config.isConnected = true;
       this.config.lastChecked = new Date().toISOString();
       this.config.error = undefined;
+      this.installCloudStateSync();
       this.saveConfigToStorage();
-      return { success: true, message: 'Successfully connected to Supabase PostgreSQL!' };
-    } catch (err: any) {
-      this.config.isConnected = false;
-      this.config.error = err.message || 'Unknown network error';
-      this.saveConfigToStorage();
-      return { success: false, message: `Connection test failed: ${err.message}` };
+      return { success: true, message: 'Supabase Auth and the companies database query are reachable. User credentials and profile permissions were not tested.' };
+    } catch {
+      return setFailure('Supabase Auth is reachable, but the companies database request could not be completed.');
     }
   }
 
   public saveConfig(url: string, anonKey: string): Promise<{ success: boolean; message: string }> {
     this.config.url = url.trim();
     this.config.anonKey = anonKey.trim();
+    this.config.isConnected = false;
+    this.config.error = undefined;
     this.saveConfigToStorage();
 
     if (this.config.url && this.config.anonKey) {
-      this.supabase = createClient(this.config.url, this.config.anonKey);
-      return this.checkLiveConnection();
+      try {
+        this.supabase = createClient(this.config.url, this.config.anonKey);
+        return this.checkLiveConnection();
+      } catch {
+        this.supabase = null;
+        this.config.isConnected = false;
+        this.config.error = 'Could not initialize Supabase client. Check the project URL and public key format.';
+        this.saveConfigToStorage();
+        return Promise.resolve({ success: false, message: this.config.error });
+      }
     } else {
       this.supabase = null;
       this.config.isConnected = false;
@@ -920,6 +1084,231 @@ class DataService {
 
   public isCloudConnected(): boolean {
     return this.config.isConnected;
+  }
+
+  /** True when the existing project has endpoint credentials, even if the
+   * asynchronous connection probe has not completed yet. */
+  public isCloudConfigured(): boolean {
+    return Boolean(this.config.url.trim() && this.config.anonKey.trim() && this.supabase);
+  }
+
+  public getCloudStateSyncWarning(): string | null {
+    return this.cloudStateSyncWarning;
+  }
+
+  /**
+   * Signs the current browser into Supabase Auth so RLS policies can identify
+   * the user that is reading or writing shared company data.
+   */
+  public async signInWithSupabase(email: string, password: string): Promise<UserProfile> {
+    if (!this.isCloudConfigured() || !this.supabase) {
+      throw new Error('Supabase authentication is not configured in this application. Restore the existing Supabase project URL and public anon key, then try again.');
+    }
+
+    const normalizedEmail = email.trim().toLocaleLowerCase();
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      throw new Error('Enter the registered email address, or use a User ID linked to a local account mapping.');
+    }
+
+    let authResult: Awaited<ReturnType<NonNullable<typeof this.supabase>['auth']['signInWithPassword']>>;
+    try {
+      authResult = await this.supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+    } catch {
+      throw new Error('Could not reach the configured Supabase authentication service. Check the project connection and try again.');
+    }
+    const { data, error } = authResult;
+    if (error || !data.user) {
+      const message = error?.message || '';
+      if (/invalid login credentials|invalid credentials|email not confirmed/i.test(message)) {
+        throw new Error(/email not confirmed/i.test(message)
+          ? 'This Supabase account email has not been confirmed. Ask the Supabase administrator to verify its existing Auth user.'
+          : 'Invalid email or password. Supabase Auth did not authenticate this account. This browser is configured for Supabase Auth, so its local BuildPulse password is not checked. Use the password for the existing Supabase Auth account, or ask the Supabase administrator to reset that same account; no account was changed.');
+      }
+      if (/fetch|network|timeout|connection/i.test(message)) {
+        throw new Error('Could not reach the configured Supabase authentication service. Check the project connection and try again.');
+      }
+      throw new Error(`Supabase authentication failed: ${message || 'The existing Auth account could not be verified.'}`);
+    }
+
+    let profileResult: { data: Record<string, unknown> | null; error: { message: string; code?: string } | null };
+    try {
+      profileResult = await this.supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .maybeSingle();
+    } catch {
+      await this.supabase.auth.signOut().catch(() => undefined);
+      throw new Error('Supabase authenticated the account, but its profile could not be read. Check the profiles table and self-profile SELECT policy.');
+    }
+    const { data: profile, error: profileError } = profileResult;
+
+    if (profileError || !profile) {
+      await this.supabase.auth.signOut().catch(() => undefined);
+      if (profileError?.code === '42501' || /permission|row.level security|rls/i.test(profileError?.message || '')) {
+        throw new Error('Supabase authenticated the account, but the profile lookup was blocked by row-level security. Ask the Supabase administrator to restore the self-profile SELECT policy.');
+      }
+      throw new Error('Supabase Auth accepted this account, but no matching profile exists. A Supabase administrator must link the existing Auth UUID to its existing company profile; do not create a duplicate Auth user or grant a role by email alone.');
+    }
+
+    const supportedRoles = new Set<UserRole>([
+      'admin', 'site_supervisor', 'accountant', 'worker', 'project_manager',
+      'site_engineer', 'storekeeper', 'management_viewer'
+    ]);
+    const profileEmail = typeof profile.email === 'string' ? profile.email.trim().toLocaleLowerCase() : '';
+    const authEmail = (data.user.email || normalizedEmail).trim().toLocaleLowerCase();
+    if (profile.id !== data.user.id || !profileEmail || profileEmail !== authEmail
+      || typeof profile.company_id !== 'string' || !profile.company_id.trim()
+      || typeof profile.full_name !== 'string' || !profile.full_name.trim()
+      || typeof profile.role !== 'string' || !supportedRoles.has(profile.role as UserRole)) {
+      await this.supabase.auth.signOut().catch(() => undefined);
+      throw new Error('The Supabase profile does not match the authenticated Auth identity or has incomplete role/company data. Ask a Supabase administrator to correct the existing profile mapping.');
+    }
+
+    const cloudUser: UserProfile = {
+      id: data.user.id,
+      auth_uid: data.user.id,
+      user_id: typeof profile.user_id === 'string' && profile.user_id.trim() ? profile.user_id.trim().toLocaleUpperCase() : undefined,
+      email: profileEmail,
+      full_name: profile.full_name.trim(),
+      role: profile.role as UserRole,
+      role_title: typeof profile.role_title === 'string' && profile.role_title.trim() ? profile.role_title.trim() : 'Team Member',
+      company_id: profile.company_id,
+      avatar_url: typeof profile.avatar_url === 'string' ? profile.avatar_url : undefined,
+      phone: typeof profile.phone === 'string' ? profile.phone : undefined,
+      status: 'active'
+    };
+
+    this.currentUser = cloudUser;
+    this.cloudStateSyncWarning = null;
+    try {
+      await this.syncCloudState();
+    } catch {
+      // A state-snapshot outage must not discard a valid Auth session/profile.
+      // The warning contains no endpoint, key, token, or database error details.
+      this.cloudStateSyncWarning = 'Authentication succeeded, but shared application data could not be synchronized. Retry data refresh or contact the administrator.';
+    }
+    return cloudUser;
+  }
+
+  public async signOutFromSupabase(): Promise<void> {
+    if (this.supabase) {
+      await this.supabase.auth.signOut();
+    }
+  }
+
+  /** Shared state bridge for modules that still use localStorage internally. */
+  private getCloudStateSnapshot(): Record<string, string> {
+    const state: Record<string, string> = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('buildpulse_') && !LOCAL_ONLY_CLOUD_STATE_KEYS.has(key)) {
+        const value = localStorage.getItem(key);
+        if (value !== null) state[key] = value;
+      }
+    }
+    return state;
+  }
+
+  private readLocalGenericTransactions(): GenericMaterialTransaction[] {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.GENERIC_TRANSACTIONS);
+      const parsed = stored ? JSON.parse(stored) : [];
+      if (!Array.isArray(parsed)) throw new Error('Invalid local stock history');
+      return parsed;
+    } catch {
+      throw new StockEntryDuplicateCheckError();
+    }
+  }
+
+  /** Read the shared app_state snapshot without restoring unrelated browser state. */
+  private async getLatestGenericTransactions(): Promise<GenericMaterialTransaction[]> {
+    const local = this.readLocalGenericTransactions();
+    if (!this.config.isConnected) return local;
+    const supabase = this.supabase;
+    const companyId = this.currentUser.company_id;
+    if (!supabase || !companyId) throw new StockEntryDuplicateCheckError();
+
+    return loadDuplicateCheckCandidates(local, true, async () => {
+      const { data, error } = await supabase
+        .from('app_state')
+        .select('state')
+        .eq('company_id', companyId)
+        .maybeSingle();
+      if (error) throw error;
+
+      const state = data?.state as Record<string, unknown> | null;
+      const storedSnapshot = state?.[STORAGE_KEYS.GENERIC_TRANSACTIONS];
+      let shared: GenericMaterialTransaction[] = [];
+      if (Array.isArray(storedSnapshot)) {
+        shared = storedSnapshot as GenericMaterialTransaction[];
+      } else if (typeof storedSnapshot === 'string') {
+        const parsed = JSON.parse(storedSnapshot);
+        if (!Array.isArray(parsed)) throw new Error('Invalid shared stock history');
+        shared = parsed;
+      } else if (storedSnapshot !== undefined && storedSnapshot !== null) {
+        throw new Error('Invalid shared stock history');
+      }
+      return shared;
+    });
+  }
+
+  private installCloudStateSync(): void {
+    if (this.storageSyncInstalled || typeof window === 'undefined') return;
+    this.storageSyncInstalled = true;
+    const storage = window.localStorage;
+    const originalSetItem = storage.setItem.bind(storage);
+    storage.setItem = (key: string, value: string) => {
+      originalSetItem(key, value);
+      if (!this.isRestoringCloudState && shouldQueueCloudStateSync(key)) {
+        this.queueCloudStateSync();
+      }
+    };
+  }
+
+  private queueCloudStateSync(): void {
+    if (!this.supabase || !this.config.isConnected || this.isRestoringCloudState) return;
+    if (this.cloudStateSyncTimer) clearTimeout(this.cloudStateSyncTimer);
+    this.cloudStateSyncTimer = setTimeout(() => {
+      void this.pushCloudState();
+    }, 500);
+  }
+
+  private async pushCloudState(): Promise<void> {
+    if (!this.supabase || !this.config.isConnected || !this.currentUser.company_id) return;
+    const { error } = await this.supabase.from('app_state').upsert({
+      company_id: this.currentUser.company_id,
+      state: this.getCloudStateSnapshot(),
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'company_id' });
+    if (error) console.error('Cloud state sync failed:', error.message);
+  }
+
+  public async syncCloudState(): Promise<void> {
+    if (!this.supabase || !this.config.isConnected || !this.currentUser.company_id) return;
+    this.installCloudStateSync();
+    const { data, error } = await this.supabase
+      .from('app_state')
+      .select('state')
+      .eq('company_id', this.currentUser.company_id)
+      .maybeSingle();
+    if (error) throw new Error(`Cloud state read failed: ${error.message}`);
+
+    if (data?.state && Object.keys(data.state).length > 0) {
+      this.isRestoringCloudState = true;
+      try {
+        restoreCloudStateSnapshot(data.state as Record<string, unknown>, localStorage);
+      } finally {
+        this.isRestoringCloudState = false;
+      }
+    } else {
+      await this.pushCloudState();
+    }
+  }
+
+  /** Persist the current local collection snapshot immediately. */
+  public async persistCloudState(): Promise<void> {
+    await this.pushCloudState();
   }
 
   // ==========================================
@@ -964,11 +1353,20 @@ class DataService {
   // SEEDING DEFAULT DATA FOR IMMEDIATE TESTING
   // ==========================================
   private seedDefaultDataIfEmpty() {
+    // Business/demo records are intentionally not seeded in the application.
+    // Required catalog defaults remain available through their respective
+    // getters, while projects, locations, and ledgers start empty for a new
+    // local installation. Existing stored data is left untouched.
+    return;
+
+    /* Legacy demo seed data retained below for historical reference only.
+       It is unreachable and must not be re-enabled in production. */
+    /*
     try {
       if (!localStorage.getItem(STORAGE_KEYS.COMPANY)) {
         const defaultCompany: Company = {
           id: 'comp-apex-01',
-          name: 'CHEN INFRA',
+          name: '',
           code: 'CHEN',
           address: 'Plot 42, Outer Ring Road, Tech Corridor, Bengaluru, KA 560103',
           gstin: '29AAACA1234F1Z8',
@@ -1575,57 +1973,334 @@ class DataService {
     } catch (e) {
       console.error('Error during data seeding', e);
     }
+    */
   }
 
   // ==========================================
   // COMPANY OPERATIONS
   // ==========================================
-  public async getCompany(): Promise<Company> {
-    if (this.supabase && this.config.isConnected) {
-      try {
-        const { data, error } = await this.supabase.from('companies').select('*').limit(1).single();
-        if (data && !error) return data;
-      } catch (e) {}
+  private readStoredCompany(companyId: string): Company | null {
+    const raw = localStorage.getItem(STORAGE_KEYS.COMPANY);
+    if (!raw) return null;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('Saved company settings are unreadable. No company data was changed.');
     }
 
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.COMPANY);
-      if (stored) return JSON.parse(stored);
-    } catch (e) {}
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Saved company settings are invalid. No company data was changed.');
+    }
+    const record = parsed as Record<string, unknown>;
+    const company = typeof record.id === 'string'
+      ? (record.id === companyId ? record as unknown as Company : null)
+      : record[companyId] as Company | undefined;
+    if (!company || company.id !== companyId) return null;
+
+    const name = typeof company.name === 'string' ? company.name.trim() : '';
+    return {
+      ...company,
+      name: UNCONFIGURED_COMPANY_NAMES.has(name.toLocaleLowerCase()) ? '' : name,
+      watermark_enabled: company.watermark_enabled === true,
+      watermark_opacity: this.clampCompanyWatermarkOpacity(company.watermark_opacity),
+      watermark_size: this.clampCompanyWatermarkSize(company.watermark_size),
+      stock_background_slideshow: normalizeStockBackgroundSlideshow(company.stock_background_slideshow)
+    };
+  }
+
+  private saveStoredCompany(company: Company): void {
+    const raw = localStorage.getItem(STORAGE_KEYS.COMPANY);
+    let companies: Record<string, Company> = {};
+    if (raw) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        throw new Error('Saved company settings are unreadable. No company data was changed.');
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Saved company settings are invalid. No company data was changed.');
+      }
+      const record = parsed as Record<string, unknown>;
+      if (typeof record.id === 'string') {
+        companies[record.id] = record as unknown as Company;
+      } else {
+        companies = Object.fromEntries(Object.entries(record).filter(([key, value]) =>
+          Boolean(value) && typeof value === 'object' && !Array.isArray(value) && (value as Company).id === key
+        )) as Record<string, Company>;
+      }
+    }
+    companies[company.id] = company;
+    localStorage.setItem(STORAGE_KEYS.COMPANY, JSON.stringify(companies));
+  }
+
+  public async getCompany(): Promise<Company> {
+    const companyId = this.currentUser.company_id || 'comp-apex-01';
+
+    if (this.supabase && this.config.isConnected) {
+      const { data, error } = await this.supabase
+        .from('companies')
+        .select('*')
+        .eq('id', companyId)
+        .maybeSingle();
+      if (error) throw new Error(`Company settings could not be loaded: ${error.message}`);
+      if (data) {
+        const name = typeof data.name === 'string' ? data.name.trim() : '';
+        return {
+          ...data,
+          name: UNCONFIGURED_COMPANY_NAMES.has(name.toLocaleLowerCase()) ? '' : name,
+          watermark_enabled: data.watermark_enabled === true,
+          watermark_opacity: this.clampCompanyWatermarkOpacity(data.watermark_opacity),
+          watermark_size: this.clampCompanyWatermarkSize(data.watermark_size),
+          stock_background_slideshow: normalizeStockBackgroundSlideshow(data.stock_background_slideshow)
+        } as Company;
+      }
+    }
+
+    const localCompany = this.readStoredCompany(companyId);
+    if (localCompany) return localCompany;
 
     return {
-      id: 'comp-apex-01',
-      name: 'Apex Horizon Builders & Infrastructure',
-      code: 'AHBI',
+      id: companyId,
+      name: '',
+      code: '',
+      watermark_enabled: false,
+      watermark_opacity: DEFAULT_COMPANY_WATERMARK_OPACITY,
+      watermark_size: DEFAULT_COMPANY_WATERMARK_SIZE,
+      stock_background_slideshow: {
+        ...DEFAULT_STOCK_BACKGROUND_SLIDESHOW,
+        images: [],
+        modules: [...DEFAULT_STOCK_BACKGROUND_SLIDESHOW.modules]
+      },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
   }
 
   public async updateCompanyName(newName: string): Promise<Company> {
+    const trimmed = newName.trim();
+    if (!trimmed) throw new Error('Company name cannot be blank.');
+    return this.updateCompanySettings({ name: trimmed });
+  }
+
+  private clampCompanyWatermarkOpacity(value: unknown): number {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.min(20, Math.max(1, numeric)) : DEFAULT_COMPANY_WATERMARK_OPACITY;
+  }
+
+  private clampCompanyWatermarkSize(value: unknown): number {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.round(Math.min(360, Math.max(120, numeric))) : DEFAULT_COMPANY_WATERMARK_SIZE;
+  }
+
+  public async updateCompanySettings(updates: Partial<Pick<Company,
+    'name' | 'logo_url' | 'watermark_enabled' | 'watermark_opacity' | 'watermark_size' | 'stock_background_slideshow'
+  >>): Promise<Company> {
     if (this.currentUser.role !== 'admin') {
       throw new Error('Only Company Administrators have permission to edit company details.');
     }
 
-    const trimmed = newName.trim();
-    if (!trimmed) throw new Error('Company name cannot be blank.');
-
     const company = await this.getCompany();
+    const trimmedName = updates.name === undefined ? company.name : updates.name.trim();
+    if (updates.name !== undefined && !trimmedName) throw new Error('Company name cannot be blank.');
+    const logoUrl = updates.logo_url === undefined ? company.logo_url : updates.logo_url;
+    const watermarkEnabled = updates.watermark_enabled ?? company.watermark_enabled ?? false;
+    if (watermarkEnabled && !logoUrl) {
+      throw new Error('Select and save a company logo before enabling the watermark.');
+    }
+    const slideshow = normalizeStockBackgroundSlideshow(
+      updates.stock_background_slideshow ?? company.stock_background_slideshow
+    );
+    if (updates.stock_background_slideshow?.enabled && (!slideshow.images.length || !slideshow.modules.length)) {
+      throw new Error('Add at least one valid image and select a stock module before enabling the slideshow.');
+    }
+    if (slideshow.images.length > MAX_STOCK_BACKGROUND_IMAGES) throw new Error(`A maximum of ${MAX_STOCK_BACKGROUND_IMAGES} stock background images is allowed.`);
+    for (const image of slideshow.images) {
+      if (!image.url.startsWith('data:image/png;')
+        && !image.url.startsWith('data:image/jpeg;')
+        && !image.url.startsWith('data:image/webp;')
+        && !image.url.startsWith('company-branding/')) {
+        throw new Error('A stock background image reference is invalid. Re-select the image and try again.');
+      }
+    }
+    if (!this.isCloudConnected()) {
+      const localTotalBytes = slideshow.images.reduce((total, image) => {
+        if (image.size_bytes > 0) return total + image.size_bytes;
+        if (!image.url.startsWith('data:')) return total;
+        const commaIndex = image.url.indexOf(',');
+        return total + (commaIndex >= 0 ? Math.floor((image.url.length - commaIndex - 1) * 0.75) : 0);
+      }, 0);
+      if (localTotalBytes > MAX_LOCAL_STOCK_BACKGROUND_BYTES) {
+        throw new Error('Local browser storage supports up to 2 MB of stock background images. Reduce image sizes before saving.');
+      }
+    }
+
     const updated: Company = {
       ...company,
-      name: trimmed,
+      ...updates,
+      name: trimmedName,
+      watermark_enabled: watermarkEnabled,
+      watermark_opacity: this.clampCompanyWatermarkOpacity(updates.watermark_opacity ?? company.watermark_opacity),
+      watermark_size: this.clampCompanyWatermarkSize(updates.watermark_size ?? company.watermark_size),
+      stock_background_slideshow: slideshow,
       updated_at: new Date().toISOString()
     };
 
     if (this.supabase && this.config.isConnected) {
-      try {
-        await this.supabase.from('companies').update({ name: trimmed, updated_at: updated.updated_at }).eq('id', company.id);
-      } catch (e) {}
+      const databaseUpdates = {
+        ...(updates.name !== undefined ? { name: updated.name } : {}),
+        ...(updates.logo_url !== undefined ? { logo_url: updated.logo_url ?? null } : {}),
+        watermark_enabled: updated.watermark_enabled,
+        watermark_opacity: updated.watermark_opacity,
+        watermark_size: updated.watermark_size,
+        ...(updates.stock_background_slideshow !== undefined
+          ? { stock_background_slideshow: updated.stock_background_slideshow }
+          : {}),
+        updated_at: updated.updated_at
+      };
+      const { data, error } = await this.supabase
+        .from('companies')
+        .update(databaseUpdates)
+        .eq('id', company.id)
+        .select('*')
+        .maybeSingle();
+      if (error) throw new Error(`Company settings could not be saved: ${error.message}`);
+      if (!data) throw new Error('The company record was not found in the connected database. No new company was created.');
+      Object.assign(updated, data);
+      updated.stock_background_slideshow = normalizeStockBackgroundSlideshow(data.stock_background_slideshow);
+      if (updates.name === undefined) {
+        const savedName = typeof data.name === 'string' ? data.name.trim() : '';
+        updated.name = UNCONFIGURED_COMPANY_NAMES.has(savedName.toLocaleLowerCase()) ? '' : savedName;
+      }
     }
 
-    localStorage.setItem(STORAGE_KEYS.COMPANY, JSON.stringify(updated));
-    this.recordAuditLog('update_company_name', 'companies', company.id, { old: company.name, new: trimmed });
+    try {
+      this.saveStoredCompany(updated);
+    } catch (error) {
+      if (error instanceof Error && /unreadable|invalid/i.test(error.message)) throw error;
+      throw new Error('Company settings could not be saved in this browser. Check available storage and try again.');
+    }
+    this.recordAuditLog('update_company_settings', 'companies', company.id, {
+      changed_fields: Object.keys(updates)
+    });
     return updated;
+  }
+
+  public async uploadCompanyLogo(file: File): Promise<string> {
+    if (this.currentUser.role !== 'admin') {
+      throw new Error('Only Company Administrators can change the company logo.');
+    }
+    const allowedTypes: Record<string, string> = {
+      'image/png': 'png',
+      'image/jpeg': 'jpg',
+      'image/webp': 'webp'
+    };
+    if (!file || !allowedTypes[file.type]) throw new Error('Choose a PNG, JPG, or WebP image.');
+    if (file.size <= 0 || file.size > 512 * 1024) throw new Error('Company logos must be 512 KB or smaller.');
+
+    const company = await this.getCompany();
+    const extension = allowedTypes[file.type];
+    if (this.supabase && this.config.isConnected) {
+      const safeCompanyId = company.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const uniquePart = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const storagePath = `${safeCompanyId}/${uniquePart}.${extension}`;
+      const { data, error } = await this.supabase.storage
+        .from('company-branding')
+        .upload(storagePath, file, {
+          cacheControl: '3600',
+          contentType: file.type,
+          upsert: false
+        });
+      if (error || !data) {
+        throw new Error(`Company logo upload failed: ${error?.message || 'The private storage bucket is unavailable.'}`);
+      }
+      return `company-branding/${storagePath}`;
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== 'string' || !reader.result.startsWith(`data:${file.type};`)) {
+          reject(new Error('The selected company logo could not be read.'));
+          return;
+        }
+        resolve(reader.result);
+      };
+      reader.onerror = () => reject(new Error('The selected company logo could not be read.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  public async uploadStockBackgroundImage(file: File): Promise<CompanyStockBackgroundImage> {
+    if (this.currentUser.role !== 'admin') {
+      throw new Error('Only Company Administrators can change stock background images.');
+    }
+    const allowedTypes: Record<string, string> = {
+      'image/png': 'png',
+      'image/jpeg': 'jpg',
+      'image/webp': 'webp'
+    };
+    if (!file || !allowedTypes[file.type]) throw new Error('Choose a PNG, JPG, or WebP background image.');
+    if (file.size <= 0 || file.size > MAX_STOCK_BACKGROUND_IMAGE_BYTES) {
+      throw new Error('Each stock background image must be 1.5 MB or smaller.');
+    }
+
+    let url: string;
+    if (this.supabase && this.config.isConnected) {
+      const company = await this.getCompany();
+      const safeCompanyId = company.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const uniquePart = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const storagePath = `${safeCompanyId}/stock-background-${uniquePart}.${allowedTypes[file.type]}`;
+      const { data, error } = await this.supabase.storage
+        .from('company-branding')
+        .upload(storagePath, file, {
+          cacheControl: '3600',
+          contentType: file.type,
+          upsert: false
+        });
+      if (error || !data) throw new Error(`Stock background upload failed: ${error?.message || 'Private storage is unavailable.'}`);
+      url = `company-branding/${storagePath}`;
+    } else {
+      url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result !== 'string' || !reader.result.startsWith(`data:${file.type};`)) {
+            reject(new Error('The selected stock background could not be read.'));
+            return;
+          }
+          resolve(reader.result);
+        };
+        reader.onerror = () => reject(new Error('The selected stock background could not be read.'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    return {
+      id: `stock-bg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      name: file.name.slice(0, 160),
+      url,
+      size_bytes: file.size
+    };
+  }
+
+  public async resolveCompanyLogoUrl(reference?: string): Promise<string | undefined> {
+    const value = reference?.trim();
+    if (!value) return undefined;
+    if (value.startsWith('data:') || value.startsWith('blob:') || value.startsWith('/') || /^https?:\/\//i.test(value)) {
+      return value;
+    }
+    if (value.startsWith('company-branding/')) {
+      if (!this.supabase || !this.config.isConnected) return undefined;
+      const storagePath = value.slice('company-branding/'.length);
+      const { data, error } = await this.supabase.storage
+        .from('company-branding')
+        .createSignedUrl(storagePath, 3600);
+      if (error || !data?.signedUrl) throw new Error(error?.message || 'The company logo could not be loaded.');
+      return data.signedUrl;
+    }
+    return this.resolveAttachmentUrl(value);
   }
 
   // ==========================================
@@ -1633,6 +2308,7 @@ class DataService {
   // ==========================================
   public async getProjects(filter?: { status?: ProjectStatus | 'all'; search?: string }): Promise<Project[]> {
     let projects: Project[] = [];
+    let cloudQuerySucceeded = false;
 
     if (this.supabase && this.config.isConnected) {
       try {
@@ -1643,11 +2319,12 @@ class DataService {
         const { data, error } = await query;
         if (data && !error) {
           projects = data;
+          cloudQuerySucceeded = true;
         }
       } catch (e) {}
     }
 
-    if (projects.length === 0) {
+    if (projects.length === 0 && !cloudQuerySucceeded) {
       try {
         const stored = localStorage.getItem(STORAGE_KEYS.PROJECTS);
         projects = stored ? JSON.parse(stored) : [];
@@ -1700,8 +2377,16 @@ class DataService {
     if (!projectInput.expected_completion_date) {
       throw new Error('Expected completion date is required.');
     }
-    if (new Date(projectInput.expected_completion_date) < new Date(projectInput.start_date)) {
+    if (projectInput.expected_completion_date < projectInput.start_date) {
       throw new Error('Expected completion date cannot be earlier than start date.');
+    }
+    const today = getLocalDateString();
+    const effectiveStatus = projectInput.status || 'in_progress';
+    if (effectiveStatus === 'in_progress' && projectInput.start_date > today) {
+      throw new Error("An ongoing project's start date cannot be in the future.");
+    }
+    if (effectiveStatus === 'planning' && projectInput.start_date < today) {
+      throw new Error("A planning project's start date cannot be in the past.");
     }
 
     const company = await this.getCompany();
@@ -1717,14 +2402,14 @@ class DataService {
 
     const newProject: Project = {
       ...projectInput,
-      id: 'proj-' + Math.random().toString(36).substring(2, 9) + '-' + Date.now().toString(36),
+      id: generateUuid(),
       company_id: company.id,
       code: projectInput.code.trim().toUpperCase(),
       name: projectInput.name.trim(),
       client_name: projectInput.client_name.trim(),
       address: projectInput.address.trim(),
       location: projectInput.location.trim(),
-      status: projectInput.status || 'in_progress',
+      status: effectiveStatus,
       created_by: this.currentUser.id,
       created_by_name: this.currentUser.full_name,
       created_at: new Date().toISOString(),
@@ -1733,12 +2418,18 @@ class DataService {
 
     if (this.supabase && this.config.isConnected) {
       try {
-        const { error } = await this.supabase.from('projects').insert([newProject]);
+        const cloudProject = {
+          ...newProject,
+          project_manager_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(newProject.project_manager_id)
+            ? newProject.project_manager_id
+            : null
+        };
+        const { error } = await this.supabase.from('projects').insert([cloudProject]);
         if (error) {
           throw new Error(error.message);
         }
       } catch (err: any) {
-        console.warn('Supabase cloud insert error, falling back to local storage', err);
+        throw new Error(`Cloud project save failed: ${err.message}`);
       }
     }
 
@@ -1751,6 +2442,108 @@ class DataService {
 
     this.recordAuditLog('create_project', 'projects', newProject.id, { name: newProject.name, code: newProject.code });
     return newProject;
+  }
+
+  public async updateProject(
+    projectId: string,
+    projectInput: Omit<Project, 'id' | 'company_id' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at' | 'completed_at' | 'completed_by' | 'actual_completion_date' | 'reopened_at' | 'reopened_by'>
+  ): Promise<Project> {
+    if (this.currentUser.role !== 'admin' && this.currentUser.role !== 'project_manager') {
+      throw new Error('Access Denied: Only Company Administrators and Project Managers can edit projects.');
+    }
+
+    if (!projectInput.name || !projectInput.name.trim()) {
+      throw new Error('Project name is required.');
+    }
+    if (!projectInput.code || !projectInput.code.trim()) {
+      throw new Error('Unique project code is required.');
+    }
+    if (!projectInput.client_name || !projectInput.client_name.trim()) {
+      throw new Error('Client or Customer name is required.');
+    }
+    if (!projectInput.location || !projectInput.location.trim()) {
+      throw new Error('Location (City, State) is required.');
+    }
+    if (!projectInput.start_date) {
+      throw new Error('Start date is required.');
+    }
+    if (!projectInput.expected_completion_date) {
+      throw new Error('Expected completion date is required.');
+    }
+    if (projectInput.expected_completion_date < projectInput.start_date) {
+      throw new Error('Expected completion date cannot be earlier than start date.');
+    }
+    const today = getLocalDateString();
+    const effectiveStatus = projectInput.status || 'in_progress';
+    if (effectiveStatus === 'in_progress' && projectInput.start_date > today) {
+      throw new Error("An ongoing project's start date cannot be in the future.");
+    }
+    if (effectiveStatus === 'planning' && projectInput.start_date < today) {
+      throw new Error("A planning project's start date cannot be in the past.");
+    }
+
+    const projects = await this.getProjects();
+    const projectIndex = projects.findIndex(p => p.id === projectId);
+    if (projectIndex === -1) throw new Error('Project not found.');
+
+    const isDuplicateCode = projects.some(
+      p => p.id !== projectId && p.code.trim().toUpperCase() === projectInput.code.trim().toUpperCase()
+    );
+    if (isDuplicateCode) {
+      throw new Error(`Project code "${projectInput.code.trim().toUpperCase()}" already exists. Please enter a unique code.`);
+    }
+
+    const existing = projects[projectIndex];
+    const updated: Project = {
+      ...existing,
+      ...projectInput,
+      status: effectiveStatus,
+      id: existing.id,
+      company_id: existing.company_id,
+      created_by: existing.created_by,
+      created_by_name: existing.created_by_name,
+      created_at: existing.created_at,
+      code: projectInput.code.trim().toUpperCase(),
+      name: projectInput.name.trim(),
+      client_name: projectInput.client_name.trim(),
+      address: projectInput.address.trim(),
+      location: projectInput.location.trim(),
+      description: projectInput.description.trim(),
+      project_manager_name: projectInput.project_manager_name.trim(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (this.supabase && this.config.isConnected) {
+      try {
+        const cloudProject = {
+          name: updated.name,
+          code: updated.code,
+          client_name: updated.client_name,
+          address: updated.address,
+          location: updated.location,
+          description: updated.description,
+          start_date: updated.start_date,
+          expected_completion_date: updated.expected_completion_date,
+          project_manager_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(updated.project_manager_id)
+            ? updated.project_manager_id
+            : null,
+          status: updated.status,
+          updated_at: updated.updated_at
+        };
+        const { error } = await this.supabase.from('projects').update(cloudProject).eq('id', projectId);
+        if (error) throw new Error(error.message);
+      } catch (err: any) {
+        throw new Error(`Cloud project update failed: ${err.message}`);
+      }
+    }
+
+    projects[projectIndex] = updated;
+    localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+    this.recordAuditLog('update_project', 'projects', updated.id, {
+      name: updated.name,
+      code: updated.code
+    });
+    return updated;
   }
 
   public async markProjectCompleted(projectId: string): Promise<Project> {
@@ -1770,7 +2563,7 @@ class DataService {
     const updated: Project = {
       ...project,
       status: 'completed',
-      actual_completion_date: new Date().toISOString().split('T')[0],
+      actual_completion_date: getLocalDateString(),
       completed_at: new Date().toISOString(),
       completed_by: this.currentUser.id,
       updated_at: new Date().toISOString()
@@ -1846,13 +2639,25 @@ class DataService {
   // ==========================================
   public async getCementBrands(): Promise<CementBrand[]> {
     if (this.supabase && this.config.isConnected) {
-      try {
-        const { data, error } = await this.supabase
-          .from('cement_brands')
-          .select('*')
-          .order('display_order', { ascending: true });
-        if (data && !error && data.length > 0) return data;
-      } catch (e) {}
+      const { data, error } = await this.supabase
+        .from('cement_brands')
+        .select('*')
+        .order('display_order', { ascending: true });
+      if (error) throw new Error(`Cloud brand read failed: ${error.message}`);
+      if (data && data.length > 0) return data;
+
+      const company = await this.getCompany();
+      const cloudBrands: CementBrand[] = INITIAL_CEMENT_BRANDS.map(b => ({
+        id: generateUuid(),
+        company_id: company.id,
+        brand_name: b.name,
+        code: b.code,
+        is_active: true,
+        display_order: b.order
+      }));
+      const { error: seedError } = await this.supabase.from('cement_brands').insert(cloudBrands);
+      if (seedError) throw new Error(`Cloud brand setup failed: ${seedError.message}`);
+      return cloudBrands;
     }
 
     try {
@@ -1884,8 +2689,8 @@ class DataService {
     }
 
     const newBrand: CementBrand = {
-      id: 'brand-' + Math.random().toString(36).substring(2, 8),
-      company_id: 'comp-apex-01',
+      id: generateUuid(),
+      company_id: (await this.getCompany()).id,
       brand_name: trimmed,
       code: trimmed.substring(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, ''),
       is_active: true,
@@ -1893,9 +2698,8 @@ class DataService {
     };
 
     if (this.supabase && this.config.isConnected) {
-      try {
-        await this.supabase.from('cement_brands').insert([newBrand]);
-      } catch (e) {}
+      const { error } = await this.supabase.from('cement_brands').insert([newBrand]);
+      if (error) throw new Error(`Cloud brand save failed: ${error.message}`);
     }
 
     const updatedList = [...brands, newBrand];
@@ -1905,6 +2709,16 @@ class DataService {
   }
 
   public async getMaterialLocations(projectId: string): Promise<MaterialLocation[]> {
+    if (this.supabase && this.config.isConnected) {
+      const { data, error } = await this.supabase
+        .from('material_locations')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
+      if (error) throw new Error(`Cloud location read failed: ${error.message}`);
+      if (data) return data;
+    }
+
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS);
       const all: MaterialLocation[] = stored ? JSON.parse(stored) : [];
@@ -1919,13 +2733,18 @@ class DataService {
     const all: MaterialLocation[] = stored ? JSON.parse(stored) : [];
 
     const newLoc: MaterialLocation = {
-      id: 'loc-' + Math.random().toString(36).substring(2, 8),
-      company_id: 'comp-apex-01',
+      id: generateUuid(),
+      company_id: (await this.getCompany()).id,
       project_id: projectId,
       name: name.trim(),
       code: code ? code.trim() : 'LOC-' + (all.length + 1).toString().padStart(2, '0'),
       description: description?.trim()
     };
+
+    if (this.supabase && this.config.isConnected) {
+      const { error } = await this.supabase.from('material_locations').insert([newLoc]);
+      if (error) throw new Error(`Cloud location save failed: ${error.message}`);
+    }
 
     all.push(newLoc);
     localStorage.setItem(STORAGE_KEYS.LOCATIONS, JSON.stringify(all));
@@ -1943,6 +2762,7 @@ class DataService {
     endDate?: string;
   }): Promise<MaterialTransaction[]> {
     let transactions: MaterialTransaction[] = [];
+    let cloudQuerySucceeded = false;
 
     if (this.supabase && this.config.isConnected) {
       try {
@@ -1960,11 +2780,16 @@ class DataService {
           query = query.eq('transaction_type', filters.transactionType);
         }
         const { data, error } = await query;
-        if (data && !error) transactions = data;
-      } catch (e) {}
+        if (data && !error) {
+          transactions = data;
+          cloudQuerySucceeded = true;
+        }
+      } catch (e) {
+        throw e;
+      }
     }
 
-    if (transactions.length === 0) {
+    if (transactions.length === 0 && !cloudQuerySucceeded) {
       try {
         const stored = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
         const all: MaterialTransaction[] = stored ? JSON.parse(stored) : [];
@@ -2084,8 +2909,109 @@ class DataService {
     };
   }
 
+  private async findRecentCementDuplicate(txInput: {
+    projectId: string;
+    projectName: string;
+    brandId: string;
+    brandName: string;
+    quantityBags: number;
+    transactionType: TransactionType;
+  }): Promise<DuplicateStockEntryDetails | null> {
+    const userId = this.currentUser.id;
+    if (!userId) throw new StockEntryDuplicateCheckError();
+
+    let local: MaterialTransaction[] = [];
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+      const parsed = stored ? JSON.parse(stored) : [];
+      if (!Array.isArray(parsed)) throw new Error('Invalid local stock history');
+      local = parsed;
+    } catch {
+      throw new StockEntryDuplicateCheckError();
+    }
+
+    const now = Date.now();
+    const cloudCheckRequired = this.config.isConnected;
+    const supabase = this.supabase;
+    if (cloudCheckRequired && !supabase) throw new StockEntryDuplicateCheckError();
+    const candidates = await loadDuplicateCheckCandidates(local, cloudCheckRequired, async () => {
+      if (!supabase) throw new StockEntryDuplicateCheckError();
+      const { data, error } = await supabase
+        .from('material_transactions')
+        .select('*')
+        .eq('project_id', txInput.projectId)
+        .eq('brand_id', txInput.brandId)
+        .eq('quantity_bags', txInput.quantityBags)
+        .eq('transaction_type', txInput.transactionType)
+        .gte('created_at', new Date(now - 24 * 60 * 60 * 1000).toISOString());
+      if (error) throw error;
+      return (data || []) as MaterialTransaction[];
+    });
+
+    const current = {
+      projectId: txInput.projectId,
+      category: 'cement',
+      itemId: txInput.brandId,
+      itemName: txInput.brandName,
+      quantity: txInput.quantityBags,
+      unit: 'bags',
+      transactionType: txInput.transactionType,
+      createdBy: userId
+    };
+    const match = candidates
+      .filter(record => isPotentialDuplicateStockEntry(current, {
+        projectId: record.project_id,
+        category: record.category,
+        itemId: record.brand_id,
+        itemName: record.brand_name,
+        quantity: record.quantity_bags,
+        unit: 'bags',
+        transactionType: record.transaction_type,
+        createdBy: record.created_by,
+        createdAt: record.created_at,
+        createdByName: record.created_by_name,
+        isReversal: record.is_reversal
+      }, now))
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+
+    if (!match) return null;
+    return {
+      itemName: match.brand_name || txInput.brandName,
+      quantity: match.quantity_bags,
+      unit: 'bags',
+      projectName: txInput.projectName,
+      createdAt: match.created_at,
+      createdByName: match.created_by_name || undefined
+    };
+  }
+
+  public async checkCementTransactionDuplicate(txInput: {
+    projectId: string;
+    projectName?: string;
+    brandId: string;
+    brandName: string;
+    quantityBags: number;
+    transactionType: TransactionType;
+  }): Promise<DuplicateStockEntryDetails | null> {
+    const role = this.currentUser.role;
+    if (role === 'management_viewer') {
+      throw new Error('Access Denied: Management Viewers have read-only permissions and cannot submit material transactions.');
+    }
+    if (role === 'site_engineer' && (txInput.transactionType === 'receipt' || txInput.transactionType === 'opening_stock')) {
+      throw new Error('Access Denied: Site Engineers / Supervisors are permitted to record usage and damage, not material receipts.');
+    }
+    const project = await this.getProjectById(txInput.projectId);
+    if (!project) throw new Error('Project does not exist.');
+    if (project.status === 'completed' && role !== 'admin') {
+      throw new Error('This project is completed and locked. Only Company Administrators can record audited corrections on completed projects.');
+    }
+    const projectName = txInput.projectName || (await this.getProjectById(txInput.projectId))?.name || '';
+    return this.findRecentCementDuplicate({ ...txInput, projectName });
+  }
+
   public async recordCementTransaction(txInput: {
     projectId: string;
+    projectName?: string;
     locationId: string;
     locationName: string;
     brandId: string;
@@ -2100,6 +3026,8 @@ class DataService {
     attachmentUrl?: string;
     attachmentName?: string;
     attachmentSize?: number;
+    attachments?: import('../types').TransactionAttachments;
+    allowPossibleDuplicate?: boolean;
   }): Promise<MaterialTransaction> {
     // 1. RBAC Permissions Verification
     const role = this.currentUser.role;
@@ -2149,10 +3077,22 @@ class DataService {
       }
     }
 
+    const duplicate = await this.checkCementTransactionDuplicate({
+      projectId: txInput.projectId,
+      projectName: txInput.projectName || project.name,
+      brandId: txInput.brandId,
+      brandName: txInput.brandName,
+      quantityBags: qty,
+      transactionType: txInput.transactionType
+    });
+    if (duplicate && !txInput.allowPossibleDuplicate) {
+      throw new PossibleDuplicateStockEntryError(duplicate);
+    }
+
     // 5. Build Transaction Record with Server-authoritative Audit fields
     const company = await this.getCompany();
     const newTx: MaterialTransaction = {
-      id: 'tx-' + Math.random().toString(36).substring(2, 9) + '-' + Date.now().toString(36),
+      id: generateUuid(),
       company_id: company.id,
       project_id: txInput.projectId,
       location_id: txInput.locationId,
@@ -2173,6 +3113,7 @@ class DataService {
       attachment_url: txInput.attachmentUrl,
       attachment_name: txInput.attachmentName,
       attachment_size: txInput.attachmentSize,
+      attachments: txInput.attachments,
       // Authenticated user snapshot (cannot be spoofed)
       created_by: this.currentUser.id,
       created_by_name: this.currentUser.full_name,
@@ -2190,12 +3131,12 @@ class DataService {
     }
 
     if (this.supabase && this.config.isConnected) {
-      try {
-        const { error } = await this.supabase.from('material_transactions').insert([newTx]);
-        if (error) throw new Error(error.message);
-      } catch (err: any) {
-        console.warn('Supabase transaction insert failed, keeping in local storage', err);
-      }
+      // Keep the structured attachment bundle in local persistence until the
+      // remote schema has an attachments column; legacy attachment columns
+      // continue to be sent to Supabase unchanged.
+      const { attachments: _attachments, ...cloudTransaction } = newTx;
+      const { error } = await this.supabase.from('material_transactions').insert([cloudTransaction]);
+      if (error) throw new Error(`Cloud transaction save failed: ${error.message}`);
     }
 
     // Save to persistent storage
@@ -2249,7 +3190,7 @@ class DataService {
       category: 'cement',
       brand_id: orig.brand_id,
       brand_name: orig.brand_name,
-      transaction_date: new Date().toISOString().split('T')[0],
+          transaction_date: getLocalDateString(),
       transaction_type: invertedType,
       quantity_bags: orig.quantity_bags,
       received_qty: invertedType === 'receipt' ? orig.quantity_bags : 0,
@@ -2290,20 +3231,14 @@ class DataService {
       throw new Error(`File is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum allowed attachment size is 10MB.`);
     }
 
-    const allowedMime = [
-      'image/jpeg',
-      'image/png',
-      'image/webp',
-      'application/pdf',
-      'image/heic'
-    ];
-    if (!allowedMime.includes(file.type) && !file.name.match(/\.(jpg|jpeg|png|webp|pdf|heic)$/i)) {
-      throw new Error('Unsupported file format. Please attach JPEG, PNG, WEBP, or PDF invoices/challans.');
+    const allowedMime = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowedMime.includes(file.type) && !file.name.match(/\.(jpg|jpeg|png|pdf)$/i)) {
+      throw new Error('Unsupported file format. Please attach PDF, JPG, JPEG, or PNG files.');
     }
 
     const fileExt = file.name.split('.').pop() || 'bin';
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const storagePath = `comp-apex-01/${projectId}/cement_${Date.now()}_${sanitizedName}`;
+    const storagePath = `comp-apex-01/${projectId}/documents_${Date.now()}_${sanitizedName}`;
 
     // If Supabase Storage is connected, upload to 'construction-docs' bucket
     if (this.supabase && this.config.isConnected) {
@@ -2344,6 +3279,77 @@ class DataService {
       reader.onerror = () => reject(new Error('Failed to read file for storage'));
       reader.readAsDataURL(file);
     });
+  }
+
+  /**
+   * Uploads a sensitive employee document without exposing a public URL.
+   * The returned storage path is resolved through createSignedUrl when it is
+   * opened. The local fallback remains a data URL because localStorage is the
+   * supported offline persistence mechanism for this application.
+   */
+  public async uploadPrivateAttachment(file: File, projectId: string): Promise<{ url: string; name: string; size: number; type?: string }> {
+    const maxSizeBytes = 5 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      throw new Error('Aadhaar document is too large. Maximum allowed size is 5MB.');
+    }
+    const allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowedMime.includes(file.type) && !file.name.match(/\.(jpg|jpeg|png|webp|pdf)$/i)) {
+      throw new Error('Unsupported Aadhaar format. Please attach PDF, JPG, JPEG, PNG, or WEBP.');
+    }
+
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const storagePath = `comp-apex-01/${projectId}/private_employee_documents_${Date.now()}_${sanitizedName}`;
+    if (this.supabase && this.config.isConnected) {
+      try {
+        const { data, error } = await this.supabase.storage
+          .from('construction-docs')
+          .upload(storagePath, file, { cacheControl: '3600', upsert: false });
+        if (!error && data) {
+          return { url: storagePath, name: file.name, size: file.size, type: file.type };
+        }
+        if (error) throw error;
+      } catch (err) {
+        console.warn('Private document upload failed, using client data URL', err);
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ url: reader.result as string, name: file.name, size: file.size, type: file.type });
+      reader.onerror = () => reject(new Error('Failed to read Aadhaar document for storage'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /** Resolve a saved attachment reference before it is used by a viewer. */
+  public async resolveAttachmentUrl(reference: string): Promise<string> {
+    const value = reference.trim();
+    if (!value) throw new Error('Attachment reference is empty.');
+    const isSupabaseStorageReference = value.includes('/storage/v1/object/');
+    if (value.startsWith('data:') || value.startsWith('blob:') || value.startsWith('/') || (/^https?:\/\//i.test(value) && !isSupabaseStorageReference)) {
+      return value;
+    }
+
+    if (this.supabase && this.config.isConnected) {
+      let path = value;
+      const storageMarker = '/storage/v1/object/';
+      const markerIndex = value.indexOf(storageMarker);
+      if (markerIndex >= 0) {
+        const afterMarker = value.slice(markerIndex + storageMarker.length);
+        const parts = afterMarker.split('/');
+        if (parts.length >= 3) path = parts.slice(2).join('/').split('?')[0];
+      } else if (path.startsWith('construction-docs/')) {
+        path = path.slice('construction-docs/'.length);
+      }
+
+      const { data, error } = await this.supabase.storage
+        .from('construction-docs')
+        .createSignedUrl(path, 3600);
+      if (!error && data?.signedUrl) return data.signedUrl;
+      throw new Error(error?.message || 'The saved attachment could not be opened.');
+    }
+
+    throw new Error('The saved attachment reference is not a complete local or public URL.');
   }
 
   // ==========================================
@@ -2891,8 +3897,82 @@ class DataService {
     };
   }
 
+  private async findRecentGenericDuplicate(
+    txInput: GenericDuplicateCheckInput,
+    candidates: GenericMaterialTransaction[]
+  ): Promise<DuplicateStockEntryDetails | null> {
+    if (!this.currentUser.id) throw new StockEntryDuplicateCheckError();
+
+    const catItems = await this.getCategoryItems(txInput.category);
+    const matchedItem = catItems.find(item => item.name.toLowerCase() === txInput.itemName.trim().toLowerCase());
+    const currentIdentity = {
+      projectId: txInput.projectId,
+      category: txInput.category,
+      itemId: txInput.itemId || matchedItem?.id,
+      itemName: txInput.itemName.trim(),
+      brandName: txInput.brandName?.trim(),
+      diameterOrSize: txInput.diameterOrSize?.trim(),
+      quantity: Number(txInput.quantity),
+      unit: txInput.unit.trim(),
+      transactionType: txInput.transactionType,
+      createdBy: this.currentUser.id
+    };
+    const duplicateRecord = candidates
+      .filter(record => isPotentialDuplicateStockEntry(currentIdentity, {
+        projectId: record.project_id,
+        category: record.category,
+        itemId: record.item_id,
+        itemName: record.item_name,
+        brandName: record.brand_name,
+        diameterOrSize: record.diameter_or_size,
+        quantity: record.quantity,
+        unit: record.unit,
+        transactionType: record.transaction_type,
+        createdBy: record.created_by,
+        createdAt: record.created_at,
+        createdByName: record.created_by_name,
+        isReversal: record.is_reversal
+      }))
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+
+    if (!duplicateRecord) return null;
+
+    const duplicateNameParts = [duplicateRecord.item_name].filter(Boolean);
+    for (const descriptor of [duplicateRecord.brand_name, duplicateRecord.diameter_or_size]) {
+      if (descriptor && !duplicateNameParts.some(part => part.toLowerCase() === descriptor.toLowerCase())) {
+        duplicateNameParts.push(descriptor);
+      }
+    }
+    return {
+      itemName: duplicateNameParts.join(' · ') || txInput.itemName.trim(),
+      quantity: duplicateRecord.quantity,
+      unit: duplicateRecord.unit,
+      projectName: txInput.projectName || (await this.getProjectById(txInput.projectId))?.name || '',
+      createdAt: duplicateRecord.created_at,
+      createdByName: duplicateRecord.created_by_name || undefined
+    };
+  }
+
+  public async checkGenericTransactionDuplicate(txInput: GenericDuplicateCheckInput): Promise<DuplicateStockEntryDetails | null> {
+    const role = this.currentUser.role;
+    if (role === 'management_viewer') {
+      throw new Error('Access Denied: Management Viewers have read-only permissions and cannot submit material transactions.');
+    }
+    if (role === 'site_engineer' && (txInput.transactionType === 'receipt' || txInput.transactionType === 'opening_stock')) {
+      throw new Error('Access Denied: Site Engineers / Supervisors are permitted to record usage, issues, and damages, not new stock receipts.');
+    }
+    const project = await this.getProjectById(txInput.projectId);
+    if (!project) throw new Error('Project not found.');
+    if (project.status === 'completed' && role !== 'admin') {
+      throw new Error('This project is completed and locked. Only Company Administrators can record audited corrections.');
+    }
+    const candidates = await this.getLatestGenericTransactions();
+    return this.findRecentGenericDuplicate(txInput, candidates);
+  }
+
   public async recordGenericTransaction(txInput: {
     projectId: string;
+    projectName?: string;
     locationId: string;
     locationName: string;
     category: StandardCategoryKey;
@@ -2912,17 +3992,21 @@ class DataService {
     attachmentUrl?: string;
     attachmentName?: string;
     attachmentSize?: number;
+    attachments?: import('../types').TransactionAttachments;
     equipment_condition?: 'good' | 'fair' | 'damaged' | 'maintenance';
     issued_to?: string;
     idempotency_key?: string;
+    allowPossibleDuplicate?: boolean;
   }): Promise<GenericMaterialTransaction> {
+    if (!this.currentUser.id) throw new StockEntryDuplicateCheckError();
+
     const role = this.currentUser.role;
     if (role === 'management_viewer') {
       throw new Error('Access Denied: Management Viewers have read-only permissions and cannot submit material transactions.');
     }
 
-    const stored = localStorage.getItem(STORAGE_KEYS.GENERIC_TRANSACTIONS);
-    const all: GenericMaterialTransaction[] = stored ? JSON.parse(stored) : [];
+    // Use the latest shared snapshot when available and merge pending local writes.
+    const all = await this.getLatestGenericTransactions();
 
     // Idempotency & Duplicate submission protection
     if (txInput.idempotency_key) {
@@ -2934,6 +4018,7 @@ class DataService {
       // Rapid duplicate click protection: within 2 seconds with exact same parameters
       const recent = all.find(t =>
         t.project_id === txInput.projectId &&
+        t.created_by === this.currentUser.id &&
         t.category === txInput.category &&
         t.item_name === txInput.itemName.trim() &&
         t.transaction_type === txInput.transactionType &&
@@ -2996,10 +4081,27 @@ class DataService {
       }
     }
 
+    const duplicate = await this.findRecentGenericDuplicate({
+      projectId: txInput.projectId,
+      projectName: txInput.projectName || project.name,
+      category: txInput.category,
+      transactionType: txInput.transactionType,
+      itemId: txInput.itemId,
+      itemName: txInput.itemName,
+      brandName: txInput.brandName,
+      diameterOrSize: txInput.diameterOrSize,
+      unit: txInput.unit,
+      quantity: qty
+    }, all);
+    if (duplicate && !txInput.allowPossibleDuplicate) {
+      throw new PossibleDuplicateStockEntryError(duplicate);
+    }
+
     const company = await this.getCompany();
     const catItemsForSub = await this.getCategoryItems(txInput.category);
     const matchedItem = catItemsForSub.find(i => i.name.toLowerCase() === txInput.itemName.trim().toLowerCase());
     const subcategory = txInput.subcategory || matchedItem?.subcategory;
+    const itemId = txInput.itemId || matchedItem?.id;
 
     const newTx: GenericMaterialTransaction = {
       id: 'gtx-' + Math.random().toString(36).substring(2, 9) + '-' + Date.now().toString(36),
@@ -3008,7 +4110,7 @@ class DataService {
       location_id: txInput.locationId,
       location_name: txInput.locationName || 'Main Site Storage Yard',
       category: txInput.category,
-      item_id: txInput.itemId || matchedItem?.id,
+      item_id: itemId,
       item_name: txInput.itemName.trim(),
       subcategory,
       brand_name: txInput.brandName?.trim(),
@@ -3030,6 +4132,7 @@ class DataService {
       attachment_url: txInput.attachmentUrl,
       attachment_name: txInput.attachmentName,
       attachment_size: txInput.attachmentSize,
+      attachments: txInput.attachments,
       idempotency_key: txInput.idempotency_key,
       created_by: this.currentUser.id,
       created_by_name: this.currentUser.full_name,
@@ -3094,7 +4197,7 @@ class DataService {
       brand_name: orig.brand_name,
       diameter_or_size: orig.diameter_or_size,
       unit: orig.unit,
-      transaction_date: new Date().toISOString().split('T')[0],
+      transaction_date: getLocalDateString(),
       transaction_type: invertedType,
       quantity: orig.quantity,
       received_qty: invertedType === 'receipt' ? orig.quantity : 0,
@@ -3151,6 +4254,1079 @@ class DataService {
     }
 
     return lines.join('\n');
+  }
+
+  // ==========================================
+  // VEHICLE & MACHINERY HIRE
+  // ==========================================
+  private canManageHire(): boolean {
+    return ['admin', 'project_manager', 'site_supervisor'].includes(this.currentUser.role);
+  }
+
+  public createVehicleAssetId(): string {
+    return `vh-${generateUuid()}`;
+  }
+
+  public createVehicleEquipmentId(): string {
+    return `VEH-${generateUuid().slice(0, 8).toUpperCase()}`;
+  }
+
+  private canAccessHireProject(projectId: string): boolean {
+    return this.currentUser.role !== 'site_supervisor'
+      || !this.currentUser.assigned_projects?.length
+      || this.currentUser.assigned_projects.includes(projectId);
+  }
+
+  private async requireHireProject(projectId: string): Promise<Project> {
+    if (!this.canAccessHireProject(projectId)) throw new Error('Access Denied: This project is not assigned to your account.');
+    const project = await this.getProjectById(projectId);
+    if (!project || project.company_id !== this.currentUser.company_id) throw new Error('Project not found.');
+    return project;
+  }
+
+  private readHireRecords<T>(storageKey: string, label: string): T[] {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      const parsed = stored ? JSON.parse(stored) : [];
+      if (!Array.isArray(parsed)) throw new Error('Invalid hire record data.');
+      return parsed as T[];
+    } catch {
+      throw new Error(`Unable to read saved ${label} records. Refresh the application and try again.`);
+    }
+  }
+
+  public async getVehicleTypes(): Promise<string[]> {
+    const savedTypes = this.readHireRecords<VehicleTypeRecord>(STORAGE_KEYS.VEHICLE_TYPES, 'vehicle type')
+      .filter(record => record.company_id === this.currentUser.company_id)
+      .map(record => record.name);
+    const existingAssets = this.readHireRecords<VehicleAssetRecord>(STORAGE_KEYS.VEHICLE_ASSETS, 'vehicle')
+      .filter(record => record.company_id === this.currentUser.company_id)
+      .map(record => record.vehicle_type);
+    const existingHistory = this.readHireRecords<VehicleHireRecord>(STORAGE_KEYS.VEHICLE_HIRE, 'vehicle work history')
+      .filter(record => record.company_id === this.currentUser.company_id)
+      .map(record => record.vehicle_type);
+
+    return mergeVehicleTypeOptions(VEHICLE_TYPES, savedTypes, existingAssets, existingHistory);
+  }
+
+  public async addVehicleType(input: string): Promise<string> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to add vehicle types.');
+    const name = input.trim();
+    if (!name) throw new Error('Enter a vehicle type name.');
+
+    const currentTypes = await this.getVehicleTypes();
+    if (currentTypes.some(type => type.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      throw new Error('That vehicle type already exists.');
+    }
+
+    const saved = this.readHireRecords<VehicleTypeRecord>(STORAGE_KEYS.VEHICLE_TYPES, 'vehicle type');
+    // Recheck the company-scoped storage immediately before writing in case another form added it meanwhile.
+    if (saved.some(record => record.company_id === this.currentUser.company_id
+      && record.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      throw new Error('That vehicle type already exists.');
+    }
+
+    const record: VehicleTypeRecord = {
+      id: `vht-${generateUuid()}`,
+      company_id: this.currentUser.company_id,
+      name,
+      created_by: this.currentUser.id,
+      created_by_name: this.currentUser.full_name,
+      created_at: new Date().toISOString()
+    };
+    saved.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_TYPES, JSON.stringify(saved));
+    this.recordAuditLog('add_vehicle_type', 'vehicle_types', record.id, { name });
+    return name;
+  }
+
+  private async validateHireSite(projectId: string, siteId: string | undefined, siteName: string): Promise<void> {
+    const cleanName = siteName.trim();
+    if (!cleanName) throw new Error('Site / location is required.');
+    if (siteId) {
+      const locations = await this.getMaterialLocations(projectId);
+      if (!locations.some(location => location.id === siteId && location.project_id === projectId)) {
+        throw new Error('Select a site that belongs to the selected project.');
+      }
+    }
+  }
+
+  public async getVehicleAssets(projectIds?: string[]): Promise<VehicleAssetRecord[]> {
+    const filterIds = projectIds ? new Set(projectIds) : null;
+    return this.readHireRecords<VehicleAssetRecord>(STORAGE_KEYS.VEHICLE_ASSETS, 'vehicle')
+      .filter(asset => asset.company_id === this.currentUser.company_id
+        && this.canAccessHireProject(asset.project_id)
+        && (!filterIds || filterIds.has(asset.project_id)))
+      .sort((a, b) => a.vehicle_equipment_id.localeCompare(b.vehicle_equipment_id));
+  }
+
+  public async getVehicleRentalRecords(projectIds?: string[]): Promise<VehicleRentalRecord[]> {
+    const filterIds = projectIds ? new Set(projectIds) : null;
+    return this.readHireRecords<VehicleRentalRecord>(STORAGE_KEYS.VEHICLE_RENTALS, 'vehicle hire')
+      .filter(record => record.company_id === this.currentUser.company_id
+        && this.canAccessHireProject(record.project_id)
+        && (!filterIds || filterIds.has(record.project_id)))
+      .sort((a, b) => b.in_date.localeCompare(a.in_date) || b.created_at.localeCompare(a.created_at));
+  }
+
+  public async getVehicleMovementRecords(projectIds?: string[]): Promise<VehicleMovementRecord[]> {
+    const filterIds = projectIds ? new Set(projectIds) : null;
+    return this.readHireRecords<VehicleMovementRecord>(STORAGE_KEYS.VEHICLE_MOVEMENTS, 'vehicle movement')
+      .filter(record => record.company_id === this.currentUser.company_id
+        && this.canAccessHireProject(record.project_id)
+        && (!filterIds || filterIds.has(record.project_id)))
+      .sort((a, b) => b.work_date.localeCompare(a.work_date) || b.created_at.localeCompare(a.created_at));
+  }
+
+  private validateVehicleAssetInput(input: {
+    id?: string;
+    vehicle_equipment_id: string;
+    vehicle_type: string;
+    vehicle_category: string;
+    vendor: string;
+    model: string;
+    fuel_type: VehicleAssetRecord['fuel_type'];
+    registration_number?: string;
+    project_id: string;
+    site_id?: string;
+    site_name: string;
+    condition: VehicleAssetRecord['condition'];
+    remarks?: string;
+  }, all: VehicleAssetRecord[], now: string): Promise<VehicleAssetRecord> {
+    const equipmentId = input.vehicle_equipment_id.trim();
+    if (!equipmentId || !input.vehicle_type.trim() || !input.vendor.trim() || !input.model.trim()) {
+      throw new Error('Vehicle type, vendor, model, and Vehicle / Equipment ID are required.');
+    }
+    const projectPromise = this.requireHireProject(input.project_id);
+    const sitePromise = this.validateHireSite(input.project_id, input.site_id, input.site_name);
+    const typesPromise = this.getVehicleTypes();
+    return Promise.all([projectPromise, sitePromise, typesPromise]).then(([project, , types]) => {
+      const normalizedType = input.vehicle_type.trim();
+      const vehicleType = types.find(type => type.toLocaleLowerCase() === normalizedType.toLocaleLowerCase());
+      if (!vehicleType) throw new Error('Select a vehicle type from the list or add it before saving.');
+      const duplicateId = all.find(asset => asset.company_id === this.currentUser.company_id
+        && asset.id !== input.id
+        && asset.vehicle_equipment_id.toLocaleLowerCase() === equipmentId.toLocaleLowerCase());
+      if (duplicateId) throw new Error('Vehicle / Equipment ID is already registered.');
+      const registration = input.registration_number?.trim().toLocaleLowerCase();
+      if (registration && all.some(asset => asset.company_id === this.currentUser.company_id
+        && asset.id !== input.id
+        && asset.registration_number?.trim().toLocaleLowerCase() === registration)) {
+        throw new Error('That vehicle registration number is already in the fleet.');
+      }
+      const existing = input.id ? all.find(asset => asset.id === input.id) : undefined;
+      if (existing && !this.canAccessHireProject(existing.project_id)) throw new Error('Access Denied: This vehicle is outside your assigned projects.');
+      return {
+        ...input,
+        vehicle_equipment_id: equipmentId,
+        vehicle_type: vehicleType,
+        vehicle_category: input.vehicle_category.trim(),
+        vendor: input.vendor.trim(),
+        model: input.model.trim(),
+        registration_number: input.registration_number?.trim() || undefined,
+        site_name: input.site_name.trim(),
+        remarks: input.remarks?.trim() || undefined,
+        project_name: project.name,
+        company_id: existing?.company_id || project.company_id,
+        created_by: existing?.created_by || this.currentUser.id,
+        created_by_name: existing?.created_by_name || this.currentUser.full_name,
+        created_at: existing?.created_at || now,
+        updated_at: now,
+        id: existing?.id || input.id || this.createVehicleAssetId()
+      } as VehicleAssetRecord;
+    });
+  }
+
+  public async saveVehicleAsset(input: Omit<VehicleAssetRecord, 'id' | 'company_id' | 'project_name' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at'> & { id?: string }): Promise<VehicleAssetRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to manage vehicle hire.');
+    const all = this.readHireRecords<VehicleAssetRecord>(STORAGE_KEYS.VEHICLE_ASSETS, 'vehicle');
+    const record = await this.validateVehicleAssetInput(input, all, new Date().toISOString());
+    const existingIndex = all.findIndex(asset => asset.id === record.id);
+    if (existingIndex >= 0) all[existingIndex] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_ASSETS, JSON.stringify(all));
+    this.recordAuditLog(existingIndex >= 0 ? 'update_vehicle_asset' : 'register_vehicle_asset', 'vehicle_assets', record.id, { project_id: record.project_id, vehicle_equipment_id: record.vehicle_equipment_id });
+    return record;
+  }
+
+  public async saveVehicleHireWithAsset(
+    assetInput: Omit<VehicleAssetRecord, 'id' | 'company_id' | 'project_name' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at'> & { id?: string },
+    rentalInput: Omit<VehicleRentalRecord, 'id' | 'company_id' | 'project_name' | 'total_months' | 'total_days' | 'billable_days' | 'estimated_hire_cost' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at'> & { id?: string }
+  ): Promise<{ asset: VehicleAssetRecord; rental: VehicleRentalRecord }> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to manage vehicle hire.');
+    if (assetInput.id !== rentalInput.asset_id) throw new Error('The hire period must reference the selected vehicle.');
+
+    const now = new Date().toISOString();
+    const assets = this.readHireRecords<VehicleAssetRecord>(STORAGE_KEYS.VEHICLE_ASSETS, 'vehicle');
+    const rentals = this.readHireRecords<VehicleRentalRecord>(STORAGE_KEYS.VEHICLE_RENTALS, 'vehicle hire');
+    const asset = await this.validateVehicleAssetInput(assetInput, assets, now);
+    const hireProject = await this.requireHireProject(rentalInput.project_id);
+    await this.validateHireSite(rentalInput.project_id, rentalInput.site_id, rentalInput.site_name);
+
+    const calculation = calculateVehicleRental({
+      inDate: rentalInput.in_date,
+      outDate: rentalInput.out_date,
+      billingBasis: rentalInput.billing_basis,
+      dateRule: rentalInput.date_rule,
+      rentPerDay: rentalInput.rent_per_day,
+      rentPerMonth: rentalInput.rent_per_month
+    });
+    const previousRental = rentalInput.id ? rentals.find(record => record.id === rentalInput.id) : undefined;
+    if (rentalInput.id && !previousRental) throw new Error('Hire period was not found. Refresh the list and try again.');
+    if (previousRental && previousRental.asset_id !== asset.id) throw new Error('A saved hire period cannot be reassigned to a different vehicle.');
+
+    const overlaps = rentals.find(record => {
+      if (record.asset_id !== asset.id || record.id === rentalInput.id) return false;
+      return vehicleHirePeriodsOverlap(
+        { inDate: rentalInput.in_date, outDate: rentalInput.out_date, dateRule: rentalInput.date_rule },
+        { inDate: record.in_date, outDate: record.out_date, dateRule: record.date_rule }
+      );
+    });
+    if (overlaps) throw new Error(`This vehicle already has an overlapping hire period (${overlaps.in_date} to ${overlaps.out_date}).`);
+
+    const rental: VehicleRentalRecord = {
+      ...rentalInput,
+      id: previousRental?.id || rentalInput.id || `vhr-${generateUuid()}`,
+      company_id: previousRental?.company_id || hireProject.company_id,
+      project_name: hireProject.name,
+      total_months: calculation.totalMonths,
+      total_days: calculation.totalDays,
+      billable_days: calculation.billableDays,
+      estimated_hire_cost: calculation.estimatedHireCost,
+      created_by: previousRental?.created_by || this.currentUser.id,
+      created_by_name: previousRental?.created_by_name || this.currentUser.full_name,
+      created_at: previousRental?.created_at || now,
+      updated_at: now,
+      site_name: rentalInput.site_name.trim(),
+      remarks: rentalInput.remarks?.trim() || undefined
+    };
+
+    const assetIndex = assets.findIndex(entry => entry.id === asset.id);
+    if (assetIndex >= 0) assets[assetIndex] = asset; else assets.push(asset);
+    const rentalIndex = rentals.findIndex(entry => entry.id === rental.id);
+    if (rentalIndex >= 0) rentals[rentalIndex] = rental; else rentals.push(rental);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_ASSETS, JSON.stringify(assets));
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_RENTALS, JSON.stringify(rentals));
+    this.recordAuditLog(rentalIndex >= 0 ? 'update_vehicle_rental' : 'create_vehicle_rental', 'vehicle_rentals', rental.id, {
+      project_id: rental.project_id,
+      asset_id: asset.id,
+      billing_basis: rental.billing_basis,
+      billable_days: rental.billable_days,
+      estimated_hire_cost: rental.estimated_hire_cost
+    });
+    return { asset, rental };
+  }
+
+  public async recordVehicleMovement(input: Omit<VehicleMovementRecord, 'id' | 'company_id' | 'project_name' | 'sessions' | 'total_working_minutes' | 'scheduled_minutes' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at'> & { id?: string; sessions: Array<{ id: string; start_time: string; stop_time: string }> }): Promise<VehicleMovementRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to record vehicle movements.');
+    const assets = await this.getVehicleAssets();
+    const asset = assets.find(item => item.id === input.asset_id);
+    if (!asset) throw new Error('Select a registered vehicle that is accessible to your account.');
+    const project = await this.requireHireProject(input.project_id);
+    await this.validateHireSite(input.project_id, input.site_id, input.site_name);
+    if (!isValidVehicleHireDate(input.work_date)) throw new Error('Select a valid vehicle work date.');
+    if (!input.operator_name.trim()) throw new Error('Operator Name is required.');
+    if (!Number.isFinite(input.idle_minutes) || input.idle_minutes < 0 || !Number.isInteger(input.idle_minutes)) throw new Error('Idle time must be a non-negative whole number of minutes.');
+    if (input.idle_minutes > 0 && !input.idle_reason?.trim()) throw new Error('Provide a reason for recorded idle time.');
+    const filledInputs = input.sessions.filter(session => session.start_time || session.stop_time);
+    const calculatedSessions = calculateWorkingSessions(filledInputs.map(session => ({ startTime: session.start_time, stopTime: session.stop_time })));
+    const sessions = calculatedSessions.map((session, index) => ({
+      id: filledInputs[index].id,
+      start_time: session.startTime,
+      stop_time: session.stopTime,
+      duration_minutes: session.durationMinutes
+    }));
+    const all = this.readHireRecords<VehicleMovementRecord>(STORAGE_KEYS.VEHICLE_MOVEMENTS, 'vehicle movement');
+    const duplicate = all.find(record => record.idempotency_key === input.idempotency_key);
+    if (duplicate) return duplicate;
+    const now = new Date().toISOString();
+    const record: VehicleMovementRecord = {
+      ...input,
+      sessions,
+      id: input.id || `vhm-${generateUuid()}`,
+      company_id: project.company_id,
+      project_name: project.name,
+      total_working_minutes: sessions.reduce((sum, session) => sum + session.duration_minutes, 0),
+      scheduled_minutes: sessions.reduce((sum, session) => sum + session.duration_minutes, 0) + input.idle_minutes,
+      operator_name: input.operator_name.trim(),
+      site_name: input.site_name.trim(),
+      idle_reason: input.idle_reason?.trim() || undefined,
+      remarks: input.remarks?.trim() || undefined,
+      created_by: this.currentUser.id,
+      created_by_name: this.currentUser.full_name,
+      created_at: now,
+      updated_at: now
+    };
+    all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_MOVEMENTS, JSON.stringify(all));
+    this.recordAuditLog('record_vehicle_movement', 'vehicle_movements', record.id, {
+      asset_id: asset.id,
+      project_id: project.id,
+      work_date: record.work_date,
+      total_working_minutes: record.total_working_minutes,
+      idle_minutes: record.idle_minutes
+    });
+    return record;
+  }
+
+  public async deleteVehicleAsset(assetId: string): Promise<void> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to manage vehicle hire.');
+    const assets = this.readHireRecords<VehicleAssetRecord>(STORAGE_KEYS.VEHICLE_ASSETS, 'vehicle');
+    const asset = assets.find(item => item.id === assetId);
+    if (!asset) throw new Error('Vehicle record was not found.');
+    if (!this.canAccessHireProject(asset.project_id)) throw new Error('Access Denied: This vehicle is outside your assigned projects.');
+    const rentals = this.readHireRecords<VehicleRentalRecord>(STORAGE_KEYS.VEHICLE_RENTALS, 'vehicle hire');
+    const movements = this.readHireRecords<VehicleMovementRecord>(STORAGE_KEYS.VEHICLE_MOVEMENTS, 'vehicle movement');
+    const legacy = this.readHireRecords<VehicleHireRecord>(STORAGE_KEYS.VEHICLE_HIRE, 'vehicle work history');
+    if (rentals.some(record => record.asset_id === assetId)
+      || movements.some(record => record.asset_id === assetId)
+      || legacy.some(record => record.vehicle_identifier === asset.vehicle_equipment_id || record.vehicle_identifier === asset.registration_number)) {
+      throw new Error('This vehicle has hire or movement history and cannot be deleted. Change its condition to Maintenance instead.');
+    }
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_ASSETS, JSON.stringify(assets.filter(item => item.id !== assetId)));
+    this.recordAuditLog('delete_vehicle_asset', 'vehicle_assets', asset.id, { vehicle_equipment_id: asset.vehicle_equipment_id });
+  }
+
+  public async deleteVehicleRentalRecord(rentalId: string): Promise<void> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to manage vehicle hire.');
+    const all = this.readHireRecords<VehicleRentalRecord>(STORAGE_KEYS.VEHICLE_RENTALS, 'vehicle hire');
+    const record = all.find(item => item.id === rentalId);
+    if (!record) throw new Error('Hire period was not found.');
+    await this.requireHireProject(record.project_id);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_RENTALS, JSON.stringify(all.filter(item => item.id !== rentalId)));
+    this.recordAuditLog('delete_vehicle_rental', 'vehicle_rentals', rentalId, { asset_id: record.asset_id, project_id: record.project_id });
+  }
+
+  public async deleteVehicleMovementRecord(movementId: string): Promise<void> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to manage vehicle movements.');
+    const all = this.readHireRecords<VehicleMovementRecord>(STORAGE_KEYS.VEHICLE_MOVEMENTS, 'vehicle movement');
+    const record = all.find(item => item.id === movementId);
+    if (!record) throw new Error('Movement record was not found.');
+    await this.requireHireProject(record.project_id);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_MOVEMENTS, JSON.stringify(all.filter(item => item.id !== movementId)));
+    this.recordAuditLog('delete_vehicle_movement', 'vehicle_movements', movementId, { asset_id: record.asset_id, project_id: record.project_id });
+  }
+
+  private validHireDateTime(value: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return false;
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.getTime())
+      && `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}T${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}` === value;
+  }
+
+  public async getVehicleDealers(): Promise<VehicleDealerRecord[]> {
+    return this.readHireRecords<VehicleDealerRecord>(STORAGE_KEYS.VEHICLE_DEALERS, 'vehicle dealer')
+      .filter(record => record.company_id === this.currentUser.company_id)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  public async saveVehicleDealer(input: Omit<VehicleDealerRecord, 'id' | 'company_id' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at'> & { id?: string }): Promise<VehicleDealerRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to manage vehicle dealers.');
+    const dealerId = input.dealer_id.trim();
+    const name = input.name.trim();
+    const contact = input.contact_person.trim();
+    const phone = input.phone.trim();
+    const address = input.address.trim();
+    if (!dealerId || !name || !contact || !phone || !address) throw new Error('Dealer ID, name, contact person, phone, and address are required.');
+    if (input.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email.trim())) throw new Error('Enter a valid dealer email address.');
+    const all = this.readHireRecords<VehicleDealerRecord>(STORAGE_KEYS.VEHICLE_DEALERS, 'vehicle dealer');
+    const existing = input.id ? all.find(record => record.id === input.id && record.company_id === this.currentUser.company_id) : undefined;
+    if (input.id && !existing) throw new Error('Dealer was not found. Refresh and try again.');
+    if (all.some(record => record.company_id === this.currentUser.company_id && record.id !== existing?.id
+      && record.dealer_id.trim().toLocaleLowerCase() === dealerId.toLocaleLowerCase())) {
+      throw new Error('Dealer ID already exists.');
+    }
+    const now = new Date().toISOString();
+    const record: VehicleDealerRecord = {
+      ...input,
+      id: existing?.id || input.id || `vdl-${generateUuid()}`,
+      company_id: existing?.company_id || this.currentUser.company_id,
+      dealer_id: dealerId,
+      name,
+      contact_person: contact,
+      phone,
+      address,
+      email: input.email?.trim() || undefined,
+      payment_details: input.payment_details?.trim() || undefined,
+      remarks: input.remarks?.trim() || undefined,
+      status: existing?.status === 'archived' ? 'archived' : input.status,
+      created_by: existing?.created_by || this.currentUser.id,
+      created_by_name: existing?.created_by_name || this.currentUser.full_name,
+      created_at: existing?.created_at || now,
+      updated_at: now
+    };
+    const index = all.findIndex(item => item.id === record.id);
+    if (index >= 0) all[index] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALERS, JSON.stringify(all));
+    this.recordAuditLog(index >= 0 ? 'update_vehicle_dealer' : 'create_vehicle_dealer', 'vehicle_dealers', record.id, { dealer_id: dealerId });
+    return record;
+  }
+
+  public async archiveVehicleDealer(dealerId: string): Promise<void> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to archive vehicle dealers.');
+    const all = this.readHireRecords<VehicleDealerRecord>(STORAGE_KEYS.VEHICLE_DEALERS, 'vehicle dealer');
+    const dealer = all.find(record => record.id === dealerId && record.company_id === this.currentUser.company_id);
+    if (!dealer) throw new Error('Dealer was not found.');
+    const archived = { ...dealer, status: 'archived' as const, updated_at: new Date().toISOString() };
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALERS, JSON.stringify(all.map(record => record.id === dealer.id ? archived : record)));
+    this.recordAuditLog('archive_vehicle_dealer', 'vehicle_dealers', dealer.id, { dealer_id: dealer.dealer_id });
+  }
+
+  public async deleteVehicleDealerIfUnused(dealerId: string): Promise<void> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to delete vehicle dealers.');
+    const dealers = this.readHireRecords<VehicleDealerRecord>(STORAGE_KEYS.VEHICLE_DEALERS, 'vehicle dealer');
+    const dealer = dealers.find(record => record.id === dealerId && record.company_id === this.currentUser.company_id);
+    if (!dealer) throw new Error('Dealer was not found.');
+    const hires = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract')
+      .filter(record => record.company_id === this.currentUser.company_id && record.dealer_id === dealer.id);
+    const hireIds = new Set(hires.map(hire => hire.id));
+    const payments = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment')
+      .filter(record => record.company_id === this.currentUser.company_id && record.dealer_id === dealer.id);
+    const fuelEntries = this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel')
+      .filter(record => record.company_id === this.currentUser.company_id && record.dealer_id === dealer.id);
+    const advances = this.readHireRecords<VehicleDriverFuelAdvanceRecord>(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, 'driver fuel advance')
+      .filter(record => record.company_id === this.currentUser.company_id && record.hire_id && hireIds.has(record.hire_id));
+    if (hires.length || payments.length || fuelEntries.length || advances.length) {
+      throw new Error('This dealer has hire, payment, or fuel history. Archive the dealer to preserve its transaction links.');
+    }
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALERS, JSON.stringify(dealers.filter(record => record.id !== dealer.id)));
+    this.recordAuditLog('delete_vehicle_dealer', 'vehicle_dealers', dealer.id, { dealer_id: dealer.dealer_id, name: dealer.name });
+  }
+
+  public async getVehicleHireContracts(projectIds?: string[]): Promise<VehicleHireContractRecord[]> {
+    const projectFilter = projectIds ? new Set(projectIds) : null;
+    return this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract')
+      .filter(record => record.company_id === this.currentUser.company_id && this.canAccessHireProject(record.project_id)
+        && (!projectFilter || projectFilter.has(record.project_id)))
+      .sort((a, b) => b.start_at.localeCompare(a.start_at));
+  }
+
+  public async getVehicleHireReturns(projectIds?: string[]): Promise<VehicleHireReturnRecord[]> {
+    const projectFilter = projectIds ? new Set(projectIds) : null;
+    const hires = await this.getVehicleHireContracts(projectIds);
+    const hireIds = new Set(hires.map(hire => hire.id));
+    return this.readHireRecords<VehicleHireReturnRecord>(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, 'vehicle return')
+      .filter(record => record.company_id === this.currentUser.company_id && hireIds.has(record.hire_id));
+  }
+
+  public async getVehicleDealerPayments(projectIds?: string[]): Promise<VehicleDealerPaymentRecord[]> {
+    const projectFilter = projectIds ? new Set(projectIds) : null;
+    const hires = await this.getVehicleHireContracts(projectIds);
+    const hireIds = new Set(hires.map(hire => hire.id));
+    return this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment')
+      .filter(record => record.company_id === this.currentUser.company_id
+        && (record.hire_ids.length === 0
+          ? !projectFilter && this.currentUser.role !== 'site_supervisor'
+          : record.hire_ids.some(id => hireIds.has(id))));
+  }
+
+  public async getVehicleFuelEntries(projectIds?: string[]): Promise<VehicleFuelEntryRecord[]> {
+    const projectFilter = projectIds ? new Set(projectIds) : null;
+    return this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel')
+      .filter(record => record.company_id === this.currentUser.company_id && this.canAccessHireProject(record.project_id)
+        && (!projectFilter || projectFilter.has(record.project_id)))
+      .sort((a, b) => b.fuel_date.localeCompare(a.fuel_date));
+  }
+
+  public async getVehicleDriverFuelAdvances(projectIds?: string[]): Promise<VehicleDriverFuelAdvanceRecord[]> {
+    const projectFilter = projectIds ? new Set(projectIds) : null;
+    return this.readHireRecords<VehicleDriverFuelAdvanceRecord>(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, 'driver fuel advance')
+      .filter(record => record.company_id === this.currentUser.company_id && this.canAccessHireProject(record.project_id)
+        && (!projectFilter || projectFilter.has(record.project_id)))
+      .sort((a, b) => b.advance_date.localeCompare(a.advance_date));
+  }
+
+  public async recordVehicleDriverFuelAdvance(input: Omit<VehicleDriverFuelAdvanceRecord, 'id' | 'company_id' | 'project_name' | 'created_by' | 'created_by_name' | 'created_at'> & { id?: string }): Promise<VehicleDriverFuelAdvanceRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to record driver advances.');
+    const project = await this.requireHireProject(input.project_id);
+    await this.validateHireSite(input.project_id, input.site_id, input.site_name);
+    if (!input.driver_name.trim()) throw new Error('Driver name is required for a fuel advance.');
+    if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error('Driver advance must be greater than zero.');
+    if (!isValidVehicleHireDate(input.advance_date)) throw new Error('Enter a valid driver advance date.');
+    const existing = this.readHireRecords<VehicleDriverFuelAdvanceRecord>(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, 'driver fuel advance');
+    const duplicate = existing.find(record => record.company_id === this.currentUser.company_id && record.idempotency_key === input.idempotency_key);
+    if (duplicate) return duplicate;
+    if (input.hire_id) {
+      const hire = (await this.getVehicleHireContracts([project.id])).find(record => record.id === input.hire_id);
+      if (!hire || hire.project_id !== project.id || hire.driver_name?.trim().toLocaleLowerCase() !== input.driver_name.trim().toLocaleLowerCase()) {
+        throw new Error('Driver advance must match the selected hire and driver.');
+      }
+    }
+    const now = new Date().toISOString();
+    const record: VehicleDriverFuelAdvanceRecord = {
+      ...input,
+      id: input.id || `vfadv-${generateUuid()}`,
+      company_id: project.company_id,
+      project_name: project.name,
+      driver_name: input.driver_name.trim(),
+      transaction_reference: input.transaction_reference?.trim() || undefined,
+      employee_id: input.employee_id.trim(),
+      employee_name: input.employee_name.trim(),
+      created_by: this.currentUser.id,
+      created_by_name: this.currentUser.full_name,
+      created_at: now
+    };
+    existing.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, JSON.stringify(existing));
+    this.recordAuditLog('record_vehicle_driver_fuel_advance', 'vehicle_fuel_advances', record.id, { project_id: project.id, amount: record.amount });
+    return record;
+  }
+
+  public async saveVehicleHireContract(input: Omit<VehicleHireContractRecord, 'id' | 'company_id' | 'hire_reference' | 'project_name' | 'advance_payment_id' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at' | 'status'> & {
+    id?: string;
+    advance_payment_method?: VehicleDealerPaymentMethod;
+    advance_transaction_reference?: string;
+  }): Promise<VehicleHireContractRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to create vehicle hires.');
+    const project = await this.requireHireProject(input.project_id);
+    await this.validateHireSite(input.project_id, input.site_id, input.site_name);
+    const dealers = await this.getVehicleDealers();
+    const dealer = dealers.find(record => record.id === input.dealer_id && record.status === 'active');
+    if (!dealer) throw new Error('Select an active dealer.');
+    if (!input.vehicle_type.trim() || !input.vehicle_description.trim()) throw new Error('Vehicle type and description are required.');
+    if (!this.validHireDateTime(input.start_at) || !this.validHireDateTime(input.expected_return_at)) throw new Error('Enter valid local start and expected return date and times.');
+    if (input.expected_return_at <= input.start_at) throw new Error('Expected return must be after the hire start.');
+    if (!Number.isFinite(input.agreed_rate) || input.agreed_rate < 0) throw new Error('Agreed rate cannot be negative or invalid.');
+    if (input.billing_method === 'fixed_contract' && input.agreed_rate <= 0) throw new Error('Enter the fixed contract amount.');
+    if (!Number.isFinite(input.advance_amount) || input.advance_amount < 0) throw new Error('Advance payment cannot be negative or invalid.');
+    for (const reading of [input.initial_meter_reading, input.initial_engine_hours]) {
+      if (reading !== undefined && (!Number.isFinite(reading) || reading < 0)) throw new Error('Meter and engine-hour readings must be non-negative.');
+    }
+    if (input.asset_id) {
+      const assets = await this.getVehicleAssets();
+      if (!assets.some(asset => asset.id === input.asset_id)) throw new Error('Select a registered vehicle that is accessible to your account.');
+    }
+    const all = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract');
+    const previous = input.id ? all.find(record => record.id === input.id && record.company_id === this.currentUser.company_id) : undefined;
+    if (input.id && !previous) throw new Error('Hire record was not found. Refresh and try again.');
+    const returns = this.readHireRecords<VehicleHireReturnRecord>(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, 'vehicle return');
+    if (previous && returns.some(record => record.hire_id === previous.id)) throw new Error('A returned hire cannot be edited. Correct it through the return audit workflow.');
+    const registration = input.registration_number?.trim().toLocaleLowerCase();
+    if (all.some(record => record.company_id === this.currentUser.company_id && record.id !== previous?.id
+      && record.status === 'active'
+      && ((input.asset_id && record.asset_id === input.asset_id)
+        || (registration && record.registration_number?.trim().toLocaleLowerCase() === registration))
+      && input.start_at < (returns.find(returnRecord => returnRecord.hire_id === record.id)?.actual_return_at || record.expected_return_at)
+      && record.start_at < input.expected_return_at)) {
+      throw new Error('This vehicle has an overlapping active hire period.');
+    }
+    const now = new Date().toISOString();
+    const id = previous?.id || input.id || `vhc-${generateUuid()}`;
+    const hire: VehicleHireContractRecord = {
+      ...input,
+      id,
+      company_id: project.company_id,
+      hire_reference: previous?.hire_reference || `VH-${input.start_at.slice(0, 10).replaceAll('-', '')}-${generateUuid().slice(0, 6).toUpperCase()}`,
+      project_name: project.name,
+      dealer_id: dealer.id,
+      vehicle_type: input.vehicle_type.trim(),
+      registration_number: input.registration_number?.trim() || undefined,
+      vehicle_description: input.vehicle_description.trim(),
+      driver_name: input.driver_name?.trim() || undefined,
+      driver_phone: input.driver_phone?.trim() || undefined,
+      site_name: input.site_name.trim(),
+      remarks: input.remarks?.trim() || undefined,
+      status: previous?.status || 'active',
+      advance_amount: previous?.advance_amount ?? input.advance_amount,
+      created_by: previous?.created_by || this.currentUser.id,
+      created_by_name: previous?.created_by_name || this.currentUser.full_name,
+      created_at: previous?.created_at || now,
+      updated_at: now
+    };
+    const index = all.findIndex(record => record.id === hire.id);
+    if (index >= 0) all[index] = hire; else all.push(hire);
+
+    const paymentRows = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment');
+    let advancePaymentId = previous?.advance_payment_id;
+    if (!previous && hire.advance_amount > 0) {
+      const payment: VehicleDealerPaymentRecord = {
+        id: `vdp-${generateUuid()}`,
+        company_id: project.company_id,
+        dealer_id: dealer.id,
+        hire_ids: [hire.id],
+        payment_date: input.start_at.slice(0, 10),
+        amount: hire.advance_amount,
+        payment_type: 'advance',
+        method: input.advance_payment_method || 'other',
+        transaction_reference: input.advance_transaction_reference?.trim() || undefined,
+        idempotency_key: `hire-advance-${hire.id}`,
+        created_by: this.currentUser.id,
+        created_by_name: this.currentUser.full_name,
+        created_at: now
+      };
+      paymentRows.push(payment);
+      advancePaymentId = payment.id;
+    }
+    const savedHire = { ...hire, advance_payment_id: advancePaymentId };
+    all[index >= 0 ? index : all.length - 1] = savedHire;
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, JSON.stringify(all));
+    if (paymentRows.length !== this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment').length) {
+      localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, JSON.stringify(paymentRows));
+    }
+    this.recordAuditLog(previous ? 'update_vehicle_hire_contract' : 'create_vehicle_hire_contract', 'vehicle_hire_contracts', savedHire.id, { hire_reference: savedHire.hire_reference, dealer_id: dealer.id, project_id: project.id });
+    return savedHire;
+  }
+
+  public async cancelVehicleHireContract(hireId: string): Promise<void> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to cancel vehicle hires.');
+    const all = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract');
+    const hire = all.find(record => record.id === hireId && record.company_id === this.currentUser.company_id);
+    if (!hire) throw new Error('Hire record was not found.');
+    await this.requireHireProject(hire.project_id);
+    if (this.readHireRecords<VehicleHireReturnRecord>(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, 'vehicle return').some(record => record.hire_id === hire.id)) throw new Error('A returned hire cannot be cancelled.');
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, JSON.stringify(all.map(record => record.id === hire.id ? { ...record, status: 'cancelled' as const, updated_at: new Date().toISOString() } : record)));
+    this.recordAuditLog('cancel_vehicle_hire_contract', 'vehicle_hire_contracts', hire.id, { hire_reference: hire.hire_reference });
+  }
+
+  public async deleteVehicleHireContractIfUnused(hireId: string): Promise<void> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to delete vehicle hires.');
+    const hires = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract');
+    const hire = hires.find(record => record.id === hireId && record.company_id === this.currentUser.company_id);
+    if (!hire) throw new Error('Hire record was not found.');
+    await this.requireHireProject(hire.project_id);
+    const hasReturn = this.readHireRecords<VehicleHireReturnRecord>(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, 'vehicle return')
+      .some(record => record.company_id === this.currentUser.company_id && record.hire_id === hire.id);
+    const hasPayment = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment')
+      .some(record => record.company_id === this.currentUser.company_id && record.hire_ids.includes(hire.id));
+    const hasFuel = this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel')
+      .some(record => record.company_id === this.currentUser.company_id && record.hire_id === hire.id);
+    const hasAdvance = this.readHireRecords<VehicleDriverFuelAdvanceRecord>(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, 'driver fuel advance')
+      .some(record => record.company_id === this.currentUser.company_id && record.hire_id === hire.id);
+    if (hasReturn || hasPayment || hasFuel || hasAdvance) {
+      throw new Error('This hire has return, payment, or fuel dependencies. Cancel the hire instead; linked financial records must remain in the audit trail.');
+    }
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, JSON.stringify(hires.filter(record => record.id !== hire.id)));
+    this.recordAuditLog('delete_vehicle_hire_contract', 'vehicle_hire_contracts', hire.id, { hire_reference: hire.hire_reference, project_id: hire.project_id });
+  }
+
+  public async finalizeVehicleHireReturn(input: Omit<VehicleHireReturnRecord, 'id' | 'company_id' | 'final_bill' | 'revision_history' | 'finalized_by' | 'finalized_by_name' | 'created_at' | 'updated_at'> & { id?: string; correction_reason?: string }): Promise<VehicleHireReturnRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to finalize vehicle returns.');
+    const hires = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract');
+    const hire = hires.find(record => record.id === input.hire_id && record.company_id === this.currentUser.company_id);
+    if (!hire) throw new Error('Hire record was not found.');
+    await this.requireHireProject(hire.project_id);
+    if (!this.validHireDateTime(input.actual_return_at) || input.actual_return_at < hire.start_at) throw new Error('Enter a valid actual return date and time after the hire started.');
+    for (const reading of [input.final_meter_reading, input.final_engine_hours]) {
+      if (reading !== undefined && (!Number.isFinite(reading) || reading < 0)) throw new Error('Final readings must be non-negative.');
+    }
+    if (input.final_meter_reading !== undefined && hire.initial_meter_reading !== undefined && input.final_meter_reading < hire.initial_meter_reading) throw new Error('Final meter reading cannot be below the initial reading.');
+    if (input.final_engine_hours !== undefined && hire.initial_engine_hours !== undefined && input.final_engine_hours < hire.initial_engine_hours) throw new Error('Final engine hours cannot be below the initial reading.');
+    const bill = calculateFinalVehicleHireBill({ billingMethod: hire.billing_method, agreedRate: hire.agreed_rate, billableUsage: input.billable_usage, additionalCharges: input.additional_charges, discount: input.discount });
+    const all = this.readHireRecords<VehicleHireReturnRecord>(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, 'vehicle return');
+    const previous = all.find(record => record.hire_id === hire.id);
+    if (previous && !input.correction_reason?.trim()) throw new Error('A correction reason is required to change a finalized return.');
+    const now = new Date().toISOString();
+    const priorValues = previous ? {
+      actual_return_at: previous.actual_return_at,
+      final_meter_reading: previous.final_meter_reading,
+      final_engine_hours: previous.final_engine_hours,
+      billable_usage: previous.billable_usage,
+      return_condition: previous.return_condition,
+      additional_charges: previous.additional_charges,
+      discount: previous.discount,
+      final_bill: previous.final_bill,
+      remarks: previous.remarks
+    } : undefined;
+    const revisionHistory = previous && priorValues ? [...previous.revision_history, {
+      id: `vhrrev-${generateUuid()}`,
+      changed_by: this.currentUser.id,
+      changed_by_name: this.currentUser.full_name,
+      changed_at: now,
+      reason: input.correction_reason!.trim(),
+      previous_values: priorValues
+    }] : [];
+    const record: VehicleHireReturnRecord = {
+      ...input,
+      id: previous?.id || input.id || `vhr-${generateUuid()}`,
+      company_id: hire.company_id,
+      final_bill: bill,
+      revision_history: revisionHistory,
+      finalized_by: this.currentUser.id,
+      finalized_by_name: this.currentUser.full_name,
+      created_at: previous?.created_at || now,
+      updated_at: now
+    };
+    const index = all.findIndex(item => item.hire_id === hire.id);
+    if (index >= 0) all[index] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE_RETURNS, JSON.stringify(all));
+    this.recordAuditLog(previous ? 'correct_vehicle_hire_return' : 'finalize_vehicle_hire_return', 'vehicle_hire_returns', record.id, { hire_reference: hire.hire_reference, final_bill: bill, revision_reason: input.correction_reason });
+    return record;
+  }
+
+  private syncHireAdvanceBalances(hireIds: string[]): void {
+    const uniqueIds = new Set(hireIds);
+    if (!uniqueIds.size) return;
+    const payments = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment');
+    const hires = this.readHireRecords<VehicleHireContractRecord>(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, 'vehicle hire contract');
+    const updated = hires.map(hire => {
+      if (hire.company_id !== this.currentUser.company_id || !uniqueIds.has(hire.id)) return hire;
+      const advanceAmount = payments.reduce((sum, payment) => {
+        if (payment.company_id !== this.currentUser.company_id) return sum;
+        if (payment.payment_type === 'advance' && payment.hire_ids.includes(hire.id)) return sum + payment.amount;
+        if (payment.payment_type !== 'reversal' || !payment.reverses_payment_id) return sum;
+        const original = payments.find(row => row.id === payment.reverses_payment_id);
+        return original?.payment_type === 'advance' && original.hire_ids.includes(hire.id) ? sum - payment.amount : sum;
+      }, 0);
+      return { ...hire, advance_amount: Math.max(0, Math.round((advanceAmount + Number.EPSILON) * 100) / 100), updated_at: new Date().toISOString() };
+    });
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE_CONTRACTS, JSON.stringify(updated));
+  }
+
+  public async recordVehicleDealerPayment(input: Omit<VehicleDealerPaymentRecord, 'id' | 'company_id' | 'created_by' | 'created_by_name' | 'created_at' | 'revision_history' | 'reverses_payment_id' | 'reversal_reason'> & {
+    id?: string;
+    correction_reason?: string;
+  }): Promise<VehicleDealerPaymentRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to record dealer payments.');
+    if (input.payment_type === 'reversal') throw new Error('Use the payment reversal workflow instead of recording a reversal as a new payment.');
+    const all = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment');
+    const previous = input.id ? all.find(record => record.id === input.id && record.company_id === this.currentUser.company_id) : undefined;
+    if (input.id && !previous) throw new Error('Payment record was not found.');
+    if (previous?.payment_type === 'reversal') throw new Error('A reversal is immutable. Record a new payment or request an authorized correction.');
+    if (previous && !['admin', 'project_manager'].includes(this.currentUser.role)) throw new Error('Only a Company Administrator or Project Manager can edit a payment.');
+    if (previous && all.some(record => record.payment_type === 'reversal' && record.reverses_payment_id === previous.id)) {
+      throw new Error('This payment has already been reversed and cannot be edited.');
+    }
+    if (previous && !input.correction_reason?.trim()) throw new Error('Enter a correction reason before editing this payment.');
+    if (previous?.payment_type === 'advance' && input.payment_type !== 'advance') throw new Error('An advance must remain classified as an advance; reverse it and record the corrected payment instead.');
+    if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error('Payment amount must be greater than zero.');
+    if (!isValidVehicleHireDate(input.payment_date)) throw new Error('Enter a valid payment date.');
+    if (this.currentUser.role === 'site_supervisor' && input.hire_ids.length === 0) throw new Error('Site Supervisors must link a dealer payment to an assigned hire record.');
+    const dealers = await this.getVehicleDealers();
+    if (!dealers.some(dealer => dealer.id === input.dealer_id)) throw new Error('Dealer was not found.');
+    const hires = await this.getVehicleHireContracts();
+    const related = input.hire_ids.map(id => hires.find(hire => hire.id === id));
+    if (related.some(hire => !hire || hire.dealer_id !== input.dealer_id)) throw new Error('Payments can only be linked to hires for the selected dealer.');
+    if (previous?.payment_type === 'advance' && previous.hire_ids.join('|') !== [...new Set(input.hire_ids)].join('|')) {
+      throw new Error('An advance payment cannot be reassigned to a different hire. Reverse it and record a new advance instead.');
+    }
+    const duplicateKey = all.find(record => record.company_id === this.currentUser.company_id
+      && record.idempotency_key === input.idempotency_key && record.id !== previous?.id);
+    if (duplicateKey) return duplicateKey;
+    const reference = input.transaction_reference?.trim().toLocaleLowerCase();
+    if (reference && all.some(record => record.company_id === this.currentUser.company_id && record.id !== previous?.id
+      && record.dealer_id === input.dealer_id && record.transaction_reference?.trim().toLocaleLowerCase() === reference)) {
+      throw new Error('That transaction reference has already been recorded for this dealer.');
+    }
+    const now = new Date().toISOString();
+    const previousValues = previous ? {
+      dealer_id: previous.dealer_id,
+      hire_ids: [...previous.hire_ids],
+      payment_date: previous.payment_date,
+      amount: previous.amount,
+      payment_type: previous.payment_type,
+      method: previous.method,
+      transaction_reference: previous.transaction_reference,
+      remarks: previous.remarks
+    } : undefined;
+    const revisionHistory = previous && previousValues ? [...(previous.revision_history || []), {
+      id: `vdprev-${generateUuid()}`,
+      changed_by: this.currentUser.id,
+      changed_by_name: this.currentUser.full_name,
+      changed_at: now,
+      reason: input.correction_reason!.trim(),
+      previous_values: previousValues
+    }] : [];
+    const record: VehicleDealerPaymentRecord = {
+      ...input,
+      id: previous?.id || input.id || `vdp-${generateUuid()}`,
+      company_id: previous?.company_id || this.currentUser.company_id,
+      hire_ids: previous?.payment_type === 'advance' ? [...previous.hire_ids] : [...new Set(input.hire_ids)],
+      transaction_reference: input.transaction_reference?.trim() || undefined,
+      remarks: input.remarks?.trim() || undefined,
+      idempotency_key: previous?.idempotency_key || input.idempotency_key,
+      revision_history: revisionHistory,
+      created_by: previous?.created_by || this.currentUser.id,
+      created_by_name: previous?.created_by_name || this.currentUser.full_name,
+      created_at: previous?.created_at || now
+    };
+    const index = all.findIndex(item => item.id === record.id);
+    if (index >= 0) all[index] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, JSON.stringify(all));
+    const advanceRelated = previous?.payment_type === 'advance' || record.payment_type === 'advance'
+      ? [...(previous?.hire_ids || []), ...record.hire_ids]
+      : [];
+    this.syncHireAdvanceBalances(advanceRelated);
+    this.recordAuditLog(previous ? 'correct_vehicle_dealer_payment' : 'record_vehicle_dealer_payment', 'vehicle_dealer_payments', record.id, {
+      dealer_id: record.dealer_id, amount: record.amount, payment_type: record.payment_type,
+      correction_reason: input.correction_reason
+    });
+    return record;
+  }
+
+  public async reverseVehicleDealerPayment(paymentId: string, reason: string): Promise<VehicleDealerPaymentRecord> {
+    if (!['admin', 'project_manager'].includes(this.currentUser.role)) throw new Error('Only a Company Administrator or Project Manager can reverse dealer payments.');
+    const all = this.readHireRecords<VehicleDealerPaymentRecord>(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, 'dealer payment');
+    const original = all.find(record => record.id === paymentId && record.company_id === this.currentUser.company_id);
+    if (!original) throw new Error('Payment record was not found.');
+    if (original.payment_type === 'reversal') throw new Error('A reversal cannot be reversed. Correct the original payment through the audit workflow.');
+    if (all.some(record => record.payment_type === 'reversal' && record.reverses_payment_id === original.id)) throw new Error('This payment has already been reversed.');
+    const cleanReason = reason.trim();
+    if (!cleanReason) throw new Error('A reversal reason is required.');
+    const now = new Date().toISOString();
+    const reversal: VehicleDealerPaymentRecord = {
+      id: `vdrev-${generateUuid()}`,
+      company_id: original.company_id,
+      dealer_id: original.dealer_id,
+      hire_ids: [...original.hire_ids],
+      payment_date: getLocalDateString(),
+      amount: original.amount,
+      payment_type: 'reversal',
+      method: 'other',
+      transaction_reference: `REV-${original.transaction_reference || original.id}`,
+      remarks: cleanReason,
+      idempotency_key: `reversal-${original.id}`,
+      reverses_payment_id: original.id,
+      reversal_reason: cleanReason,
+      revision_history: [],
+      created_by: this.currentUser.id,
+      created_by_name: this.currentUser.full_name,
+      created_at: now
+    };
+    all.push(reversal);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_DEALER_PAYMENTS, JSON.stringify(all));
+    if (original.payment_type === 'advance') this.syncHireAdvanceBalances(original.hire_ids);
+    this.recordAuditLog('reverse_vehicle_dealer_payment', 'vehicle_dealer_payments', reversal.id, {
+      original_payment_id: original.id, amount: original.amount, reason: cleanReason
+    });
+    return reversal;
+  }
+
+  public async recordVehicleFuelEntry(input: Omit<VehicleFuelEntryRecord, 'id' | 'company_id' | 'project_name' | 'total_amount' | 'reimbursement_confirmed_by' | 'reimbursement_confirmed_by_name' | 'reimbursement_confirmed_at' | 'created_by' | 'created_by_name' | 'created_at' | 'revision_history' | 'status' | 'void_reason' | 'voided_by' | 'voided_by_name' | 'voided_at'> & {
+    id?: string;
+    confirm_dealer_reimbursement?: boolean;
+    correction_reason?: string;
+  }): Promise<VehicleFuelEntryRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to record fuel.');
+    const project = await this.requireHireProject(input.project_id);
+    await this.validateHireSite(input.project_id, input.site_id, input.site_name);
+    const amount = calculateVehicleFuelAmount(input.quantity_litres, input.price_per_litre);
+    if (!isValidVehicleHireDate(input.fuel_date)) throw new Error('Enter a valid fuel date.');
+    if (!input.supplier.trim() || !input.employee_name.trim()) throw new Error('Supplier and recording employee are required.');
+    if (input.meter_reading !== undefined && (!Number.isFinite(input.meter_reading) || input.meter_reading < 0)) throw new Error('Meter reading must be non-negative.');
+    if (input.payer === 'driver_advance' && !input.driver_advance_id) throw new Error('Select an existing driver fuel advance to reconcile this fuel purchase.');
+    if (input.payer !== 'driver_advance' && (input.driver_advance_id || input.driver_advance_amount !== 0)) throw new Error('A driver advance can only be linked to fuel bought with that advance.');
+    let dealer = undefined as VehicleDealerRecord | undefined;
+    if (input.dealer_id) dealer = (await this.getVehicleDealers()).find(record => record.id === input.dealer_id);
+    if (input.dealer_id && !dealer) throw new Error('Dealer was not found.');
+    if (input.payer === 'dealer_paid' && !dealer) throw new Error('Select the dealer that paid for this fuel.');
+    if (input.hire_id) {
+      const hire = (await this.getVehicleHireContracts([project.id])).find(record => record.id === input.hire_id);
+      if (!hire || hire.project_id !== project.id || hire.dealer_id !== input.dealer_id) throw new Error('Fuel entry does not match the selected hire, dealer, and project.');
+    }
+    const confirmReimbursement = input.payer === 'dealer_paid' && Boolean(input.confirm_dealer_reimbursement);
+    if (confirmReimbursement && !['admin', 'project_manager'].includes(this.currentUser.role)) throw new Error('Only a Company Administrator or Project Manager can confirm dealer fuel reimbursement.');
+    if (!input.idempotency_key?.trim()) throw new Error('Fuel entry submission reference is missing. Refresh the form and try again.');
+    const all = this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel');
+    const duplicate = input.id ? all.find(entry => entry.id === input.id && entry.company_id === this.currentUser.company_id) : undefined;
+    if (input.id && !duplicate) throw new Error('Fuel entry was not found.');
+    if (duplicate?.status === 'voided') throw new Error('A voided fuel entry is immutable. Record a new corrected fuel entry instead.');
+    if (duplicate && !input.correction_reason?.trim()) throw new Error('Enter a correction reason before editing this fuel entry.');
+    if (duplicate && (duplicate.driver_advance_id || (duplicate.payer === 'dealer_paid' && duplicate.reimbursement_confirmed))
+      && !['admin', 'project_manager'].includes(this.currentUser.role)) {
+      throw new Error('Only a Company Administrator or Project Manager can edit fuel linked to an advance or dealer settlement.');
+    }
+    const repeatedSubmission = all.find(entry => entry.company_id === this.currentUser.company_id
+      && entry.idempotency_key === input.idempotency_key && entry.id !== duplicate?.id);
+    if (repeatedSubmission) return repeatedSubmission;
+    if (input.payer === 'driver_advance' && input.driver_advance_id) {
+      const advances = this.readHireRecords<VehicleDriverFuelAdvanceRecord>(STORAGE_KEYS.VEHICLE_FUEL_ADVANCES, 'driver fuel advance');
+      const advance = advances.find(record => record.id === input.driver_advance_id && record.company_id === this.currentUser.company_id);
+      if (!advance || advance.project_id !== project.id || (advance.hire_id && advance.hire_id !== input.hire_id)) {
+        throw new Error('The selected fuel advance does not match this project or hire.');
+      }
+      const alreadyReconciled = all.filter(entry => entry.company_id === this.currentUser.company_id
+        && entry.status !== 'voided' && entry.driver_advance_id === advance.id && entry.id !== duplicate?.id)
+        .reduce((sum, entry) => sum + entry.total_amount, 0);
+      if (alreadyReconciled + amount > advance.amount + 0.005) throw new Error('Fuel expenses exceed the unreconciled driver advance. Record another advance or correct the expense amount.');
+    }
+    const now = new Date().toISOString();
+    const previousValues = duplicate ? {
+      project_id: duplicate.project_id,
+      site_id: duplicate.site_id,
+      site_name: duplicate.site_name,
+      fuel_date: duplicate.fuel_date,
+      fuel_type: duplicate.fuel_type,
+      quantity_litres: duplicate.quantity_litres,
+      price_per_litre: duplicate.price_per_litre,
+      total_amount: duplicate.total_amount,
+      meter_reading: duplicate.meter_reading,
+      supplier: duplicate.supplier,
+      payer: duplicate.payer,
+      driver_advance_id: duplicate.driver_advance_id,
+      reimbursement_confirmed: duplicate.reimbursement_confirmed,
+      notes: duplicate.notes
+    } : undefined;
+    const revisionHistory = duplicate && previousValues ? [...(duplicate.revision_history || []), {
+      id: `vfe-rev-${generateUuid()}`,
+      changed_by: this.currentUser.id,
+      changed_by_name: this.currentUser.full_name,
+      changed_at: now,
+      reason: input.correction_reason!.trim(),
+      previous_values: previousValues
+    }] : [];
+    const record: VehicleFuelEntryRecord = {
+      ...input,
+      id: duplicate?.id || input.id || `vfe-${generateUuid()}`,
+      company_id: project.company_id,
+      idempotency_key: duplicate?.idempotency_key || input.idempotency_key,
+      project_name: project.name,
+      total_amount: amount,
+      driver_advance_id: input.payer === 'driver_advance' ? input.driver_advance_id : undefined,
+      reimbursement_confirmed: confirmReimbursement,
+      reimbursement_confirmed_by: confirmReimbursement ? this.currentUser.id : undefined,
+      reimbursement_confirmed_by_name: confirmReimbursement ? this.currentUser.full_name : undefined,
+      reimbursement_confirmed_at: confirmReimbursement ? now : undefined,
+      status: duplicate?.status || 'active',
+      revision_history: revisionHistory,
+      supplier: input.supplier.trim(),
+      employee_id: input.employee_id.trim(),
+      employee_name: input.employee_name.trim(),
+      notes: input.notes?.trim() || undefined,
+      created_by: duplicate?.created_by || this.currentUser.id,
+      created_by_name: duplicate?.created_by_name || this.currentUser.full_name,
+      created_at: duplicate?.created_at || now
+    };
+    const index = all.findIndex(entry => entry.id === record.id);
+    if (index >= 0) all[index] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, JSON.stringify(all));
+    this.recordAuditLog(duplicate ? 'correct_vehicle_fuel_entry' : 'record_vehicle_fuel_entry', 'vehicle_fuel_entries', record.id, {
+      project_id: project.id, amount, payer: input.payer,
+      reimbursement_confirmed: confirmReimbursement, correction_reason: input.correction_reason
+    });
+    return record;
+  }
+
+  public async confirmVehicleFuelReimbursement(entryId: string, reason: string): Promise<VehicleFuelEntryRecord> {
+    if (!['admin', 'project_manager'].includes(this.currentUser.role)) throw new Error('Only a Company Administrator or Project Manager can confirm dealer fuel reimbursement.');
+    const cleanReason = reason.trim();
+    if (!cleanReason) throw new Error('A confirmation reason is required.');
+    const all = this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel');
+    const entry = all.find(record => record.id === entryId && record.company_id === this.currentUser.company_id);
+    if (!entry || entry.status === 'voided') throw new Error('Active fuel entry was not found.');
+    if (entry.payer !== 'dealer_paid') throw new Error('Only dealer-paid fuel can be applied to the dealer payable.');
+    if (entry.reimbursement_confirmed) throw new Error('This dealer reimbursement has already been confirmed.');
+    const now = new Date().toISOString();
+    const previousValues = {
+      project_id: entry.project_id,
+      site_id: entry.site_id,
+      site_name: entry.site_name,
+      fuel_date: entry.fuel_date,
+      fuel_type: entry.fuel_type,
+      quantity_litres: entry.quantity_litres,
+      price_per_litre: entry.price_per_litre,
+      total_amount: entry.total_amount,
+      meter_reading: entry.meter_reading,
+      supplier: entry.supplier,
+      payer: entry.payer,
+      driver_advance_id: entry.driver_advance_id,
+      reimbursement_confirmed: entry.reimbursement_confirmed,
+      notes: entry.notes
+    };
+    const updated: VehicleFuelEntryRecord = {
+      ...entry,
+      reimbursement_confirmed: true,
+      reimbursement_confirmed_by: this.currentUser.id,
+      reimbursement_confirmed_by_name: this.currentUser.full_name,
+      reimbursement_confirmed_at: now,
+      revision_history: [...(entry.revision_history || []), {
+        id: `vfe-rev-${generateUuid()}`,
+        changed_by: this.currentUser.id,
+        changed_by_name: this.currentUser.full_name,
+        changed_at: now,
+        reason: cleanReason,
+        previous_values: previousValues
+      }]
+    };
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, JSON.stringify(all.map(record => record.id === entry.id ? updated : record)));
+    this.recordAuditLog('confirm_vehicle_fuel_reimbursement', 'vehicle_fuel_entries', entry.id, { amount: entry.total_amount, reason: cleanReason });
+    return updated;
+  }
+
+  public async voidVehicleFuelEntry(entryId: string, reason: string): Promise<void> {
+    if (!['admin', 'project_manager'].includes(this.currentUser.role)) throw new Error('Only a Company Administrator or Project Manager can void fuel expenses.');
+    const cleanReason = reason.trim();
+    if (!cleanReason) throw new Error('A void reason is required.');
+    const all = this.readHireRecords<VehicleFuelEntryRecord>(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, 'vehicle fuel');
+    const entry = all.find(record => record.id === entryId && record.company_id === this.currentUser.company_id);
+    if (!entry || entry.status === 'voided') throw new Error('Active fuel entry was not found.');
+    if (entry.payer !== 'company_direct' || entry.driver_advance_id || entry.reimbursement_confirmed) {
+      throw new Error('This fuel entry is linked to a driver advance or dealer settlement. Correct it through the authorized fuel correction workflow instead of voiding it.');
+    }
+    await this.requireHireProject(entry.project_id);
+    const now = new Date().toISOString();
+    const voided: VehicleFuelEntryRecord = {
+      ...entry,
+      status: 'voided',
+      void_reason: cleanReason,
+      voided_by: this.currentUser.id,
+      voided_by_name: this.currentUser.full_name,
+      voided_at: now
+    };
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_FUEL_ENTRIES, JSON.stringify(all.map(record => record.id === entry.id ? voided : record)));
+    this.recordAuditLog('void_vehicle_fuel_entry', 'vehicle_fuel_entries', entry.id, { amount: entry.total_amount, reason: cleanReason });
+  }
+
+  public async getVehicleHireRecords(projectId: string): Promise<VehicleHireRecord[]> {
+    const stored = localStorage.getItem(STORAGE_KEYS.VEHICLE_HIRE);
+    return (stored ? JSON.parse(stored) : [])
+      .filter((record: VehicleHireRecord) => record.company_id === this.currentUser.company_id
+        && record.project_id === projectId
+        && this.canAccessHireProject(record.project_id))
+      .sort((a: VehicleHireRecord, b: VehicleHireRecord) => b.hire_date.localeCompare(a.hire_date) || b.created_at.localeCompare(a.created_at));
+  }
+
+  public async saveVehicleHireRecord(input: Omit<VehicleHireRecord, 'id' | 'company_id' | 'project_name' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at'> & { id?: string }): Promise<VehicleHireRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to manage vehicle hire.');
+    const project = await this.getProjectById(input.project_id);
+    if (!project) throw new Error('Project not found.');
+    const stored = localStorage.getItem(STORAGE_KEYS.VEHICLE_HIRE);
+    const all: VehicleHireRecord[] = stored ? JSON.parse(stored) : [];
+    const now = new Date().toISOString();
+    const existingIndex = input.id ? all.findIndex(record => record.id === input.id) : -1;
+    const record: VehicleHireRecord = {
+      ...input,
+      id: existingIndex >= 0 ? all[existingIndex].id : `vh-${generateUuid()}`,
+      company_id: existingIndex >= 0 ? all[existingIndex].company_id : project.company_id,
+      project_name: project.name,
+      created_by: existingIndex >= 0 ? all[existingIndex].created_by : this.currentUser.id,
+      created_by_name: existingIndex >= 0 ? all[existingIndex].created_by_name : this.currentUser.full_name,
+      created_at: existingIndex >= 0 ? all[existingIndex].created_at : now,
+      updated_at: now
+    };
+    if (existingIndex >= 0) all[existingIndex] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.VEHICLE_HIRE, JSON.stringify(all));
+    this.recordAuditLog(existingIndex >= 0 ? 'update_vehicle_hire' : 'create_vehicle_hire', 'vehicle_hire', record.id, { project_id: record.project_id });
+    return record;
+  }
+
+  public async getMachineryHireRecords(projectId: string): Promise<MachineryHireRecord[]> {
+    const stored = localStorage.getItem(STORAGE_KEYS.MACHINERY_HIRE);
+    return (stored ? JSON.parse(stored) : [])
+      .filter((record: MachineryHireRecord) => record.project_id === projectId)
+      .sort((a: MachineryHireRecord, b: MachineryHireRecord) => b.received_date.localeCompare(a.received_date) || b.created_at.localeCompare(a.created_at));
+  }
+
+  public async saveMachineryHireRecord(input: Omit<MachineryHireRecord, 'id' | 'company_id' | 'project_name' | 'created_by' | 'created_by_name' | 'created_at' | 'updated_at'> & { id?: string }): Promise<MachineryHireRecord> {
+    if (!this.canManageHire()) throw new Error('Access Denied: You do not have permission to manage machinery hire.');
+    const project = await this.getProjectById(input.project_id);
+    if (!project) throw new Error('Project not found.');
+    const stored = localStorage.getItem(STORAGE_KEYS.MACHINERY_HIRE);
+    const all: MachineryHireRecord[] = stored ? JSON.parse(stored) : [];
+    const now = new Date().toISOString();
+    const existingIndex = input.id ? all.findIndex(record => record.id === input.id) : -1;
+    const record: MachineryHireRecord = {
+      ...input,
+      id: existingIndex >= 0 ? all[existingIndex].id : `mh-${generateUuid()}`,
+      company_id: existingIndex >= 0 ? all[existingIndex].company_id : project.company_id,
+      project_name: project.name,
+      created_by: existingIndex >= 0 ? all[existingIndex].created_by : this.currentUser.id,
+      created_by_name: existingIndex >= 0 ? all[existingIndex].created_by_name : this.currentUser.full_name,
+      created_at: existingIndex >= 0 ? all[existingIndex].created_at : now,
+      updated_at: now
+    };
+    if (existingIndex >= 0) all[existingIndex] = record; else all.push(record);
+    localStorage.setItem(STORAGE_KEYS.MACHINERY_HIRE, JSON.stringify(all));
+    this.recordAuditLog(existingIndex >= 0 ? 'update_machinery_hire' : 'create_machinery_hire', 'machinery_hire', record.id, { project_id: record.project_id });
+    return record;
   }
 
   // ==========================================

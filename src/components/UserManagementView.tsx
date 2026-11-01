@@ -21,18 +21,23 @@ import {
   UserCheck,
   Check,
   ShieldAlert,
-  Calendar
+  Calendar,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { AuthAccount, UserRole, Project, Employee } from '../types';
 import { authService, ROLE_TITLES } from '../services/authService';
 import { attendanceService } from '../services/attendanceService';
 import { dataService } from '../services/dataService';
+import { useCompanyBranding } from '../contexts/CompanyBrandingContext';
+import { CompanyLogo } from './CompanyLogo';
 
 interface UserManagementViewProps {
   onNavigateHome: () => void;
 }
 
 export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNavigateHome }) => {
+  const { companyName, companyLogoUrl } = useCompanyBranding();
   const [accounts, setAccounts] = useState<AuthAccount[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -45,7 +50,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AuthAccount | null>(null);
   const [resettingPasswordAccount, setResettingPasswordAccount] = useState<AuthAccount | null>(null);
-  const [adminNewPassword, setAdminNewPassword] = useState('ChenInfra@2026');
+  const [adminNewPassword, setAdminNewPassword] = useState('');
+  const [showAdminNewPassword, setShowAdminNewPassword] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -57,7 +63,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
   const [createRole, setCreateRole] = useState<UserRole>('site_supervisor');
   const [createAssignedProjects, setCreateAssignedProjects] = useState<string[]>([]);
   const [createEmployeeId, setCreateEmployeeId] = useState<string>('');
-  const [createPassword, setCreatePassword] = useState('ChenInfra@2026');
+  const [createPassword, setCreatePassword] = useState('');
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [createRequireChange, setCreateRequireChange] = useState(true);
   const [createStatus, setCreateStatus] = useState<'active' | 'inactive'>('active');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -111,6 +118,23 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
   });
 
   // Handle open create modal
+  const handleCloseCreate = (force = false) => {
+    if (isSubmitting && !force) return;
+    setIsCreateModalOpen(false);
+    setCreateFullName('');
+    setCreateUserId('');
+    setCreateRole('site_supervisor');
+    setCreateEmail('');
+    setCreatePhone('');
+    setCreateAssignedProjects([]);
+    setCreateEmployeeId('');
+    setCreatePassword('');
+    setShowCreatePassword(false);
+    setCreateRequireChange(true);
+    setCreateStatus('active');
+    setErrorMessage(null);
+  };
+
   const handleOpenCreate = () => {
     setCreateFullName('');
     setCreateRole('site_supervisor');
@@ -118,7 +142,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
     setCreatePhone('');
     setCreateAssignedProjects(projects.slice(0, 1).map(p => p.id));
     setCreateEmployeeId('');
-    setCreatePassword('ChenInfra@2026');
+    setCreatePassword('');
+    setShowCreatePassword(false);
     setCreateRequireChange(true);
     setCreateStatus('active');
 
@@ -162,7 +187,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       });
 
       await loadData();
-      setIsCreateModalOpen(false);
+      handleCloseCreate(true);
       setNoticeMessage(`Account created successfully for ${created.full_name} with User ID "${created.user_id}".`);
       setTimeout(() => setNoticeMessage(null), 6000);
     } catch (err: any) {
@@ -203,7 +228,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       });
 
       await loadData();
-      setEditingAccount(null);
+      handleCloseEdit(true);
       setNoticeMessage(`User profile for ${editFullName} updated successfully.`);
       setTimeout(() => setNoticeMessage(null), 6000);
     } catch (err: any) {
@@ -211,6 +236,19 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCloseEdit = (force = false) => {
+    if (isSubmitting && !force) return;
+    setEditingAccount(null);
+    setEditFullName('');
+    setEditEmail('');
+    setEditPhone('');
+    setEditRole('site_supervisor');
+    setEditAssignedProjects([]);
+    setEditEmployeeId('');
+    setEditStatus('active');
+    setErrorMessage(null);
   };
 
   // Toggle active status
@@ -235,7 +273,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
 
     try {
       await authService.adminResetUserPassword(resettingPasswordAccount.auth_uid, adminNewPassword);
-      setResettingPasswordAccount(null);
+      handleClosePasswordReset(true);
       setNoticeMessage(`Password for ${resettingPasswordAccount.full_name} has been reset.`);
       setTimeout(() => setNoticeMessage(null), 5000);
     } catch (err: any) {
@@ -243,6 +281,14 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleClosePasswordReset = (force = false) => {
+    if (isSubmitting && !force) return;
+    setResettingPasswordAccount(null);
+    setAdminNewPassword('');
+    setShowAdminNewPassword(false);
+    setErrorMessage(null);
   };
 
   // Delete account
@@ -265,80 +311,70 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
     <div className="space-y-6 font-['Inter',sans-serif] animate-in fade-in duration-150">
       
       {/* Top Breadcrumb */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-[#666666]">
-        <button onClick={onNavigateHome} className="hover:text-[#111111] transition-colors">
-          CHEN INFRA
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-bp-muted">
+        <button onClick={onNavigateHome} className="inline-flex items-center gap-1.5 hover:text-bp-text transition-colors">
+          <CompanyLogo src={companyLogoUrl} companyName={companyName} size={20} />
+          <span>{companyName || 'Company'}</span>
         </button>
-        <ChevronRight className="w-3.5 h-3.5 text-[#888888]" />
-        <span className="font-semibold text-[#111111] flex items-center gap-1.5">
-          <ShieldCheck className="w-3.5 h-3.5 text-[#FFC400]" />
+        <ChevronRight className="w-3.5 h-3.5 text-bp-muted" />
+        <span className="font-semibold text-bp-text flex items-center gap-1.5">
+          <ShieldCheck className="w-3.5 h-3.5 text-bp-cyan" />
           User Management & Access Control
         </span>
       </nav>
 
       {/* Hero Banner with Create User Button */}
-      <div className="bg-white rounded-2xl border border-[#E8E8E8] p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white rounded-2xl border border-bp-border p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#FFC400] text-[#111111] font-mono">
-                ADMINISTRATION CONSOLE
-              </span>
-              <span className="text-xs text-[#666666] font-medium">
-                Server-Enforced Role-Based Access Control
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-[28px] font-bold text-[#111111] tracking-tight">
+            <h1 className="text-2xl sm:text-[28px] font-bold text-bp-text tracking-tight">
               User Accounts & Security Permissions
             </h1>
-            <p className="text-xs sm:text-sm text-[#666666] max-w-2xl">
-              Create individual staff accounts with unique User IDs, PBKDF2 cryptographic passwords, assigned construction sites, and strict server-enforced role privileges.
-            </p>
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={() => setShowAuditLogs(!showAuditLogs)}
-              className="px-3.5 py-2.5 bg-[#F7F7F7] hover:bg-[#EAEAEA] text-[#111111] font-semibold text-xs rounded-xl border border-[#CCCCCC] flex items-center gap-2 transition-colors"
+              className="px-3.5 py-2.5 bg-bp-background hover:bg-bp-border text-bp-text font-semibold text-xs rounded-xl border border-bp-border-strong flex items-center gap-2 transition-colors"
             >
-              <Clock className="w-4 h-4 text-[#666666]" />
+              <Clock className="w-4 h-4 text-bp-muted" />
               <span>{showAuditLogs ? 'Hide Audit Log' : 'Audit Logs'}</span>
             </button>
 
             <button
               onClick={handleOpenCreate}
-              className="px-4 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02]"
+              className="px-4 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all hover:scale-[1.02]"
             >
-              <UserPlus className="w-4 h-4 text-[#111111]" />
+              <UserPlus className="w-4 h-4 text-bp-text" />
               <span>Create User Account</span>
             </button>
           </div>
         </div>
 
         {/* Quick Metrics */}
-        <div className="pt-4 border-t border-[#E8E8E8] grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-            <p className="text-[11px] font-semibold text-[#666666] uppercase">Total User Accounts</p>
-            <p className="text-xl font-bold text-[#111111] font-mono mt-0.5">
-              {accounts.length} <span className="text-xs font-normal text-[#666666]">users</span>
+        <div className="pt-4 border-t border-bp-border grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+            <p className="text-[11px] font-semibold text-bp-muted uppercase">Total User Accounts</p>
+            <p className="text-xl font-bold text-bp-text bp-numeric mt-0.5">
+              {accounts.length}
             </p>
           </div>
-          <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-            <p className="text-[11px] font-semibold text-[#666666] uppercase">Active Administrators</p>
-            <p className="text-xl font-bold text-[#111111] font-mono mt-0.5">
-              {accounts.filter(a => a.role === 'admin' && a.status === 'active').length} <span className="text-xs font-normal text-[#666666]">admins</span>
+          <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+            <p className="text-[11px] font-semibold text-bp-muted uppercase">Active Administrators</p>
+            <p className="text-xl font-bold text-bp-text bp-numeric mt-0.5">
+              {accounts.filter(a => a.role === 'admin' && a.status === 'active').length}
             </p>
           </div>
-          <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-            <p className="text-[11px] font-semibold text-[#666666] uppercase">Site Supervisors</p>
-            <p className="text-xl font-bold text-amber-600 font-mono mt-0.5">
-              {accounts.filter(a => a.role === 'site_supervisor' && a.status === 'active').length} <span className="text-xs font-normal text-[#666666]">supervisors</span>
+          <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+            <p className="text-[11px] font-semibold text-bp-muted uppercase">Site Supervisors</p>
+            <p className="text-xl font-bold text-bp-blue bp-numeric mt-0.5">
+              {accounts.filter(a => a.role === 'site_supervisor' && a.status === 'active').length}
             </p>
           </div>
-          <div className="bg-[#F7F7F7] p-3 rounded-xl border border-[#E8E8E8]">
-            <p className="text-[11px] font-semibold text-[#666666] uppercase">Workers / Staff</p>
-            <p className="text-xl font-bold text-blue-600 font-mono mt-0.5">
-              {accounts.filter(a => a.role === 'worker' && a.status === 'active').length} <span className="text-xs font-normal text-[#666666]">workers</span>
+          <div className="bg-bp-background p-3 rounded-xl border border-bp-border">
+            <p className="text-[11px] font-semibold text-bp-muted uppercase">Workers / Staff</p>
+            <p className="text-xl font-bold text-bp-blue bp-numeric mt-0.5">
+              {accounts.filter(a => a.role === 'worker' && a.status === 'active').length}
             </p>
           </div>
         </div>
@@ -361,35 +397,35 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
 
       {/* Audit Logs Drawer / Section */}
       {showAuditLogs && (
-        <div className="bg-white rounded-2xl border border-[#E8E8E8] p-5 shadow-xs space-y-3 animate-in fade-in">
+        <div className="bg-white rounded-2xl border border-bp-border p-5 shadow-xs space-y-3 animate-in fade-in">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-[#FFC400]" />
-              <h3 className="font-bold text-sm text-[#111111]">Recent Authentication & Security Audit Trail</h3>
+              <Clock className="w-4 h-4 text-bp-cyan" />
+              <h3 className="font-bold text-sm text-bp-text">Recent Authentication & Security Audit Trail</h3>
             </div>
-            <span className="text-xs text-[#666666]">{auditLogs.length} events recorded</span>
+            <span className="text-xs text-bp-muted">{auditLogs.length} events recorded</span>
           </div>
 
-          <div className="overflow-x-auto max-h-60 overflow-y-auto divide-y divide-[#E8E8E8] text-xs">
+          <div className="overflow-x-auto max-h-60 overflow-y-auto divide-y divide-[#E2E8F0] text-xs">
             {auditLogs.length === 0 ? (
-              <p className="py-4 text-center text-[#888888]">No audit logs recorded yet.</p>
+              <p className="py-4 text-center text-bp-muted">No audit logs recorded yet.</p>
             ) : (
               auditLogs.slice(0, 30).map((log, i) => (
                 <div key={log.id || i} className="py-2 flex items-center justify-between gap-4">
                   <div>
-                    <span className="font-semibold text-[#111111] uppercase tracking-wider text-[10px] px-1.5 py-0.5 rounded bg-[#F7F7F7] border border-[#E8E8E8] mr-2">
+                    <span className="font-semibold text-bp-text uppercase tracking-wider text-[10px] px-1.5 py-0.5 rounded bg-bp-background border border-bp-border mr-2">
                       {log.action.replace(/_/g, ' ')}
                     </span>
-                    <span className="text-[#666666]">
+                    <span className="text-bp-muted">
                       Actor: <strong>{log.actor_name}</strong>
                     </span>
                     {log.metadata?.user_id && (
-                      <span className="ml-2 font-mono text-[11px] text-[#888888]">
+                      <span className="ml-2 font-mono text-[11px] text-bp-muted">
                         ({log.metadata.user_id})
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] text-[#888888] font-mono shrink-0">
+                  <span className="text-[11px] text-bp-muted font-mono shrink-0">
                     {new Date(log.timestamp).toLocaleTimeString()} · {new Date(log.timestamp).toLocaleDateString()}
                   </span>
                 </div>
@@ -400,25 +436,25 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       )}
 
       {/* Search and Filters Bar */}
-      <div className="bg-white rounded-2xl border border-[#E8E8E8] p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl border border-bp-border p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-[#888888] absolute left-3 top-2.5" />
+          <Search className="w-4 h-4 text-bp-muted absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Search by name, User ID, email, or phone..."
+            aria-label="Search users"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3.5 py-2 text-xs text-[#111111] rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+            className="w-full pl-9 pr-3.5 py-2 text-xs text-bp-text rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-[#666666]">Role:</span>
+            <span className="text-xs font-semibold text-bp-muted">Role:</span>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-[#CCCCCC] bg-white text-[#111111] focus:outline-none focus:border-[#FFC400]"
+              className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-bp-border-strong bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
             >
               <option value="all">All Roles</option>
               <option value="admin">Administrator</option>
@@ -431,11 +467,11 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-[#666666]">Status:</span>
+            <span className="text-xs font-semibold text-bp-muted">Status:</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-[#CCCCCC] bg-white text-[#111111] focus:outline-none focus:border-[#FFC400]"
+              className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-bp-border-strong bg-white text-bp-text focus:outline-none focus:border-bp-cyan"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -446,10 +482,10 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       </div>
 
       {/* Users Accounts Table */}
-      <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-xs">
+      <div className="bg-white rounded-2xl border border-bp-border overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#111111] text-white uppercase font-bold text-[11px]">
+            <thead className="bg-bp-navy text-white uppercase font-bold text-[11px]">
               <tr>
                 <th className="px-4 py-3">User ID & Name</th>
                 <th className="px-3 py-3">Email / Phone</th>
@@ -461,30 +497,33 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E8E8E8]">
+            <tbody className="divide-y divide-[#E2E8F0]">
               {filteredAccounts.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-[#666666]">
+                  <td colSpan={8} className="px-4 py-12 text-center text-bp-muted">
                     No user accounts match your search or filter criteria.
                   </td>
                 </tr>
               ) : (
                 filteredAccounts.map(acc => {
                   const linkedEmp = employees.find(e => e.id === acc.employee_id);
+                  const assignedProjects = (acc.assigned_projects || [])
+                    .map(projectId => projects.find(project => project.id === projectId))
+                    .filter((project): project is Project => Boolean(project));
                   const isLocked = acc.lockout_until && new Date(acc.lockout_until) > new Date();
 
                   return (
-                    <tr key={acc.auth_uid} className={`hover:bg-[#F9F9F9] transition-colors ${acc.status === 'inactive' ? 'opacity-60 bg-[#FAFAFA]' : ''}`}>
+                    <tr key={acc.auth_uid} className={`hover:bg-bp-background transition-colors ${acc.status === 'inactive' ? 'opacity-60 bg-bp-background' : ''}`}>
                       
                       {/* Name + User ID */}
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#FFC400] text-[#111111] flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                          <div className="w-8 h-8 rounded-full bg-bp-cyan text-bp-text flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
                             {acc.full_name.charAt(0)}
                           </div>
                           <div>
-                            <p className="font-bold text-[#111111]">{acc.full_name}</p>
-                            <span className="inline-block px-1.5 py-0.2 font-mono font-semibold text-[10px] rounded bg-[#F7F7F7] border border-[#CCCCCC] text-[#111111]">
+                            <p className="font-bold text-bp-text">{acc.full_name}</p>
+                            <span className="inline-block px-1.5 py-0.2 font-mono font-semibold text-[10px] rounded bg-bp-background border border-bp-border-strong text-bp-text">
                               {acc.user_id}
                             </span>
                           </div>
@@ -493,22 +532,22 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
 
                       {/* Email + Phone */}
                       <td className="px-3 py-3.5">
-                        <p className="text-[#111111] font-medium">{acc.email}</p>
-                        {acc.phone && <p className="text-[11px] text-[#888888] font-mono">{acc.phone}</p>}
+                        <p className="text-bp-text font-medium">{acc.email}</p>
+                        {acc.phone && <p className="text-[11px] text-bp-muted font-mono">{acc.phone}</p>}
                       </td>
 
                       {/* Role Badge */}
                       <td className="px-3 py-3.5">
                         <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider ${
                           acc.role === 'admin'
-                            ? 'bg-[#111111] text-[#FFC400]'
+                            ? 'bg-bp-navy text-bp-cyan'
                             : acc.role === 'site_supervisor'
-                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            ? 'bg-bp-cyan-soft text-bp-blue border border-bp-cyan-border'
                             : acc.role === 'accountant'
                             ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
                             : acc.role === 'worker'
                             ? 'bg-blue-100 text-blue-900 border border-blue-300'
-                            : 'bg-[#F7F7F7] text-[#111111] border border-[#E8E8E8]'
+                            : 'bg-bp-background text-bp-text border border-bp-border'
                         }`}>
                           {ROLE_TITLES[acc.role] || acc.role}
                         </span>
@@ -516,19 +555,18 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
 
                       {/* Assigned Sites */}
                       <td className="px-3 py-3.5">
-                        {acc.assigned_projects && acc.assigned_projects.length > 0 ? (
+                        {assignedProjects.length > 0 ? (
                           <div className="space-y-0.5">
-                            {acc.assigned_projects.map(pid => {
-                              const proj = projects.find(p => p.id === pid);
+                            {assignedProjects.map(proj => {
                               return (
-                                <span key={pid} className="inline-block px-1.5 py-0.5 mr-1 mb-0.5 rounded bg-[#F7F7F7] border border-[#E8E8E8] text-[10px] text-[#555555]">
-                                  {proj?.name ? proj.name.slice(0, 20) + '...' : pid}
+                                <span key={proj.id} className="inline-block px-1.5 py-0.5 mr-1 mb-0.5 rounded bg-bp-background border border-bp-border text-[10px] text-bp-text-subtle">
+                                  {proj.name.slice(0, 20) + (proj.name.length > 20 ? '...' : '')}
                                 </span>
                               );
                             })}
                           </div>
                         ) : (
-                          <span className="text-[#888888] italic text-[11px]">All Sites (Unrestricted)</span>
+                          <span className="text-bp-muted text-[11px]">—</span>
                         )}
                       </td>
 
@@ -540,7 +578,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                             {linkedEmp.full_name} ({linkedEmp.employee_code})
                           </span>
                         ) : (
-                          <span className="text-[#888888] text-[11px]">—</span>
+                          <span className="text-bp-muted text-[11px]">—</span>
                         )}
                       </td>
 
@@ -566,7 +604,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                       </td>
 
                       {/* Last Login */}
-                      <td className="px-3 py-3.5 text-right font-mono text-[#666666] text-[11px]">
+                      <td className="px-3 py-3.5 text-right font-mono text-bp-muted text-[11px]">
                         {acc.last_login_at
                           ? new Date(acc.last_login_at).toLocaleDateString()
                           : 'Never logged in'}
@@ -579,9 +617,10 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                           <button
                             onClick={() => {
                               setResettingPasswordAccount(acc);
-                              setAdminNewPassword('ChenInfra@2026');
+                              setAdminNewPassword('');
+                              setShowAdminNewPassword(false);
                             }}
-                            className="p-1.5 text-[#666666] hover:text-[#111111] hover:bg-[#EAEAEA] rounded-lg transition-colors"
+                            className="p-1.5 text-bp-muted hover:text-bp-text hover:bg-bp-border rounded-lg transition-colors"
                             title="Reset password for this user"
                           >
                             <KeyRound className="w-3.5 h-3.5" />
@@ -590,7 +629,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                           {/* Edit Details */}
                           <button
                             onClick={() => handleOpenEdit(acc)}
-                            className="p-1.5 text-[#666666] hover:text-[#111111] hover:bg-[#EAEAEA] rounded-lg transition-colors"
+                            className="p-1.5 text-bp-muted hover:text-bp-text hover:bg-bp-border rounded-lg transition-colors"
                             title="Edit user details and roles"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -620,17 +659,18 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       {/* MODAL 1: CREATE USER ACCOUNT */}
       {/* ======================================================== */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-[#E8E8E8] overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-bp-navy-deep/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-bp-border overflow-hidden max-h-[90vh] flex flex-col">
             
-            <div className="bg-[#111111] text-white px-6 py-4 flex items-center justify-between border-b border-[#222222] shrink-0">
+            <div className="bg-bp-navy text-white px-6 py-4 flex items-center justify-between border-b border-bp-navy-border shrink-0">
               <div className="flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-[#FFC400]" />
+                <UserPlus className="w-4 h-4 text-bp-cyan" />
                 <h3 className="font-bold text-sm text-white">Register New User Account</h3>
               </div>
               <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="text-[#888888] hover:text-white p-1 rounded-lg"
+                onClick={() => handleCloseCreate()}
+                disabled={isSubmitting}
+                className="text-bp-muted hover:text-white p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -646,72 +686,68 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#111111] mb-1">
+                  <label className="block text-xs font-semibold text-bp-text mb-1">
                     Full Name *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Anand Mahindra"
                     value={createFullName}
                     onChange={(e) => setCreateFullName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                    className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#111111] mb-1">
+                  <label className="block text-xs font-semibold text-bp-text mb-1">
                     Unique User ID * (Permanent)
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. CHEN-SUP-05"
                     value={createUserId}
                     onChange={(e) => setCreateUserId(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 text-xs font-mono font-bold text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                    className="w-full px-3 py-2 text-xs font-mono font-bold text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#111111] mb-1">
+                  <label className="block text-xs font-semibold text-bp-text mb-1">
                     Email Address *
                   </label>
                   <input
                     type="email"
                     required
-                    placeholder="e.g. user@cheninfra.com"
                     value={createEmail}
                     onChange={(e) => setCreateEmail(e.target.value)}
-                    className="w-full px-3 py-2 text-xs text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                    className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#111111] mb-1">
+                  <label className="block text-xs font-semibold text-bp-text mb-1">
                     Phone Number (Optional)
                   </label>
                   <input
                     type="tel"
-                    placeholder="e.g. +91 98450 00000"
                     value={createPhone}
                     onChange={(e) => setCreatePhone(e.target.value)}
-                    className="w-full px-3 py-2 text-xs text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                    className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#111111] mb-1">
-                    Role & Server Permissions *
+                  <label className="block text-xs font-semibold text-bp-text mb-1">
+                    Role & Access *
                   </label>
                   <select
                     value={createRole}
                     onChange={(e) => handleRoleChangeForCreate(e.target.value as UserRole)}
-                    className="w-full px-3 py-2 text-xs font-semibold text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                    className="w-full px-3 py-2 text-xs font-semibold text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                   >
                     <option value="admin">Company Administrator (Full Access)</option>
                     <option value="site_supervisor">Site Supervisor (Site Attendance & Workers)</option>
@@ -723,13 +759,13 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#111111] mb-1">
+                  <label className="block text-xs font-semibold text-bp-text mb-1">
                     Link to Employee Profile (Optional)
                   </label>
                   <select
                     value={createEmployeeId}
                     onChange={(e) => setCreateEmployeeId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                    className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                   >
                     <option value="">None (Independent Login Account)</option>
                     {employees.map(emp => (
@@ -743,14 +779,14 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
 
               {/* Assigned Construction Sites */}
               <div>
-                <label className="block text-xs font-semibold text-[#111111] mb-1.5">
+                <label className="block text-xs font-semibold text-bp-text mb-1.5">
                   Assigned Sites & Projects (Site Supervisors / Staff)
                 </label>
-                <div className="p-3 bg-[#F9F9F9] rounded-xl border border-[#E8E8E8] grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                <div className="p-3 bg-bp-background rounded-xl border border-bp-border grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
                   {projects.map(p => {
                     const isChecked = createAssignedProjects.includes(p.id);
                     return (
-                      <label key={p.id} className="flex items-center gap-2 text-xs text-[#111111] cursor-pointer">
+                      <label key={p.id} className="flex items-center gap-2 text-xs text-bp-text cursor-pointer">
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -761,34 +797,44 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                               setCreateAssignedProjects(prev => prev.filter(id => id !== p.id));
                             }
                           }}
-                          className="rounded text-[#111111] focus:ring-[#FFC400]"
+                          className="rounded text-bp-text focus:ring-bp-cyan"
                         />
                         <span className="truncate">{p.name}</span>
                       </label>
                     );
                   })}
                 </div>
-                <p className="text-[10px] text-[#666666] mt-1">
+                <p className="text-[10px] text-bp-muted mt-1">
                   Leave empty if this account has company-wide access across all sites.
                 </p>
               </div>
 
               {/* Password configuration */}
-              <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
-                  <Lock className="w-4 h-4 text-amber-700" />
-                  <span>Initial Password Setup (PBKDF2 Encrypted)</span>
+              <div className="rounded-xl border border-bp-cyan-border bg-bp-cyan-soft p-3.5 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-bp-navy">
+                  <Lock className="w-4 h-4 text-bp-blue" />
+                  <span>Initial password *</span>
                 </div>
-                <div>
+                <div className="relative">
                   <input
-                    type="text"
+                    type={showCreatePassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     required
                     value={createPassword}
                     onChange={(e) => setCreatePassword(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs font-mono font-bold text-[#111111] bg-white rounded-lg border border-amber-300"
+                    className="min-h-11 w-full rounded-lg border border-bp-border-strong bg-white py-2 pl-3 pr-12 text-sm text-bp-text"
                   />
-                  <p className="text-[10px] text-amber-800 mt-1">
-                    A cryptographic salt will be generated and hashed using PBKDF2 with 100,000 iterations.
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePassword(value => !value)}
+                    className="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center rounded-r-lg text-bp-muted hover:text-bp-navy"
+                    aria-label={showCreatePassword ? 'Hide initial password' : 'Show initial password'}
+                    aria-pressed={showCreatePassword}
+                  >
+                    {showCreatePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                  <p className="mt-1 text-[11px] text-bp-text-subtle">
+                    Passwords are stored as salted PBKDF2 hashes.
                   </p>
                 </div>
 
@@ -797,24 +843,25 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
                     type="checkbox"
                     checked={createRequireChange}
                     onChange={(e) => setCreateRequireChange(e.target.checked)}
-                    className="rounded text-[#111111] focus:ring-[#FFC400]"
+                    className="rounded accent-bp-cyan focus:ring-bp-cyan"
                   />
-                  <span className="text-xs text-amber-900 font-medium">Require user to change password on first login</span>
+                  <span className="text-xs text-bp-text font-medium">Require user to change password on first sign-in</span>
                 </label>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-[#666666] hover:bg-[#F7F7F7] rounded-xl"
+                  onClick={() => handleCloseCreate()}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs flex items-center gap-2"
+                  className="px-5 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs flex items-center gap-2"
                 >
                   {isSubmitting ? (
                     <>
@@ -839,47 +886,47 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       {/* MODAL 2: EDIT USER ACCOUNT */}
       {/* ======================================================== */}
       {editingAccount && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-[#E8E8E8] overflow-hidden">
-            <div className="bg-[#111111] text-white px-6 py-4 flex items-center justify-between border-b border-[#222222]">
+        <div className="fixed inset-0 z-50 bg-bp-navy-deep/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-bp-border overflow-hidden">
+            <div className="bg-bp-navy text-white px-6 py-4 flex items-center justify-between border-b border-bp-navy-border">
               <div className="flex items-center gap-2">
-                <Edit2 className="w-4 h-4 text-[#FFC400]" />
+                <Edit2 className="w-4 h-4 text-bp-cyan" />
                 <h3 className="font-bold text-sm text-white">Edit User: {editingAccount.user_id}</h3>
               </div>
-              <button onClick={() => setEditingAccount(null)} className="text-[#888888] hover:text-white p-1">
+              <button type="button" onClick={() => handleCloseEdit()} disabled={isSubmitting} className="text-bp-muted hover:text-white p-1 disabled:opacity-50">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#111111] mb-1">Full Name</label>
+                <label className="block text-xs font-semibold text-bp-text mb-1">Full Name</label>
                 <input
                   type="text"
                   required
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                  className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#111111] mb-1">Email</label>
+                  <label className="block text-xs font-semibold text-bp-text mb-1">Email</label>
                   <input
                     type="email"
                     required
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full px-3 py-2 text-xs text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                    className="w-full px-3 py-2 text-xs text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#111111] mb-1">Role</label>
+                  <label className="block text-xs font-semibold text-bp-text mb-1">Role</label>
                   <select
                     value={editRole}
                     onChange={(e) => setEditRole(e.target.value as UserRole)}
-                    className="w-full px-3 py-2 text-xs font-semibold text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                    className="w-full px-3 py-2 text-xs font-semibold text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                   >
                     <option value="admin">Company Administrator</option>
                     <option value="site_supervisor">Site Supervisor</option>
@@ -892,11 +939,11 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#111111] mb-1">Status</label>
+                <label className="block text-xs font-semibold text-bp-text mb-1">Status</label>
                 <select
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value as any)}
-                  className="w-full px-3 py-2 text-xs font-semibold text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
+                  className="w-full px-3 py-2 text-xs font-semibold text-bp-text bg-white rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan"
                 >
                   <option value="active">Active (Access Granted)</option>
                   <option value="inactive">Inactive (Access Suspended)</option>
@@ -906,15 +953,16 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setEditingAccount(null)}
-                  className="px-4 py-2 text-xs font-semibold text-[#666666] hover:bg-[#F7F7F7] rounded-xl"
+                  onClick={() => handleCloseEdit()}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs"
+                  className="px-5 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs"
                 >
                   Save Changes
                 </button>
@@ -928,48 +976,61 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ onNaviga
       {/* MODAL 3: ADMIN PASSWORD RESET */}
       {/* ======================================================== */}
       {resettingPasswordAccount && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-[#E8E8E8] overflow-hidden">
-            <div className="bg-[#111111] text-white px-6 py-4 flex items-center justify-between border-b border-[#222222]">
+        <div className="fixed inset-0 z-50 bg-bp-navy-deep/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-bp-border overflow-hidden">
+            <div className="bg-bp-navy text-white px-6 py-4 flex items-center justify-between border-b border-bp-navy-border">
               <div className="flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-[#FFC400]" />
+                <KeyRound className="w-4 h-4 text-bp-cyan" />
                 <h3 className="font-bold text-sm text-white">Reset Password: {resettingPasswordAccount.full_name}</h3>
               </div>
-              <button onClick={() => setResettingPasswordAccount(null)} className="text-[#888888] hover:text-white p-1">
+              <button type="button" onClick={() => handleClosePasswordReset()} disabled={isSubmitting} className="text-bp-muted hover:text-white p-1 disabled:opacity-50">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleAdminResetPasswordSubmit} className="p-6 space-y-4">
-              <p className="text-xs text-[#666666]">
+              <p className="text-xs text-bp-muted">
                 As an authorized administrator, you can reset the password for <strong>{resettingPasswordAccount.user_id}</strong>. The user will be required to change their password on next sign in.
               </p>
 
               <div>
-                <label className="block text-xs font-semibold text-[#111111] mb-1">
+                <label className="block text-xs font-semibold text-bp-text mb-1">
                   New Password (min 8 characters)
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={adminNewPassword}
-                  onChange={(e) => setAdminNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-mono font-bold text-[#111111] bg-white rounded-xl border border-[#CCCCCC] focus:outline-none focus:border-[#FFC400]"
-                />
+                <div className="relative">
+                  <input
+                    type={showAdminNewPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    value={adminNewPassword}
+                    onChange={(e) => setAdminNewPassword(e.target.value)}
+                    className="min-h-11 w-full rounded-xl border border-bp-border-strong bg-white py-2 pl-3 pr-12 text-sm text-bp-text"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminNewPassword(value => !value)}
+                    className="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center rounded-r-xl text-bp-muted hover:text-bp-navy"
+                    aria-label={showAdminNewPassword ? 'Hide new password' : 'Show new password'}
+                    aria-pressed={showAdminNewPassword}
+                  >
+                    {showAdminNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setResettingPasswordAccount(null)}
-                  className="px-4 py-2 text-xs font-semibold text-[#666666] hover:bg-[#F7F7F7] rounded-xl"
+                  onClick={() => handleClosePasswordReset()}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-xs font-semibold text-bp-muted hover:bg-bp-background rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || adminNewPassword.length < 8}
-                  className="px-5 py-2.5 bg-[#FFC400] hover:bg-[#F0B800] text-[#111111] font-bold text-xs rounded-xl shadow-xs"
+                  className="px-5 py-2.5 bg-bp-cyan hover:bg-bp-blue text-bp-text font-bold text-xs rounded-xl shadow-xs"
                 >
                   {isSubmitting ? 'Hashing & Resetting...' : 'Reset Password'}
                 </button>

@@ -3,16 +3,17 @@ import {
   Company,
   Project,
   UserProfile,
-  UserRole,
   CementBrand,
   MaterialLocation,
   MaterialTransaction,
   ProjectStockMetrics,
   SupabaseConfig,
   TransactionType,
-  ProjectStatus
+  ProjectStatus,
+  CompanyStockBackgroundSlideshow,
+  StockInventoryModuleId
 } from './types';
-import { dataService, PRESET_USERS } from './services/dataService';
+import { dataService } from './services/dataService';
 import { Navbar } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
 import { OngoingProjectsView } from './components/OngoingProjectsView';
@@ -24,6 +25,7 @@ import { SandModule } from './components/SandModule';
 import { BricksModule } from './components/BricksModule';
 import { AggregateModule } from './components/AggregateModule';
 import { GenericEquipmentModule } from './components/GenericEquipmentModule';
+import { HireModule } from './components/HireModule';
 import { ReportsView } from './components/ReportsView';
 import { AttendanceView } from './components/AttendanceView';
 import { UserManagementView } from './components/UserManagementView';
@@ -33,7 +35,9 @@ import { authService } from './services/authService';
 import { UserSession } from './types';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { CloudSetupModal } from './components/CloudSetupModal';
-import { PlayCircle, CheckCircle2, ShieldAlert, Sparkles, X } from 'lucide-react';
+import { ModalDismissalManager } from './components/ModalDismissalManager';
+import { CompanyBrandingContext } from './contexts/CompanyBrandingContext';
+import { StockBackgroundSlideshow } from './components/StockBackgroundSlideshow';
 
 type ViewMode = 
   | 'home' 
@@ -46,6 +50,8 @@ type ViewMode =
   | 'bricks_module'
   | 'aggregate_module'
   | 'category_module'
+  | 'vehicle_hire'
+  | 'machinery_hire'
   | 'reports'
   | 'attendance'
   | 'user_management';
@@ -58,23 +64,29 @@ export default function App() {
 
   // Modals state
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isCloudSetupOpen, setIsCloudSetupOpen] = useState(false);
-  const [isTestWorkflowOpen, setIsTestWorkflowOpen] = useState(false);
-  const [testWorkflowLogs, setTestWorkflowLogs] = useState<string[]>([]);
-  const [isTestingWorkflow, setIsTestingWorkflow] = useState(false);
 
   // Core Data state
-  const [company, setCompany] = useState<Company>({
-    id: 'comp-apex-01',
-    name: 'CHEN INFRA',
-    code: 'CHEN',
+  const [company, setCompany] = useState<Company>(() => ({
+    id: authService.getCurrentUser().company_id || 'comp-apex-01',
+    name: '',
+    code: '',
+    watermark_enabled: false,
+    watermark_opacity: 6,
+    watermark_size: 280,
+    stock_background_slideshow: { enabled: false, images: [], transition_seconds: 6, overlay_opacity: 32, modules: ['cement_module', 'steel_module', 'sand_module', 'bricks_module', 'aggregate_module'] },
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
-  });
+  }));
+  const [companyLogoDisplayUrl, setCompanyLogoDisplayUrl] = useState<string | undefined>();
+  const [resolvedStockBackgroundImages, setResolvedStockBackgroundImages] = useState<Array<{ id: string; src: string }>>([]);
 
   const [session, setSession] = useState<UserSession | null>(() => authService.getSession());
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => authService.getCurrentUser());
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const canViewReports = authService.canPerformAction('view_reports');
+  const canViewAttendance = authService.canPerformAction('view_attendance');
 
   useEffect(() => {
     async function initAuth() {
@@ -118,6 +130,19 @@ export default function App() {
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(dataService.getConfig());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const resolveStockBackgroundImages = useCallback(async (settings: CompanyStockBackgroundSlideshow | undefined) => {
+    if (!settings?.images.length) return [];
+    const resolved = await Promise.all(settings.images.map(async image => {
+      try {
+        const src = await dataService.resolveCompanyLogoUrl(image.url);
+        return src ? { id: image.id, src } : null;
+      } catch {
+        return null;
+      }
+    }));
+    return resolved.filter((image): image is { id: string; src: string } => image !== null);
+  }, []);
+
   // Load all initial data
   const loadData = useCallback(async () => {
     try {
@@ -129,6 +154,12 @@ export default function App() {
       ]);
 
       setCompany(comp);
+      setResolvedStockBackgroundImages(await resolveStockBackgroundImages(comp.stock_background_slideshow));
+      try {
+        setCompanyLogoDisplayUrl(await dataService.resolveCompanyLogoUrl(comp.logo_url));
+      } catch {
+        setCompanyLogoDisplayUrl(undefined);
+      }
       setProjects(allProjects);
       setBrands(allBrands);
       setSupabaseConfig(dataService.getConfig());
@@ -149,7 +180,12 @@ export default function App() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [selectedProject]);
+  }, [selectedProject, currentUser.company_id, resolveStockBackgroundImages]);
+
+  const handleRefreshData = useCallback(async () => {
+    await dataService.syncCloudState();
+    await loadData();
+  }, [loadData]);
 
   useEffect(() => {
     loadData();
@@ -158,23 +194,14 @@ export default function App() {
   // Derived lists
   const ongoingProjects = projects.filter(p => p.status !== 'completed');
   const completedProjects = projects.filter(p => p.status === 'completed');
-
-  // Total cement stock across all ongoing projects
-  const [totalCementStockAcrossAll, setTotalCementStockAcrossAll] = useState(72);
-
-  useEffect(() => {
-    async function calculateGlobalStock() {
-      let total = 0;
-      for (const p of ongoingProjects) {
-        const m = await dataService.calculateCementStock(p.id);
-        total += m.totalAvailableBags;
-      }
-      setTotalCementStockAcrossAll(total);
-    }
-    if (ongoingProjects.length > 0) {
-      calculateGlobalStock();
-    }
-  }, [projects, transactions]);
+  const stockModuleIds: Partial<Record<ViewMode, StockInventoryModuleId>> = {
+    cement_module: 'cement_module',
+    steel_module: 'steel_module',
+    sand_module: 'sand_module',
+    bricks_module: 'bricks_module',
+    aggregate_module: 'aggregate_module'
+  };
+  const currentStockModuleId = stockModuleIds[currentView] || null;
 
   // Navigation handlers
   const handleOpenProject = async (project: Project) => {
@@ -205,26 +232,50 @@ export default function App() {
     setCurrentView('cement_module');
   };
 
-  const handleSwitchRole = async (role: UserRole) => {
-    const preset = PRESET_USERS[role];
-    if (preset) {
-      try {
-        const s = await authService.login(preset.user_id || preset.email, 'ChenInfra@2026', true);
-        setSession(s);
-        const u = authService.getCurrentUser();
-        setCurrentUser(u);
-        dataService.setCurrentUser(u);
-        setCurrentView('home');
-      } catch {
-        const updated = dataService.switchRole(role);
-        setCurrentUser(updated);
-      }
-    }
-  };
-
   const handleUpdateCompanyName = async (newName: string) => {
     const updated = await dataService.updateCompanyName(newName);
     setCompany(updated);
+  };
+
+  const handleSaveCompanyBranding = async (
+    settings: { watermark_enabled: boolean; watermark_opacity: number; watermark_size: number },
+    logoFile: File | undefined,
+    slideshowDraft: Omit<CompanyStockBackgroundSlideshow, 'images'> & {
+      images: Array<{ id: string; name: string; size_bytes: number; url?: string; file?: File }>;
+    }
+  ): Promise<CompanyStockBackgroundSlideshow> => {
+    const logoUrl = logoFile ? await dataService.uploadCompanyLogo(logoFile) : company.logo_url;
+    const images = await Promise.all(slideshowDraft.images.map(async image => {
+      if (image.file) return dataService.uploadStockBackgroundImage(image.file);
+      if (!image.url) throw new Error(`Background image “${image.name}” is missing. Remove it and select it again.`);
+      return { id: image.id, name: image.name, size_bytes: image.size_bytes, url: image.url };
+    }));
+    const stockBackgroundSlideshow: CompanyStockBackgroundSlideshow = {
+      enabled: slideshowDraft.enabled,
+      images,
+      transition_seconds: slideshowDraft.transition_seconds,
+      overlay_opacity: slideshowDraft.overlay_opacity,
+      modules: slideshowDraft.modules
+    };
+    const updated = await dataService.updateCompanySettings({
+      ...settings,
+      ...(logoUrl ? { logo_url: logoUrl } : {}),
+      stock_background_slideshow: stockBackgroundSlideshow
+    });
+    setCompany(updated);
+    setResolvedStockBackgroundImages(await resolveStockBackgroundImages(updated.stock_background_slideshow));
+    try {
+      setCompanyLogoDisplayUrl(await dataService.resolveCompanyLogoUrl(updated.logo_url));
+    } catch {
+      setCompanyLogoDisplayUrl(undefined);
+    }
+    return updated.stock_background_slideshow || {
+      enabled: false,
+      images: [],
+      transition_seconds: 6,
+      overlay_opacity: 32,
+      modules: ['cement_module', 'steel_module', 'sand_module', 'bricks_module', 'aggregate_module']
+    };
   };
 
   const handleCreateProject = async (projectData: any) => {
@@ -296,194 +347,82 @@ export default function App() {
     return res;
   };
 
-  // Section 16 Automated End-to-End Verification Test Runner
-  const runSection16Tests = async () => {
-    setIsTestingWorkflow(true);
-    setTestWorkflowLogs([]);
-
-    const log = (msg: string) => {
-      setTestWorkflowLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
-    };
-
-    try {
-      log('Starting Section 16 End-to-End Verification Suite...');
-
-      // 1. Switch to Admin
-      dataService.switchRole('admin');
-      setCurrentUser(dataService.getCurrentUser());
-      log('Step 1: Authorized Administrator session active (Rajesh Sharma).');
-
-      // 2. Create Project
-      const testCode = `TEST-PRJ-${Date.now().toString().slice(-4)}`;
-      const createdProj = await dataService.createProject({
-        name: `Automated Test Tower ${testCode}`,
-        code: testCode,
-        client_name: 'Godrej Test Realty',
-        address: 'Sector 55 Testing Hub',
-        location: 'Bengaluru, KA',
-        description: 'Automated test site for inventory verification',
-        start_date: new Date().toISOString().split('T')[0],
-        expected_completion_date: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
-        project_manager_id: PRESET_USERS.project_manager.id,
-        project_manager_name: PRESET_USERS.project_manager.full_name,
-        status: 'in_progress'
-      });
-      log(`Step 2: Project created successfully with code: ${createdProj.code}.`);
-
-      // 3. Confirm in Ongoing Projects
-      const ongoing = await dataService.getProjects({ status: 'in_progress' });
-      const found = ongoing.find(p => p.id === createdProj.id);
-      if (!found) throw new Error('Failed: Newly created project not found in ongoing projects list.');
-      log('Step 3: Confirmed project appears in Ongoing Projects.');
-
-      // 4. Open project & Cement module
-      setSelectedProject(createdProj);
-      const allBrands = await dataService.getCementBrands();
-      const targetBrand = allBrands.find(b => b.code === 'ULTRATECH') || allBrands[0];
-      log(`Step 4: Selected project workspace & chose brand: ${targetBrand.brand_name}.`);
-
-      // 5. Record Receipt of 100 bags
-      await dataService.recordCementTransaction({
-        projectId: createdProj.id,
-        locationId: 'loc-test',
-        locationName: 'Test Staging Yard',
-        brandId: targetBrand.id,
-        brandName: targetBrand.brand_name,
-        transactionDate: new Date().toISOString().split('T')[0],
-        transactionType: 'receipt',
-        quantityBags: 100,
-        supplierName: 'Balaji Depot',
-        invoiceNumber: 'INV-TEST-100',
-        remarks: 'Verification batch receipt'
-      });
-      log('Step 5: Recorded material receipt of 100 bags.');
-
-      // 6. Record Usage of 25 bags
-      await dataService.recordCementTransaction({
-        projectId: createdProj.id,
-        locationId: 'loc-test',
-        locationName: 'Test Staging Yard',
-        brandId: targetBrand.id,
-        brandName: targetBrand.brand_name,
-        transactionDate: new Date().toISOString().split('T')[0],
-        transactionType: 'usage',
-        quantityBags: 25,
-        remarks: 'Pouring for column 3A'
-      });
-      log('Step 6: Recorded material usage of 25 bags.');
-
-      // 7. Record Damage of 3 bags
-      await dataService.recordCementTransaction({
-        projectId: createdProj.id,
-        locationId: 'loc-test',
-        locationName: 'Test Staging Yard',
-        brandId: targetBrand.id,
-        brandName: targetBrand.brand_name,
-        transactionDate: new Date().toISOString().split('T')[0],
-        transactionType: 'damage',
-        quantityBags: 3,
-        remarks: 'Wet bags damaged in heavy rain'
-      });
-      log('Step 7: Recorded damage of 3 bags.');
-
-      // 8. Verify exactly 72 bags available
-      const stock = await dataService.calculateCementStock(createdProj.id);
-      const brandSummary = stock.brandSummaries.find(b => b.brand_id === targetBrand.id);
-      const available = brandSummary?.available_stock ?? 0;
-      if (available !== 72) {
-        throw new Error(`Calculation error: Expected 72 available bags, but got ${available}.`);
-      }
-      log(`Step 8: Verified stock calculation: 100 - 25 - 3 = ${available} available bags! [PASSED]`);
-
-      // 9. Negative stock prevention test
-      try {
-        await dataService.recordCementTransaction({
-          projectId: createdProj.id,
-          locationId: 'loc-test',
-          locationName: 'Test Staging Yard',
-          brandId: targetBrand.id,
-          brandName: targetBrand.brand_name,
-          transactionDate: new Date().toISOString().split('T')[0],
-          transactionType: 'usage',
-          quantityBags: 1000 // Exceeds 72 available
-        });
-        throw new Error('Failure: System allowed negative stock movement!');
-      } catch (err: any) {
-        log(`Step 9: Negative stock protection correctly rejected overdraft: "${err.message}". [PASSED]`);
-      }
-
-      // 10. RBAC Test: Viewer cannot submit
-      dataService.switchRole('management_viewer');
-      try {
-        await dataService.recordCementTransaction({
-          projectId: createdProj.id,
-          locationId: 'loc-test',
-          locationName: 'Test Staging Yard',
-          brandId: targetBrand.id,
-          brandName: targetBrand.brand_name,
-          transactionDate: new Date().toISOString().split('T')[0],
-          transactionType: 'receipt',
-          quantityBags: 50
-        });
-        throw new Error('Failure: Management viewer was allowed to record transaction!');
-      } catch (err: any) {
-        log(`Step 10: RBAC restriction confirmed: Viewer was blocked from creating transactions. [PASSED]`);
-      }
-
-      // 11. Restore Admin & Mark Completed
-      dataService.switchRole('admin');
-      setCurrentUser(dataService.getCurrentUser());
-      await dataService.markProjectCompleted(createdProj.id);
-      log('Step 11: Marked project as completed. Verified project archived in Completed Projects.');
-
-      // 12. Check history retained
-      const finalTxs = await dataService.getCementTransactions(createdProj.id);
-      if (finalTxs.length < 3) throw new Error('Transaction history lost upon completion!');
-      log(`Step 12: Confirmed all ${finalTxs.length} historical ledger transactions remain intact. [PASSED]`);
-
-      log('SUCCESS: All Section 16 verification workflows passed seamlessly!');
-      await loadData();
-    } catch (e: any) {
-      log(`TEST FAILED: ${e.message}`);
-    } finally {
-      setIsTestingWorkflow(false);
-    }
+  const handleUpdateProject = async (projectData: any) => {
+    if (!editingProject) throw new Error('No project selected for editing.');
+    const updated = await dataService.updateProject(editingProject.id, projectData);
+    await loadData();
+    setEditingProject(null);
+    return updated;
   };
 
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen bg-[#F7F7F7] flex flex-col items-center justify-center p-4">
-        <div className="w-10 h-10 border-4 border-[#FFC400] border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-xs font-semibold text-[#111111]">Verifying Secure Session...</p>
+      <div className="min-h-screen bg-bp-background flex flex-col items-center justify-center p-4">
+        <div className="w-10 h-10 border-4 border-bp-cyan border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-semibold text-bp-text">Verifying Secure Session...</p>
       </div>
     );
   }
 
   // Authentication Gate: Render secure individual login page if unauthenticated
   if (!session) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+    return (
+      <>
+        <LoginPage onLoginSuccess={handleLoginSuccess} />
+        <ModalDismissalManager />
+      </>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-['Public_Sans',sans-serif]">
-      
-      {/* Top Navbar */}
+    <CompanyBrandingContext.Provider value={{ companyName: company.name.trim(), companyLogoUrl: companyLogoDisplayUrl }}>
+    <div className="bp-app-shell min-h-screen flex flex-col font-sans lg:flex-row">
       <Navbar
         currentUser={currentUser}
-        onSwitchRole={handleSwitchRole}
+        companyName={company.name}
+        companyLogoUrl={companyLogoDisplayUrl}
+        activeView={currentView}
         onOpenCloudSetup={() => setIsCloudSetupOpen(true)}
         onNavigateHome={() => setCurrentView('home')}
-        onNavigateReports={() => setCurrentView('reports')}
-        onNavigateAttendance={() => setCurrentView('attendance')}
+        onNavigateProjects={() => setCurrentView('ongoing_projects')}
+        onNavigateReports={canViewReports ? () => setCurrentView('reports') : undefined}
+        onNavigateAttendance={canViewAttendance ? () => setCurrentView('attendance') : undefined}
         onNavigateUserManagement={() => setCurrentView('user_management')}
         onLogout={handleLogout}
+        onProfileUpdated={(profile) => {
+          setCurrentUser(profile);
+          dataService.setCurrentUser(profile);
+        }}
         supabaseConfig={supabaseConfig}
-        onRefreshData={loadData}
+        onRefreshData={handleRefreshData}
         isRefreshing={isRefreshing}
       />
 
       {/* Main Content Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="bp-main-viewport relative min-h-[calc(100vh-68px)] min-w-0 flex-1 lg:min-h-screen">
+      {company.watermark_enabled && companyLogoDisplayUrl && (
+        <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden" aria-hidden="true">
+          <img
+            src={companyLogoDisplayUrl}
+            alt=""
+            className="h-auto max-w-[78vw] object-contain"
+            style={{
+              width: company.watermark_size ?? 280,
+              maxWidth: 'min(78vw, 320px)',
+              opacity: (company.watermark_opacity ?? 6) / 100
+            }}
+          />
+        </div>
+      )}
+      <main className="bp-main-content relative isolate min-w-0 w-full max-w-[1680px] flex-1 px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+        {currentStockModuleId && selectedProject && (
+          <StockBackgroundSlideshow
+            moduleId={currentStockModuleId}
+            settings={company.stock_background_slideshow}
+            images={resolvedStockBackgroundImages}
+          />
+        )}
+        <div className={currentStockModuleId ? 'relative z-10' : undefined}>
         
         {/* ROLE-RESTRICTED VIEW: WORKER PORTAL (Restricted only to own records) */}
         {currentUser.role === 'worker' ? (
@@ -494,16 +433,18 @@ export default function App() {
             {currentView === 'home' && (
               <HomeScreen
                 company={company}
+                companyLogoDisplayUrl={companyLogoDisplayUrl}
                 ongoingProjects={ongoingProjects}
                 completedProjects={completedProjects}
                 currentUser={currentUser}
-                totalCementStockBags={totalCementStockAcrossAll}
                 onUpdateCompanyName={handleUpdateCompanyName}
+                onSaveCompanyBranding={handleSaveCompanyBranding}
+                resolvedStockBackgroundImages={resolvedStockBackgroundImages}
                 onNavigateCreateProject={() => setIsCreateProjectOpen(true)}
                 onNavigateOngoing={() => setCurrentView('ongoing_projects')}
                 onNavigateCompleted={() => setCurrentView('completed_projects')}
-                onNavigateReports={() => setCurrentView('reports')}
-                onNavigateAttendance={() => setCurrentView('attendance')}
+                onNavigateReports={canViewReports ? () => setCurrentView('reports') : undefined}
+                onNavigateAttendance={canViewAttendance ? () => setCurrentView('attendance') : undefined}
                 onNavigateUserManagement={() => setCurrentView('user_management')}
                 onOpenProject={handleOpenProject}
               />
@@ -515,6 +456,7 @@ export default function App() {
                 projects={ongoingProjects}
                 currentUser={currentUser}
                 onOpenProject={handleOpenProject}
+                onEditProject={setEditingProject}
                 onNavigateCreate={() => setIsCreateProjectOpen(true)}
                 onMarkCompleted={handleMarkProjectCompleted}
                 onNavigateBack={() => setCurrentView('home')}
@@ -547,6 +489,8 @@ export default function App() {
                   setActiveCategoryId(catId);
                   setCurrentView('category_module');
                 }}
+                onOpenVehicleHire={() => setCurrentView('vehicle_hire')}
+                onOpenMachineryHire={() => setCurrentView('machinery_hire')}
                 onNavigateHome={() => setCurrentView('home')}
                 onNavigateProjects={() => setCurrentView(selectedProject.status === 'completed' ? 'completed_projects' : 'ongoing_projects')}
               />
@@ -631,6 +575,14 @@ export default function App() {
               />
             )}
 
+            {currentView === 'vehicle_hire' && selectedProject && (
+              <HireModule mode="vehicle" project={selectedProject} currentUser={currentUser} onNavigateBack={() => setCurrentView('project_workspace')} onNavigateHome={() => setCurrentView('home')} onUploadFile={handleUploadFile} />
+            )}
+
+            {currentView === 'machinery_hire' && selectedProject && (
+              <HireModule mode="machinery" project={selectedProject} currentUser={currentUser} onNavigateBack={() => setCurrentView('project_workspace')} onNavigateHome={() => setCurrentView('home')} onUploadFile={handleUploadFile} />
+            )}
+
             {/* VIEW 11: MATERIALS & STOCK REPORTS */}
             {currentView === 'reports' && (
               <ReportsView
@@ -660,81 +612,10 @@ export default function App() {
             )}
           </>
         )}
+        </div>
 
       </main>
-
-      {/* Floating Section 16 Verification Runner Button */}
-      <aside aria-label="Testing Suite" className="fixed bottom-4 right-4 z-30">
-        <button
-          onClick={() => setIsTestWorkflowOpen(true)}
-          className="px-3.5 py-2 bg-slate-900 text-amber-400 hover:bg-slate-800 rounded-full shadow-lg border border-slate-700 text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-          title="Click to run Section 16 Automated Workflow Test (100 bags receipt -> 25 used -> 3 damaged = 72 bags)"
-        >
-          <PlayCircle className="w-4 h-4 text-amber-400" />
-          <span>Run Section 16 Test Suite</span>
-        </button>
-      </aside>
-
-      {/* Section 16 Test Modal Runner */}
-      {isTestWorkflowOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <PlayCircle className="w-5 h-5 text-amber-400" />
-                <h3 className="font-bold text-base">Section 16 Automated Verification Runner</h3>
-              </div>
-              <button
-                onClick={() => setIsTestWorkflowOpen(false)}
-                className="text-slate-400 hover:text-white p-1"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-600 leading-relaxed">
-                This executes the mandatory 14-step scenario from <strong>Section 16 of the prompt</strong>:
-                creates a test project, records 100 bags receipt, records 25 bags usage, records 3 bags damage, verifies the calculated balance equals <strong>exactly 72 bags</strong>, tests negative stock prevention, verifies RBAC restrictions, and confirms project completion preserves ledger history.
-              </p>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  disabled={isTestingWorkflow}
-                  onClick={runSection16Tests}
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
-                >
-                  <PlayCircle className="w-4 h-4" />
-                  {isTestingWorkflow ? 'Executing Test Steps...' : 'Execute Full Verification Sequence'}
-                </button>
-              </div>
-
-              {testWorkflowLogs.length > 0 && (
-                <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-slate-700 uppercase">Execution Logs:</span>
-                  <div className="bg-slate-950 text-slate-200 text-xs font-mono p-4 rounded-lg max-h-60 overflow-y-auto space-y-1">
-                    {testWorkflowLogs.map((l, i) => (
-                      <div key={i} className={l.includes('[PASSED]') ? 'text-emerald-400' : l.includes('FAILED') ? 'text-rose-400' : 'text-slate-300'}>
-                        {l}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex justify-end">
-              <button
-                onClick={() => setIsTestWorkflowOpen(false)}
-                className="px-4 py-2 bg-slate-900 text-white font-semibold text-xs rounded-lg hover:bg-slate-800 transition-colors"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* CREATE PROJECT MODAL */}
       <CreateProjectModal
@@ -742,6 +623,14 @@ export default function App() {
         onClose={() => setIsCreateProjectOpen(false)}
         onSubmit={handleCreateProject}
         currentUser={currentUser}
+      />
+
+      <CreateProjectModal
+        isOpen={Boolean(editingProject)}
+        onClose={() => setEditingProject(null)}
+        onSubmit={handleUpdateProject}
+        currentUser={currentUser}
+        project={editingProject}
       />
 
       {/* CLOUD DATABASE & SETUP MODAL */}
@@ -753,6 +642,9 @@ export default function App() {
         onTestConnection={handleTestSupabaseConnection}
       />
 
+      <ModalDismissalManager />
+
     </div>
+    </CompanyBrandingContext.Provider>
   );
 }

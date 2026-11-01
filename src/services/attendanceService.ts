@@ -10,6 +10,7 @@ import {
   EmployeeJobType,
   Project
 } from '../types';
+import { getLocalDateString } from '../utils/dateUtils';
 
 const STORAGE_KEYS = {
   GROUPS: 'buildpulse_attendance_groups_v1',
@@ -676,30 +677,16 @@ export const INITIAL_PAYMENTS: SalaryPaymentRecord[] = [
 class AttendanceService {
   private ensureInitialized() {
     if (!localStorage.getItem(STORAGE_KEYS.GROUPS)) {
-      localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(INITIAL_GROUPS));
+      localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.EMPLOYEES)) {
-      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(INITIAL_EMPLOYEES));
-    } else {
-      try {
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
-        let updated = false;
-        for (const emp of INITIAL_EMPLOYEES) {
-          if (!stored.some((e: any) => e.id === emp.id)) {
-            stored.push(emp);
-            updated = true;
-          }
-        }
-        if (updated) {
-          localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(stored));
-        }
-      } catch {}
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.ATTENDANCE_RECORDS)) {
-      localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, JSON.stringify(INITIAL_ATTENDANCE_RECORDS));
+      localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.PAYMENTS)) {
-      localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(INITIAL_PAYMENTS));
+      localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify([]));
     }
   }
 
@@ -768,6 +755,7 @@ class AttendanceService {
     const updated = [newGroup, ...groups];
     localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(updated));
     this.recordAudit('create_group', newGroup.id, { name: newGroup.name });
+    await dataService.persistCloudState();
     return newGroup;
   }
 
@@ -827,6 +815,7 @@ class AttendanceService {
     }
 
     this.recordAudit('update_group', groupId, { name: updatedGroup.name });
+    await dataService.persistCloudState();
     return updatedGroup;
   }
 
@@ -850,6 +839,7 @@ class AttendanceService {
     const filtered = groups.filter(g => g.id !== groupId);
     localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(filtered));
     this.recordAudit('delete_group', groupId, {});
+    await dataService.persistCloudState();
   }
 
   // ==========================================
@@ -881,6 +871,7 @@ class AttendanceService {
     employee_code?: string;
     full_name: string;
     photo_url?: string;
+    documents?: import('../types').EmployeeDocuments;
     phone?: string;
     address?: string;
     job_type: EmployeeJobType | string;
@@ -948,6 +939,7 @@ class AttendanceService {
       employee_code: empCode,
       full_name: trimmedName,
       photo_url: input.photo_url,
+      documents: input.documents,
       phone: input.phone?.trim(),
       address: input.address?.trim(),
       job_type: input.job_type || 'Labourer',
@@ -955,7 +947,7 @@ class AttendanceService {
       group_name: targetGroup ? targetGroup.name : undefined,
       project_id: projId,
       project_name: projectName,
-      joining_date: input.joining_date || new Date().toISOString().split('T')[0],
+      joining_date: input.joining_date || getLocalDateString(),
       salary_type: input.salary_type || 'daily_wage',
       salary_amount: wage,
       standard_hours_per_day: stdHours,
@@ -969,6 +961,7 @@ class AttendanceService {
     const updated = [newEmp, ...employees];
     localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(updated));
     this.recordAudit('create_employee', newEmp.id, { name: newEmp.full_name, code: newEmp.employee_code, group: newEmp.group_name || 'Individual' });
+    await dataService.persistCloudState();
     return newEmp;
   }
 
@@ -976,6 +969,7 @@ class AttendanceService {
     employee_code?: string;
     full_name: string;
     photo_url?: string;
+    documents?: import('../types').EmployeeDocuments;
     phone?: string;
     address?: string;
     job_type: EmployeeJobType | string;
@@ -1034,6 +1028,7 @@ class AttendanceService {
       employee_code: empCode,
       full_name: trimmedName,
       photo_url: input.photo_url !== undefined ? input.photo_url : employees[idx].photo_url,
+      documents: input.documents !== undefined ? input.documents : employees[idx].documents,
       phone: input.phone !== undefined ? input.phone.trim() : employees[idx].phone,
       address: input.address !== undefined ? input.address.trim() : employees[idx].address,
       job_type: input.job_type || employees[idx].job_type,
@@ -1053,6 +1048,7 @@ class AttendanceService {
     employees[idx] = updatedEmp;
     localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
     this.recordAudit('update_employee', employeeId, { name: updatedEmp.full_name, group: targetGroupName || 'Individual' });
+    await dataService.persistCloudState();
     return updatedEmp;
   }
 
@@ -1098,6 +1094,7 @@ class AttendanceService {
       name: updatedEmp.full_name,
       newGroup: targetGroupName || 'Ungrouped / Individual'
     });
+    await dataService.persistCloudState();
     return updatedEmp;
   }
 
@@ -1321,6 +1318,7 @@ class AttendanceService {
 
     localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, JSON.stringify(allRecords));
     this.recordAudit('save_attendance', `${groupId}_${date}`, { count: savedRecords.length, date });
+    await dataService.persistCloudState();
     return savedRecords;
   }
 
@@ -1367,6 +1365,7 @@ class AttendanceService {
     payment_type?: 'salary' | 'advance' | 'bonus' | 'deduction';
     reference_no?: string;
     remarks?: string;
+    attachments?: import('../types').TransactionAttachments;
   }): Promise<SalaryPaymentRecord> {
     const currentUser = dataService.getCurrentUser();
     if (currentUser.role !== 'admin' && currentUser.role !== 'project_manager') {
@@ -1388,12 +1387,13 @@ class AttendanceService {
       employee_id: employee.id,
       employee_name: employee.full_name,
       employee_code: employee.employee_code,
-      payment_date: input.payment_date || new Date().toISOString().split('T')[0],
+      payment_date: input.payment_date || getLocalDateString(),
       amount: amt,
       payment_method: input.payment_method,
       payment_type: input.payment_type || 'salary',
       reference_no: input.reference_no?.trim(),
       remarks: input.remarks?.trim(),
+      attachments: input.attachments,
       recorded_by: currentUser.id,
       recorded_by_name: currentUser.full_name,
       created_at: new Date().toISOString()
@@ -1409,6 +1409,8 @@ class AttendanceService {
       amount: amt,
       type: newPayment.payment_type
     });
+
+    await dataService.persistCloudState();
 
     return newPayment;
   }
@@ -1529,6 +1531,7 @@ class AttendanceService {
     toDate?: string;
     upToDate?: string;
     groupName: string;
+    companyName?: string;
     summaries: EmployeeSalarySummary[];
     records: DailyAttendanceRecord[];
     payments: SalaryPaymentRecord[];
@@ -1540,7 +1543,7 @@ class AttendanceService {
       return `"${s}"`;
     };
 
-    lines.push(escapeCsv('CHEN INFRA - BUILDPULSE ERP'));
+    lines.push(escapeCsv(`${params.companyName || 'BuildPulse ERP'}`));
     lines.push(
       params.reportType === 'date_range'
         ? escapeCsv(`GROUP ATTENDANCE & PAYROLL REPORT (${params.fromDate} to ${params.toDate})`)
