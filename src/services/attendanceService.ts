@@ -1047,6 +1047,46 @@ class AttendanceService {
     return updatedEmp;
   }
 
+  public async deleteEmployee(employeeId: string): Promise<void> {
+    const currentUser = dataService.getCurrentUser();
+    if (currentUser.role !== 'admin') {
+      throw new Error('Access Denied: Only Company Administrators can delete employees.');
+    }
+
+    const employees = await this.getEmployees();
+    const employee = employees.find(item => item.id === employeeId);
+    if (!employee) throw new Error('Employee not found. Refresh the attendance page and try again.');
+
+    const [attendanceRecords, payments] = await Promise.all([
+      this.getAttendanceRecords({ employeeId }),
+      this.getPayments({ employeeId })
+    ]);
+    if (dataService.isCloudConfigured()) {
+      const result = await dataService.requestCloudUserAdmin('GET');
+      const linkedAccounts = Array.isArray(result.accounts)
+        ? result.accounts.filter((account: { employee_id?: string }) => account.employee_id === employeeId)
+        : [];
+      if (linkedAccounts.length > 0) {
+        throw new Error(
+          `Cannot delete ${employee.full_name} because ${linkedAccounts.length} login account(s) are linked to this employee. Unlink the account in User Management first.`
+        );
+      }
+    }
+    if (attendanceRecords.length > 0 || payments.length > 0) {
+      throw new Error(
+        `Cannot delete ${employee.full_name} because ${attendanceRecords.length} attendance record(s) and ${payments.length} payment record(s) are linked. Deactivate the employee to preserve the historical payroll and attendance records.`
+      );
+    }
+
+    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees.filter(item => item.id !== employeeId)));
+    this.recordAudit('delete_employee', employeeId, {
+      employee_code: employee.employee_code,
+      name: employee.full_name,
+      deleted_by: currentUser.full_name
+    });
+    await dataService.persistCloudState();
+  }
+
   /**
    * Assigns an ungrouped or existing employee to a group without creating duplicate records.
    * Preserves all past attendance, salary, and payment history!

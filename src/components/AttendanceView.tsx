@@ -59,6 +59,9 @@ interface AttendanceViewProps {
   onNavigateProjects?: () => void;
 }
 
+// Keep this feature switchable if the client later decides to disable deletion.
+const ENABLE_EMPLOYEE_DELETE = true;
+
 export const AttendanceView: React.FC<AttendanceViewProps> = ({
   currentUser,
   initialGroupId,
@@ -360,6 +363,20 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       await loadData();
     } catch (err: any) {
       alert(err.message || 'Cannot delete group.');
+    }
+  };
+
+  const handleDeleteEmployee = async (employee: Employee) => {
+    const confirmed = window.confirm(
+      `Delete ${employee.full_name} (${employee.employee_code})? This removes the employee profile. Employees with attendance or payment history must be deactivated instead.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await attendanceService.deleteEmployee(employee.id);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Cannot delete this employee.');
     }
   };
 
@@ -1013,6 +1030,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                             )}
+                            {isAdmin && ENABLE_EMPLOYEE_DELETE && (
+                              <button
+                                onClick={() => void handleDeleteEmployee(emp)}
+                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+                                title="Delete employee (blocked when attendance or payment history exists)"
+                                aria-label={`Delete ${emp.full_name}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1562,6 +1589,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                           <Edit2 className="w-3 h-3" />
                           Edit Details
                         </button>
+                        {isAdmin && ENABLE_EMPLOYEE_DELETE && (
+                          <button
+                            onClick={() => void handleDeleteEmployee(emp)}
+                            className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-xs font-semibold text-rose-700 rounded-xl flex items-center gap-1 transition-colors"
+                            title="Delete employee (blocked when attendance or payment history exists)"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Delete
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
