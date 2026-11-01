@@ -22,6 +22,7 @@ export interface UserProfile {
   assigned_projects?: string[];
   employee_id?: string;
   status?: 'active' | 'inactive';
+  must_change_password?: boolean;
 }
 
 export interface AuthAccount {
@@ -61,6 +62,7 @@ export interface UserSession {
   company_id: string;
   assigned_projects: string[];
   employee_id?: string;
+  must_change_password?: boolean;
   login_at: string;
   expires_at: number;
 }

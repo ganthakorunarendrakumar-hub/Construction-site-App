@@ -1,10 +1,10 @@
--- BuildPulse secure Supabase Auth bootstrap.
--- Run this once in Supabase SQL Editor after creating the admin Auth user.
+-- BuildPulse production Supabase Auth bootstrap for CHENINFRA-Production.
+-- Apply the base schema first. This script is safe to rerun on this project.
 
--- Create the company used by the first administrator.
+-- Create the client company used by its first administrator.
 INSERT INTO public.companies (name, code, address)
-VALUES ('CHEN INFRA', 'CHEN', 'India')
-ON CONFLICT (code) DO NOTHING;
+VALUES ('CHENINFRA-Production', 'CHENINFRA', NULL)
+ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 
 -- Keep the cloud ledger aligned with the application stock calculations.
 ALTER TABLE public.material_transactions
@@ -166,22 +166,42 @@ CREATE POLICY "Only admins can mark transaction reversals"
   USING (company_id = public.current_user_company_id())
   WITH CHECK (company_id = public.current_user_company_id());
 
--- Automatically create the application profile whenever a Supabase Auth user
--- is created. The first user is an administrator of the CHEN company.
+-- Automatically create a least-privilege profile when a Supabase Auth user
+-- is created. Only the named company administrator receives the admin role;
+-- all other new users start as management viewers until explicitly promoted.
 CREATE OR REPLACE FUNCTION public.handle_new_buildpulse_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  assigned_role TEXT;
+  assigned_role_title TEXT;
 BEGIN
+  IF lower(NEW.email) = 'p.umamahesh61@gmail.com' THEN
+    assigned_role := 'admin';
+    assigned_role_title := 'Company Administrator';
+  ELSE
+    assigned_role := 'management_viewer';
+    assigned_role_title := 'Management Auditor / Viewer';
+  END IF;
+
   INSERT INTO public.profiles (id, company_id, full_name, email, role, role_title)
   SELECT
     NEW.id,
     c.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''),
+      CASE WHEN lower(NEW.email) = 'p.umamahesh61@gmail.com'
+        THEN 'Pulla Uma Mahesh'
+        ELSE split_part(NEW.email, '@', 1)
+      END),
     NEW.email,
-    'admin',
-    'Company Administrator'
+    assigned_role,
+    assigned_role_title
   FROM public.companies c
-  WHERE c.code = 'CHEN'
-  ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
+  WHERE c.code = 'CHENINFRA'
+  ON CONFLICT (id) DO UPDATE SET
+    company_id = EXCLUDED.company_id,
+    email = EXCLUDED.email,
+    role = EXCLUDED.role,
+    role_title = EXCLUDED.role_title;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -196,12 +216,17 @@ INSERT INTO public.profiles (id, company_id, full_name, email, role, role_title)
 SELECT
   u.id,
   c.id,
-  COALESCE(u.raw_user_meta_data->>'full_name', split_part(u.email, '@', 1)),
+  COALESCE(NULLIF(u.raw_user_meta_data->>'full_name', ''), 'Pulla Uma Mahesh'),
   u.email,
   'admin',
   'Company Administrator'
 FROM auth.users u
 CROSS JOIN public.companies c
-WHERE c.code = 'CHEN'
-  AND u.email = 'admin@cheninfra.com'
-ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
+WHERE c.code = 'CHENINFRA'
+  AND lower(u.email) = 'p.umamahesh61@gmail.com'
+ON CONFLICT (id) DO UPDATE SET
+  company_id = EXCLUDED.company_id,
+  full_name = EXCLUDED.full_name,
+  email = EXCLUDED.email,
+  role = EXCLUDED.role,
+  role_title = EXCLUDED.role_title;

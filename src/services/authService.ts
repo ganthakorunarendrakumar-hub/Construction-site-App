@@ -408,47 +408,25 @@ export class AuthService {
     const hasAnySupabaseConfig = Boolean(supabaseConfig.url.trim() || supabaseConfig.anonKey.trim());
 
     if (dataService.isCloudConfigured()) {
-      if (!this.isEmailLoginIdentifier(cleanId) && !account) {
-        throw new Error('This User ID is not linked to a local email mapping on this browser. Sign in with the registered email, or ask the administrator to securely provision the User ID mapping. Cloud profiles are self-readable only, so the app cannot look up another user’s email before authentication.');
-      }
-      if (account?.status === 'inactive') {
-        throw new Error('Account Deactivated: This user account has been disabled by the Company Administrator.');
-      }
-
-      // Supabase Auth is authoritative in cloud mode. A local PBKDF account
-      // must not be required just to reach Auth; a local account, when present,
-      // is used only to translate a User ID to its registered email.
-      const loginEmail = account?.email.trim().toLocaleLowerCase() || cleanId.toLocaleLowerCase();
-      const cloudProfile = await dataService.signInWithSupabase(loginEmail, password);
-      if (account && account.email.trim().toLocaleLowerCase() !== cloudProfile.email.trim().toLocaleLowerCase()) {
-        await dataService.signOutFromSupabase().catch(() => undefined);
-        throw new Error('The authenticated Supabase email does not match the registered User ID mapping. Ask the administrator to correct the existing mapping; no account was changed.');
-      }
-      const resolvedByUserId = !this.isEmailLoginIdentifier(cleanId);
-      if (account && resolvedByUserId && account.company_id !== cloudProfile.company_id) {
-        await dataService.signOutFromSupabase().catch(() => undefined);
-        throw new Error('This User ID mapping belongs to a different company than the authenticated Supabase profile. Ask the administrator to correct the existing mapping; the cloud profile and account were not changed.');
-      }
-      const localMappingMatchesTenant = Boolean(account && account.company_id === cloudProfile.company_id);
-
-      if (account) {
-        account.failed_attempts = 0;
-        account.lockout_until = null;
-        account.last_login_at = new Date().toISOString();
-        this.saveAccountsToStorage();
-      }
+      // Cloud Auth and the company profile are authoritative. The secure
+      // User ID login endpoint resolves the ID without relying on browser-local
+      // account mappings, so employees can sign in on a new device.
+      const cloudProfile = this.isEmailLoginIdentifier(cleanId)
+        ? await dataService.signInWithSupabase(cleanId, password)
+        : await dataService.signInWithSupabaseUserId(cleanId, password);
       const sessionDurationMs = rememberMe ? 24 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
       const session: UserSession = {
         token: AuthCrypto.generateSessionToken(),
         auth_uid: cloudProfile.auth_uid || cloudProfile.id,
-        user_id: cloudProfile.user_id || (localMappingMatchesTenant ? account?.user_id : undefined) || cloudProfile.email,
+        user_id: cloudProfile.user_id || cloudProfile.email,
         email: cloudProfile.email.trim().toLocaleLowerCase(),
         full_name: cloudProfile.full_name,
         role: cloudProfile.role,
         role_title: cloudProfile.role_title,
         company_id: cloudProfile.company_id,
-        assigned_projects: cloudProfile.assigned_projects || (localMappingMatchesTenant ? account?.assigned_projects : undefined) || [],
-        employee_id: cloudProfile.employee_id || (localMappingMatchesTenant ? account?.employee_id : undefined),
+        assigned_projects: cloudProfile.assigned_projects || [],
+        employee_id: cloudProfile.employee_id,
+        must_change_password: cloudProfile.must_change_password,
         login_at: new Date().toISOString(),
         expires_at: Date.now() + sessionDurationMs
       };
@@ -577,6 +555,17 @@ export class AuthService {
     await dataService.signOutFromSupabase();
   }
 
+  public async completeRequiredCloudPasswordChange(newPassword: string): Promise<void> {
+    const session = this.getSession();
+    if (!session || !session.must_change_password || !dataService.isCloudConfigured()) {
+      throw new Error('No required cloud password change is pending.');
+    }
+    if (newPassword.length < 8) throw new Error('Password must be at least 8 characters long.');
+    await dataService.completeRequiredCloudPasswordChange(newPassword);
+    this.currentSession = { ...session, must_change_password: false };
+    localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(this.currentSession));
+  }
+
   /**
    * Returns current active session or null.
    */
@@ -609,7 +598,8 @@ export class AuthService {
         company_id: session.company_id,
         assigned_projects: session.assigned_projects,
         employee_id: session.employee_id,
-        status: 'active'
+        status: 'active',
+        must_change_password: session.must_change_password
       };
     }
     // Fallback if not authenticated
@@ -802,12 +792,20 @@ export class AuthService {
     if (currentUser.role !== 'admin') {
       throw new Error('Access Denied: Only Company Administrators can access User Management.');
     }
+    if (dataService.isCloudConfigured()) {
+      const result = await dataService.requestCloudUserAdmin('GET');
+      this.accounts = Array.isArray(result.accounts) ? result.accounts as AuthAccount[] : [];
+    }
     return [...this.accounts];
   }
 
   /** Returns active accounts eligible to be assigned to construction projects. */
   public async getProjectManagerCandidates(): Promise<AuthAccount[]> {
     await this.ensureInitialized();
+    if (dataService.isCloudConfigured()) {
+      const result = await dataService.requestCloudUserAdmin('GET');
+      this.accounts = Array.isArray(result.accounts) ? result.accounts as AuthAccount[] : [];
+    }
     return this.accounts.filter(account =>
       account.status === 'active' && PROJECT_MANAGER_ROLES.includes(account.role)
     );
@@ -869,6 +867,32 @@ export class AuthService {
     if (!pwdToHash) throw new Error('An initial password is required for new accounts.');
     if (pwdToHash.length < 8) {
       throw new Error('Initial password must be at least 8 characters.');
+    }
+
+    if (dataService.isCloudConfigured()) {
+      const result = await dataService.requestCloudUserAdmin('POST', {
+        full_name: trimmedName,
+        user_id: finalUserId,
+        email: trimmedEmail,
+        role: input.role,
+        phone: input.phone?.trim(),
+        assigned_projects: input.assigned_projects || [],
+        employee_id: input.employee_id || null,
+        initial_password: pwdToHash,
+        require_password_change: input.require_password_change ?? false,
+        status: input.status || 'active'
+      });
+      const created = result.account as AuthAccount | undefined;
+      if (!created?.auth_uid) throw new Error('Supabase created no profile response. Refresh the account list and verify Auth before trying again.');
+      this.accounts = [...this.accounts.filter(account => account.auth_uid !== created.auth_uid), created];
+      this.recordAuditLog('create_user_account', created.auth_uid, {
+        user_id: created.user_id,
+        email: created.email,
+        role: created.role,
+        created_by: currentAdmin.full_name,
+        storage: 'supabase_auth_and_profiles'
+      });
+      return created;
     }
 
     const salt = AuthCrypto.generateSalt(16);
@@ -1230,6 +1254,15 @@ export class AuthService {
       throw new Error('Access Denied: Only Company Administrators can modify user accounts.');
     }
 
+    if (dataService.isCloudConfigured()) {
+      const result = await dataService.requestCloudUserAdmin('PATCH', { id: auth_uid, action: 'update', ...updates });
+      const updated = result.account as AuthAccount | undefined;
+      if (!updated?.auth_uid) throw new Error('The cloud did not return the updated account. Refresh the account list.');
+      this.accounts = [...this.accounts.filter(account => account.auth_uid !== auth_uid), updated];
+      this.recordAuditLog('update_user_account', auth_uid, { user_id: updated.user_id, role: updated.role, status: updated.status, storage: 'supabase_auth_and_profiles' });
+      return updated;
+    }
+
     const idx = this.accounts.findIndex(a => a.auth_uid === auth_uid);
     if (idx === -1) throw new Error('User account not found.');
 
@@ -1280,6 +1313,14 @@ export class AuthService {
       throw new Error('New password must be at least 8 characters long.');
     }
 
+    if (dataService.isCloudConfigured()) {
+      await dataService.requestCloudUserAdmin('PATCH', { id: auth_uid, action: 'reset_password', password: newPassword });
+      const account = this.accounts.find(item => item.auth_uid === auth_uid);
+      if (account) account.must_change_password = true;
+      this.recordAuditLog('admin_reset_password', auth_uid, { target_user_id: account?.user_id, reset_by: currentAdmin.full_name, storage: 'supabase_auth' });
+      return;
+    }
+
     const idx = this.accounts.findIndex(a => a.auth_uid === auth_uid);
     if (idx === -1) throw new Error('Account not found.');
 
@@ -1309,6 +1350,20 @@ export class AuthService {
     const currentAdmin = this.getCurrentUser();
     if (currentAdmin.role !== 'admin') {
       throw new Error('Access Denied: Only Company Administrators can modify account status.');
+    }
+
+    if (dataService.isCloudConfigured()) {
+      const target = this.accounts.find(item => item.auth_uid === auth_uid);
+      if (status === 'inactive' && target?.role === 'admin') {
+        const activeAdmins = this.accounts.filter(item => item.role === 'admin' && item.status === 'active');
+        if (activeAdmins.length <= 1) throw new Error('Safety Rule: Cannot deactivate the only active Company Administrator account.');
+      }
+      const result = await dataService.requestCloudUserAdmin('PATCH', { id: auth_uid, action: 'status', status });
+      const updated = result.account as AuthAccount | undefined;
+      if (!updated?.auth_uid) throw new Error('The cloud did not return the updated account. Refresh the account list.');
+      this.accounts = [...this.accounts.filter(account => account.auth_uid !== auth_uid), updated];
+      this.recordAuditLog('toggle_account_status', auth_uid, { user_id: updated.user_id, new_status: updated.status, storage: 'supabase_auth_and_profiles' });
+      return updated;
     }
 
     const idx = this.accounts.findIndex(a => a.auth_uid === auth_uid);
@@ -1342,6 +1397,19 @@ export class AuthService {
     const currentAdmin = this.getCurrentUser();
     if (currentAdmin.role !== 'admin') {
       throw new Error('Access Denied: Only Company Administrators can delete user accounts.');
+    }
+
+    if (dataService.isCloudConfigured()) {
+      const target = this.accounts.find(item => item.auth_uid === auth_uid);
+      if (!target) throw new Error('Account not found. Refresh the account list.');
+      if (target.role === 'admin') {
+        const activeAdmins = this.accounts.filter(item => item.role === 'admin' && item.status === 'active');
+        if (activeAdmins.length <= 1) throw new Error('Safety Rule: Cannot delete the primary active Company Administrator account.');
+      }
+      await dataService.requestCloudUserAdmin('DELETE', { id: auth_uid });
+      this.accounts = this.accounts.filter(item => item.auth_uid !== auth_uid);
+      this.recordAuditLog('delete_account', auth_uid, { user_id: target.user_id, deleted_by: currentAdmin.full_name, storage: 'supabase_auth' });
+      return;
     }
 
     const target = this.accounts.find(a => a.auth_uid === auth_uid);

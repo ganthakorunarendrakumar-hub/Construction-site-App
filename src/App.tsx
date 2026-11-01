@@ -31,6 +31,7 @@ import { AttendanceView } from './components/AttendanceView';
 import { UserManagementView } from './components/UserManagementView';
 import { WorkerPortalView } from './components/WorkerPortalView';
 import { LoginPage } from './components/LoginPage';
+import { RequiredPasswordChangeModal } from './components/RequiredPasswordChangeModal';
 import { authService } from './services/authService';
 import { UserSession } from './types';
 import { CreateProjectModal } from './components/CreateProjectModal';
@@ -120,6 +121,15 @@ export default function App() {
     const u = authService.getCurrentUser();
     setCurrentUser(u);
     dataService.setCurrentUser(u);
+  };
+
+  const handleRequiredPasswordChange = async (newPassword: string) => {
+    await authService.completeRequiredCloudPasswordChange(newPassword);
+    const updatedSession = authService.getSession();
+    setSession(updatedSession);
+    const updatedUser = authService.getCurrentUser();
+    setCurrentUser(updatedUser);
+    dataService.setCurrentUser(updatedUser);
   };
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -372,6 +382,10 @@ export default function App() {
         <ModalDismissalManager />
       </>
     );
+  }
+
+  if (session.must_change_password && dataService.isCloudConfigured()) {
+    return <RequiredPasswordChangeModal onSubmit={handleRequiredPasswordChange} onSignOut={handleLogout} />;
   }
 
   return (

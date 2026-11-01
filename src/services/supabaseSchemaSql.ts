@@ -33,13 +33,22 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     company_id UUID REFERENCES public.companies(id) ON DELETE RESTRICT,
     full_name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'project_manager', 'site_engineer', 'storekeeper', 'management_viewer')),
+    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'site_supervisor', 'accountant', 'worker', 'project_manager', 'site_engineer', 'storekeeper', 'management_viewer')),
     role_title VARCHAR(100),
     avatar_url TEXT,
     phone VARCHAR(30),
+    user_id VARCHAR(100),
+    assigned_projects TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+    employee_id VARCHAR(100),
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    must_change_password BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_user_id_unique
+    ON public.profiles (upper(user_id))
+    WHERE user_id IS NOT NULL AND user_id <> '';
 
 -- 4. Projects table
 CREATE TABLE IF NOT EXISTS public.projects (
