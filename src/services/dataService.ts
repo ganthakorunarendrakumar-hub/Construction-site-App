@@ -1363,7 +1363,7 @@ class DataService {
     }, 500);
   }
 
-  private async pushCloudState(): Promise<void> {
+  private async pushCloudState(verifiedCompanyId?: string): Promise<void> {
     if (!this.config.url.trim() && !this.config.anonKey.trim()) return;
     if (!this.supabase) {
       throw new Error('Supabase is configured but the client could not be initialized. Check the project URL and public key.');
@@ -1371,9 +1371,9 @@ class DataService {
     if (!this.config.isConnected) {
       throw new Error('Supabase is configured but not connected. Verify the cloud connection before saving changes.');
     }
-    if (!this.currentUser.company_id) return;
+    const companyId = verifiedCompanyId || await this.verifyCloudSyncIdentity();
     const { error } = await this.supabase.from('app_state').upsert({
-      company_id: this.currentUser.company_id,
+      company_id: companyId,
       state: this.getCloudStateSnapshot(),
       updated_at: new Date().toISOString()
     }, { onConflict: 'company_id' });
@@ -1384,13 +1384,69 @@ class DataService {
     this.cloudStateSyncWarning = null;
   }
 
+  /**
+   * Local BuildPulse sessions are not Supabase Auth sessions. Before accessing
+   * the company-scoped snapshot, verify the live Auth identity and its profile
+   * company so RLS is evaluated for the same tenant we are about to read/write.
+   */
+  private async verifyCloudSyncIdentity(): Promise<string> {
+    const supabase = this.supabase;
+    if (!supabase) throw new Error('Supabase client is not initialized; cloud state was not synchronized.');
+
+    let authUser: { id: string };
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) throw new Error('No verified Supabase Auth user.');
+      authUser = data.user;
+    } catch {
+      this.cloudStateSyncWarning = 'Shared data was not synchronized because a valid Supabase sign-in is required.';
+      throw new Error('A valid Supabase Auth session is required for shared cloud sync. Sign out and sign in with the registered Supabase account.');
+    }
+
+    const activeAuthId = this.currentUser.auth_uid || this.currentUser.id;
+    if (!activeAuthId || activeAuthId !== authUser.id) {
+      this.cloudStateSyncWarning = 'Shared data was not synchronized because the BuildPulse session does not match Supabase Auth.';
+      throw new Error('The active BuildPulse session does not match the signed-in Supabase Auth user. Sign out and sign in again before syncing.');
+    }
+
+    let profile: { id?: unknown; company_id?: unknown; status?: unknown } | null = null;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, company_id, status')
+        .eq('id', authUser.id)
+        .maybeSingle();
+      if (error || !data || data.id !== authUser.id) throw new Error('Profile lookup failed.');
+      profile = data;
+    } catch {
+      this.cloudStateSyncWarning = 'Shared data was not synchronized because the Supabase company profile could not be verified.';
+      throw new Error('The signed-in Supabase profile could not be verified. Check its existing profile and company association.');
+    }
+
+    if (profile.status === 'inactive') {
+      this.cloudStateSyncWarning = 'Shared data was not synchronized because the Supabase account is inactive.';
+      throw new Error('The signed-in Supabase account is inactive and cannot sync company data.');
+    }
+
+    const profileCompanyId = typeof profile.company_id === 'string' ? profile.company_id.trim() : '';
+    const activeCompanyId = this.currentUser.company_id.trim();
+    if (!profileCompanyId || !activeCompanyId || profileCompanyId !== activeCompanyId) {
+      this.cloudStateSyncWarning = 'Shared data was not synchronized because the active company does not match the Supabase profile.';
+      throw new Error('The active BuildPulse company_id does not match the authenticated Supabase profile company_id. Cloud sync was stopped.');
+    }
+
+    this.cloudStateSyncWarning = null;
+    return profileCompanyId;
+  }
+
   public async syncCloudState(): Promise<void> {
-    if (!this.supabase || !this.config.isConnected || !this.currentUser.company_id) return;
+    if (!this.supabase || !this.config.isConnected) return;
     this.installCloudStateSync();
+    const companyId = await this.verifyCloudSyncIdentity();
     const { data, error } = await this.supabase
       .from('app_state')
       .select('state')
-      .eq('company_id', this.currentUser.company_id)
+      .eq('company_id', companyId)
       .maybeSingle();
     if (error) throw new Error(`Cloud state read failed: ${error.message}`);
 
@@ -1402,7 +1458,7 @@ class DataService {
         this.isRestoringCloudState = false;
       }
     } else {
-      await this.pushCloudState();
+      await this.pushCloudState(companyId);
     }
   }
 

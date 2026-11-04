@@ -14,6 +14,58 @@ Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: l
 
 const { dataService, resolveSupabaseClientSettings, shouldQueueCloudStateSync } = await import('../src/services/dataService.ts');
 
+const withCloudSyncIdentity = async <T>(params: {
+  authUser: { id: string } | null;
+  profile: { id: string; company_id: string; status: string } | null;
+  currentUser?: { id: string; auth_uid?: string; company_id: string };
+  appState?: { data: { state: Record<string, unknown> } | null; error: { message: string } | null };
+  run: (result: { upsertRows: Record<string, unknown>[]; tables: string[] }) => Promise<T>;
+}): Promise<T> => {
+  const target = dataService as unknown as Record<string, unknown>;
+  const oldConfig = target.config;
+  const oldClient = target.supabase;
+  const oldCurrentUser = target.currentUser;
+  const upsertRows: Record<string, unknown>[] = [];
+  const tables: string[] = [];
+  const profileQuery = {
+    select() { return this; },
+    eq() { return this; },
+    maybeSingle: async () => ({ data: params.profile, error: null })
+  };
+  const appStateQuery = {
+    select() { return this; },
+    eq() { return this; },
+    maybeSingle: async () => params.appState || { data: null, error: null },
+    upsert: async (row: Record<string, unknown>) => {
+      upsertRows.push(row);
+      return { error: null };
+    }
+  };
+
+  target.config = { url: 'https://project.example.test', anonKey: 'public-test-key', isConnected: true };
+  target.currentUser = params.currentUser || {
+    id: 'auth-user-1', auth_uid: 'auth-user-1', company_id: 'company-1',
+    full_name: 'Test User', email: 'user@example.test', role: 'admin'
+  };
+  target.supabase = {
+    auth: { getUser: async () => ({ data: { user: params.authUser }, error: null }) },
+    from: (table: string) => {
+      tables.push(table);
+      if (table === 'profiles') return profileQuery;
+      if (table === 'app_state') return appStateQuery;
+      throw new Error('Unexpected table access in cloud-state test.');
+    }
+  };
+
+  try {
+    return await params.run({ upsertRows, tables });
+  } finally {
+    target.config = oldConfig;
+    target.supabase = oldClient;
+    target.currentUser = oldCurrentUser;
+  }
+};
+
 test('publishable environment keys are preferred while legacy anon and saved browser settings remain supported', () => {
   assert.deepEqual(resolveSupabaseClientSettings({
     VITE_SUPABASE_URL: ' https://project.example.test/ ',
@@ -134,4 +186,56 @@ test('connection settings stay local while business state remains eligible for c
   assert.equal(shouldQueueCloudStateSync('buildpulse_supabase_config_v1'), false);
   assert.equal(shouldQueueCloudStateSync('buildpulse_auth_session_v1'), false);
   assert.equal(shouldQueueCloudStateSync('buildpulse_projects_v1'), true);
+});
+
+test('cloud state writes fail closed when the SDK has no authenticated Supabase user', async () => {
+  await withCloudSyncIdentity({
+    authUser: null,
+    profile: null,
+    run: async ({ upsertRows, tables }) => {
+      await assert.rejects(dataService.persistCloudState(), /valid Supabase Auth session is required/i);
+      assert.equal(upsertRows.length, 0);
+      assert.deepEqual(tables, []);
+    }
+  });
+});
+
+test('cloud state writes fail closed when the authenticated UID does not match the active BuildPulse user', async () => {
+  await withCloudSyncIdentity({
+    authUser: { id: 'real-auth-user' },
+    profile: { id: 'real-auth-user', company_id: 'company-1', status: 'active' },
+    currentUser: { id: 'stale-local-user', auth_uid: 'stale-local-user', company_id: 'company-1' },
+    run: async ({ upsertRows, tables }) => {
+      await assert.rejects(dataService.persistCloudState(), /does not match the signed-in Supabase Auth user/i);
+      assert.equal(upsertRows.length, 0);
+      assert.deepEqual(tables, []);
+    }
+  });
+});
+
+test('cloud state writes fail closed when profile company differs from the company being synchronized', async () => {
+  await withCloudSyncIdentity({
+    authUser: { id: 'auth-user-1' },
+    profile: { id: 'auth-user-1', company_id: 'company-1', status: 'active' },
+    currentUser: { id: 'auth-user-1', auth_uid: 'auth-user-1', company_id: 'company-2' },
+    run: async ({ upsertRows, tables }) => {
+      await assert.rejects(dataService.persistCloudState(), /company_id does not match.*profile company_id/i);
+      assert.equal(upsertRows.length, 0);
+      assert.deepEqual(tables, ['profiles']);
+    }
+  });
+});
+
+test('app_state upsert uses only the active authenticated profile company ID', async () => {
+  await withCloudSyncIdentity({
+    authUser: { id: 'auth-user-1' },
+    profile: { id: 'auth-user-1', company_id: 'company-1', status: 'active' },
+    currentUser: { id: 'auth-user-1', auth_uid: 'auth-user-1', company_id: 'company-1' },
+    run: async ({ upsertRows, tables }) => {
+      await dataService.persistCloudState();
+      assert.equal(upsertRows.length, 1);
+      assert.equal(upsertRows[0].company_id, 'company-1');
+      assert.deepEqual(tables, ['profiles', 'app_state']);
+    }
+  });
 });
