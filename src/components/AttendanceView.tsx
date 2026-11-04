@@ -51,6 +51,7 @@ import { AttachmentFileLink, AttachmentLinks } from './AttachmentSections';
 import { getLocalDateString, getLocalDateStringOffset, getLocalMonthStartString, getLocalYearStartString } from '../utils/dateUtils';
 import { useCompanyBranding } from '../contexts/CompanyBrandingContext';
 import { CompanyLogo } from './CompanyLogo';
+import { IndividualAttendanceView } from './IndividualAttendanceView';
 
 interface AttendanceViewProps {
   currentUser: UserProfile;
@@ -71,6 +72,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const { companyName, companyLogoUrl } = useCompanyBranding();
   // Navigation State
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroupId || null);
+  const [attendanceMode, setAttendanceMode] = useState<'group' | 'individual'>('group');
   const [activeTab, setActiveTab] = useState<'mark' | 'employees' | 'history' | 'salary' | 'reports'>('mark');
 
   // Core Data State
@@ -565,6 +567,30 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150 font-['Inter',sans-serif]">
+
+      <nav aria-label="Attendance type" role="tablist" className="inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-bp-border bg-white p-1 shadow-xs">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={attendanceMode === 'group'}
+          onClick={() => setAttendanceMode('group')}
+          className={`min-h-10 rounded-lg px-4 text-sm font-semibold transition-colors ${attendanceMode === 'group' ? 'bg-bp-navy text-white' : 'text-bp-muted hover:bg-bp-background hover:text-bp-text'}`}
+        >
+          Group Attendance
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={attendanceMode === 'individual'}
+          onClick={() => {
+            setSelectedGroupId(null);
+            setAttendanceMode('individual');
+          }}
+          className={`min-h-10 rounded-lg px-4 text-sm font-semibold transition-colors ${attendanceMode === 'individual' ? 'bg-bp-navy text-white' : 'text-bp-muted hover:bg-bp-background hover:text-bp-text'}`}
+        >
+          Individual Attendance
+        </button>
+      </nav>
       
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-bp-muted">
@@ -575,7 +601,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           </button>
         )}
         <ChevronRight className="w-3.5 h-3.5 text-bp-muted" />
-        {selectedGroupId ? (
+        {attendanceMode === 'individual' ? (
+          <span className="font-semibold text-bp-text flex items-center gap-1.5">
+            <UserPlus className="w-3.5 h-3.5 text-bp-cyan" /> Individual Attendance
+          </span>
+        ) : selectedGroupId ? (
           <>
             <button
               onClick={() => setSelectedGroupId(null)}
@@ -598,7 +628,18 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       {/* ======================================================== */}
       {/* SCREEN 1: ATTENDANCE GROUPS HOME SCREEN */}
       {/* ======================================================== */}
-      {!selectedGroupId ? (
+      {attendanceMode === 'individual' ? (
+        <IndividualAttendanceView
+          currentUser={currentUser}
+          onRecordsChanged={loadData}
+          onOpenGroupRecord={record => {
+            setAttendanceMode('group');
+            setSelectedGroupId(record.group_id || null);
+            setAttendanceDate(record.date);
+            setActiveTab('mark');
+          }}
+        />
+      ) : !selectedGroupId ? (
         <div className="space-y-6">
           
           {/* Hero Banner with Create Group Button */}

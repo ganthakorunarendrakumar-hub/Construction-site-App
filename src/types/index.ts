@@ -759,6 +759,9 @@ export interface DailyAttendanceRecord {
   group_name?: string;
   project_id?: string;
   project_name?: string;
+  site_id?: string;
+  site_name?: string;
+  attendance_source?: 'group' | 'individual';
   employee_id: string;
   employee_code: string;
   employee_name: string;

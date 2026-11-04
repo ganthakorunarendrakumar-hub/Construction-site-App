@@ -1,4 +1,5 @@
 import { dataService } from './dataService';
+import { authService } from './authService';
 import {
   AttendanceGroup,
   Employee,
@@ -20,6 +21,29 @@ const STORAGE_KEYS = {
   PAYMENTS: 'buildpulse_salary_payments_v1',
   AUDIT_LOGS: 'buildpulse_attendance_audit_v1'
 };
+
+export class DuplicateAttendanceRecordError extends Error {
+  public readonly existingRecord: DailyAttendanceRecord;
+
+  constructor(existingRecord: DailyAttendanceRecord) {
+    super('Attendance already exists for this employee, project, and date. Review the existing record before making changes.');
+    this.name = 'DuplicateAttendanceRecordError';
+    this.existingRecord = existingRecord;
+  }
+}
+
+export type IndividualAttendanceStatus = Extract<AttendanceStatus, 'Present' | 'Absent' | 'Half Day' | 'Leave'>;
+
+export interface IndividualAttendanceInput {
+  employee_id: string;
+  project_id: string;
+  site_id?: string;
+  date: string;
+  status: IndividualAttendanceStatus;
+  working_hours: number;
+  overtime_hours: number;
+  remarks?: string;
+}
 
 // Seed realistic initial groups (e.g., Dan Group, Ram Group, and Shankar MEP Gang)
 export const INITIAL_GROUPS: AttendanceGroup[] = [
@@ -1321,18 +1345,25 @@ class AttendanceService {
 
       // Check if record exists for this employee + group + date
       const existingIdx = allRecords.findIndex(
-        r => r.employee_id === emp.id && r.group_id === groupId && r.date === date
+        r => r.employee_id === emp.id
+          && r.group_id === groupId
+          && r.date === date
+          && (r.project_id || group.project_id) === group.project_id
       );
+      const existingRecord = existingIdx !== -1 ? allRecords[existingIdx] : undefined;
 
       const record: DailyAttendanceRecord = {
         id: existingIdx !== -1
-          ? allRecords[existingIdx].id
+          ? existingRecord!.id
           : `att-${emp.id}-${date.replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6)}`,
         company_id: 'comp-apex-01',
         group_id: groupId,
         group_name: group.name,
         project_id: group.project_id,
         project_name: group.project_name,
+        site_id: existingRecord?.site_id,
+        site_name: existingRecord?.site_name,
+        attendance_source: existingRecord?.attendance_source || 'group',
         employee_id: emp.id,
         employee_code: emp.employee_code,
         employee_name: emp.full_name,
@@ -1351,7 +1382,7 @@ class AttendanceService {
         remarks: entry.remarks?.trim(),
         recorded_by: currentUser.id,
         recorded_by_name: currentUser.full_name,
-        created_at: existingIdx !== -1 ? allRecords[existingIdx].created_at : new Date().toISOString(),
+        created_at: existingRecord?.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
@@ -1368,6 +1399,201 @@ class AttendanceService {
     this.recordAudit('save_attendance', `${groupId}_${date}`, { count: savedRecords.length, date });
     await dataService.persistCloudState();
     return savedRecords;
+  }
+
+  public canManageAttendance(projectId?: string): boolean {
+    return authService.canPerformAction('manage_attendance', projectId);
+  }
+
+  private async refreshAttendanceBeforeWrite(): Promise<void> {
+    if (dataService.isCloudConfigured() && !dataService.isCloudConnected()) {
+      throw new Error('Supabase is configured but not connected. Individual attendance was not saved; restore the cloud connection and retry.');
+    }
+    if (dataService.isCloudConnected()) await dataService.syncCloudState();
+  }
+
+  private validateAttendanceDate(date: string): void {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+    if (!match) throw new Error('Select a valid attendance date.');
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const parsed = new Date(year, month - 1, day);
+    if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) {
+      throw new Error('Select a valid attendance date.');
+    }
+  }
+
+  /** Save or update one employee's attendance in the shared attendance ledger. */
+  public async saveIndividualAttendance(
+    input: IndividualAttendanceInput,
+    recordId?: string
+  ): Promise<DailyAttendanceRecord> {
+    const currentUser = dataService.getCurrentUser();
+    if (!input.project_id || !this.canManageAttendance(input.project_id)) {
+      throw new Error('Access Denied: You do not have attendance permission for this project.');
+    }
+    this.validateAttendanceDate(input.date);
+    await this.refreshAttendanceBeforeWrite();
+
+    const employee = await this.getEmployeeById(input.employee_id);
+    if (!employee || employee.company_id !== currentUser.company_id) {
+      throw new Error('Select an employee from your company.');
+    }
+    if (employee.status !== 'active') throw new Error('Inactive employees cannot receive new attendance records.');
+    if (employee.joining_date && input.date < employee.joining_date) {
+      throw new Error('Attendance date cannot be earlier than the employee joining date.');
+    }
+
+    const project = await dataService.getProjectById(input.project_id);
+    if (!project || project.company_id !== currentUser.company_id) throw new Error('Select a project from your company.');
+
+    const locations = await dataService.getMaterialLocations(project.id);
+    let siteId: string | undefined;
+    let siteName = project.location.trim() || project.address.trim() || project.name;
+    if (input.site_id) {
+      const selectedLocation = locations.find(location =>
+        location.id === input.site_id && location.company_id === currentUser.company_id
+      );
+      if (!selectedLocation) throw new Error('Select a site that belongs to the selected project.');
+      siteId = selectedLocation.id;
+      siteName = selectedLocation.name;
+    } else if (locations.length > 0) {
+      throw new Error('Select a site for the selected project.');
+    }
+
+    const validStatuses: IndividualAttendanceStatus[] = ['Present', 'Absent', 'Half Day', 'Leave'];
+    if (!validStatuses.includes(input.status)) throw new Error('Select a valid attendance status.');
+
+    const workingHours = Number(input.working_hours);
+    const overtimeHours = Number(input.overtime_hours);
+    if (!Number.isFinite(workingHours) || workingHours < 0 || workingHours > 24) {
+      throw new Error('Working hours must be between 0 and 24.');
+    }
+    if (!Number.isFinite(overtimeHours) || overtimeHours < 0 || overtimeHours > 24) {
+      throw new Error('Overtime hours must be between 0 and 24.');
+    }
+    if ((input.status === 'Present' || input.status === 'Half Day') && workingHours <= 0) {
+      throw new Error('Enter working hours for present or half-day attendance.');
+    }
+    if ((input.status === 'Absent' || input.status === 'Leave') && (workingHours !== 0 || overtimeHours !== 0)) {
+      throw new Error('Absent and leave records must have zero working and overtime hours.');
+    }
+    if (overtimeHours > 0 && input.status !== 'Present' && input.status !== 'Half Day') {
+      throw new Error('Overtime can only be recorded for present or half-day attendance.');
+    }
+
+    const groups = await this.getGroups();
+    const employeeGroupId = employee.group_id && employee.group_id !== 'ungrouped' ? employee.group_id : undefined;
+    const employeeGroup = employeeGroupId
+      ? groups.find(group => group.id === employeeGroupId && group.company_id === currentUser.company_id)
+      : undefined;
+    const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE_RECORDS);
+    let allRecords: DailyAttendanceRecord[] = stored ? JSON.parse(stored) : [];
+    if (!Array.isArray(allRecords)) throw new Error('Saved attendance data could not be read. Refresh and try again.');
+
+    const editingRecord = recordId ? allRecords.find(record => record.id === recordId) : undefined;
+    if (recordId && (!editingRecord || editingRecord.company_id !== currentUser.company_id || editingRecord.attendance_source !== 'individual')) {
+      throw new Error('Individual attendance record not found or cannot be edited from this screen.');
+    }
+    if (editingRecord?.project_id && editingRecord.project_id !== input.project_id
+      && !this.canManageAttendance(editingRecord.project_id)) {
+      throw new Error('Access Denied: You do not have permission to move this record from its current project.');
+    }
+
+    const duplicate = allRecords.find(record =>
+      record.id !== editingRecord?.id
+      && record.company_id === currentUser.company_id
+      && record.employee_id === employee.id
+      && (record.project_id
+        || (record.group_id ? groups.find(group => group.id === record.group_id)?.project_id : undefined)
+        || (record.employee_id === employee.id ? employee.project_id : undefined)) === project.id
+      && record.date === input.date
+    );
+    if (duplicate) throw new DuplicateAttendanceRecordError(duplicate);
+
+    const { payableDays, dailyEarnings } = this.calculateDailyEarnings(
+      input.status,
+      employee.salary_type,
+      employee.salary_amount,
+      overtimeHours,
+      employee.overtime_rate_per_hour || 0
+    );
+    const now = new Date().toISOString();
+    const record: DailyAttendanceRecord = {
+      id: editingRecord?.id || `att-ind-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      company_id: currentUser.company_id,
+      group_id: employeeGroup?.id,
+      group_name: employeeGroup?.name || 'Individual / Direct Worker',
+      project_id: project.id,
+      project_name: project.name,
+      site_id: siteId,
+      site_name: siteName,
+      attendance_source: 'individual',
+      employee_id: employee.id,
+      employee_code: employee.employee_code,
+      employee_name: employee.full_name,
+      job_type: employee.job_type,
+      date: input.date,
+      status: input.status,
+      working_hours: input.status === 'Absent' || input.status === 'Leave' ? 0 : workingHours,
+      overtime_hours: input.status === 'Absent' || input.status === 'Leave' ? 0 : overtimeHours,
+      salary_type: employee.salary_type,
+      salary_rate: employee.salary_amount,
+      payable_days: payableDays,
+      daily_earnings: dailyEarnings,
+      remarks: input.remarks?.trim() || undefined,
+      recorded_by: currentUser.id,
+      recorded_by_name: currentUser.full_name,
+      created_at: editingRecord?.created_at || now,
+      updated_at: now
+    };
+
+    if (editingRecord) {
+      allRecords = allRecords.map(existing => existing.id === record.id ? record : existing);
+    } else {
+      allRecords.push(record);
+    }
+    localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, JSON.stringify(allRecords));
+    this.recordAudit(editingRecord ? 'update_individual_attendance' : 'create_individual_attendance', record.id, {
+      employee_id: record.employee_id,
+      project_id: record.project_id,
+      date: record.date,
+      status: record.status
+    });
+    await dataService.persistCloudState();
+    return record;
+  }
+
+  public async deleteIndividualAttendance(recordId: string): Promise<void> {
+    const currentUser = dataService.getCurrentUser();
+    const initialStored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE_RECORDS);
+    const initialRecords: DailyAttendanceRecord[] = initialStored ? JSON.parse(initialStored) : [];
+    const initialRecord = initialRecords.find(item => item.id === recordId);
+    if (!initialRecord || initialRecord.company_id !== currentUser.company_id || initialRecord.attendance_source !== 'individual') {
+      throw new Error('Individual attendance record not found.');
+    }
+    if (!initialRecord.project_id || !this.canManageAttendance(initialRecord.project_id)) {
+      throw new Error('Access Denied: You do not have attendance permission for this project.');
+    }
+
+    await this.refreshAttendanceBeforeWrite();
+    const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE_RECORDS);
+    const allRecords: DailyAttendanceRecord[] = stored ? JSON.parse(stored) : [];
+    const record = allRecords.find(item => item.id === recordId);
+    if (!record || record.company_id !== currentUser.company_id || record.attendance_source !== 'individual') {
+      throw new Error('Individual attendance record no longer exists. Refresh the history and try again.');
+    }
+    if (!record.project_id || !this.canManageAttendance(record.project_id)) {
+      throw new Error('Access Denied: You do not have attendance permission for this project.');
+    }
+    localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, JSON.stringify(allRecords.filter(item => item.id !== recordId)));
+    this.recordAudit('delete_individual_attendance', record.id, {
+      employee_id: record.employee_id,
+      project_id: record.project_id,
+      date: record.date
+    });
+    await dataService.persistCloudState();
   }
 
   // ==========================================
@@ -1652,7 +1878,7 @@ class AttendanceService {
       lines.push(
         [
           escapeCsv(r.group_name),
-          escapeCsv(r.project_name || 'Main Site'),
+          escapeCsv(`${r.project_name || 'Main Site'}${r.site_name ? ` / ${r.site_name}` : ''}`),
           escapeCsv(r.employee_code),
           escapeCsv(r.employee_name),
           escapeCsv(r.job_type),
