@@ -40,13 +40,15 @@ import {
   AttendanceStatus,
   Project,
   UserProfile,
-  SalaryType
+  SalaryType,
+  WorkerPayrollEditInput
 } from '../types';
 import { attendanceService } from '../services/attendanceService';
 import { dataService } from '../services/dataService';
 import { CreateGroupModal } from './CreateGroupModal';
 import { AddEmployeeModal } from './AddEmployeeModal';
 import { RecordPaymentModal } from './RecordPaymentModal';
+import { EditWorkerPayrollModal } from './EditWorkerPayrollModal';
 import { AttachmentFileLink, AttachmentLinks } from './AttachmentSections';
 import { getLocalDateString, getLocalDateStringOffset, getLocalMonthStartString, getLocalYearStartString } from '../utils/dateUtils';
 import { useCompanyBranding } from '../contexts/CompanyBrandingContext';
@@ -95,6 +97,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
   const [paymentTargetEmployee, setPaymentTargetEmployee] = useState<Employee | null>(null);
   const [paymentSuggestedAmount, setPaymentSuggestedAmount] = useState<number | undefined>(undefined);
+  const [editingPayrollEmployee, setEditingPayrollEmployee] = useState<Employee | null>(null);
 
   // Group Search & Filter
   const [groupSearch, setGroupSearch] = useState('');
@@ -126,6 +129,14 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   // Salary & Payments State
   const [salarySummaries, setSalarySummaries] = useState<EmployeeSalarySummary[]>([]);
   const [salaryPeriod, setSalaryPeriod] = useState<'this_month' | 'last_30_days' | 'all'>('this_month');
+  const salaryDateRange = useMemo(() => ({
+    fromDate: salaryPeriod === 'last_30_days'
+      ? getLocalDateStringOffset(-29)
+      : salaryPeriod === 'all'
+      ? getLocalYearStartString()
+      : getLocalMonthStartString(),
+    toDate: getLocalDateString()
+  }), [salaryPeriod]);
 
   // Reports State
   const [reportMode, setReportMode] = useState<'date_range' | 'up_to_date'>('date_range');
@@ -274,22 +285,15 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   useEffect(() => {
     if (!selectedGroupId) return;
     async function loadSalary() {
-      let fromDate = getLocalMonthStartString();
-      let toDate = getLocalDateString();
-      if (salaryPeriod === 'last_30_days') {
-        fromDate = getLocalDateStringOffset(-29);
-      } else if (salaryPeriod === 'all') {
-        fromDate = getLocalYearStartString();
-      }
       const sums = await attendanceService.computeSalarySummaries({
         groupId: selectedGroupId || undefined,
-        fromDate,
-        toDate
+        fromDate: salaryDateRange.fromDate,
+        toDate: salaryDateRange.toDate
       });
       setSalarySummaries(sums);
     }
     loadSalary();
-  }, [selectedGroupId, salaryPeriod, attendanceRecords, paymentRecords, employees]);
+  }, [selectedGroupId, salaryDateRange, attendanceRecords, paymentRecords, employees]);
 
   // Load report data when reports tab is active or report parameters change
   useEffect(() => {
@@ -524,6 +528,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     await attendanceService.recordPayment(paymentData);
     await loadData();
     setIsRecordPaymentOpen(false);
+  };
+
+  const handleSaveWorkerPayroll = async (payrollData: WorkerPayrollEditInput) => {
+    await attendanceService.updateWorkerPayroll(payrollData);
+    await loadData();
+    setEditingPayrollEmployee(null);
   };
 
   // CSV Export for Reports Tab
@@ -1820,13 +1830,14 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <th className="px-3 py-3 text-right text-rose-400">Advances / Ded.</th>
                         <th className="px-3 py-3 text-right text-emerald-400">Paid Out</th>
                         <th className="px-3 py-3 text-right font-bold text-white bg-slate-900">Remaining Balance</th>
+                        <th className="px-3 py-3 text-center">Edit</th>
                         <th className="px-3 py-3 text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#E2E8F0]">
                       {salarySummaries.length === 0 ? (
                         <tr>
-                          <td colSpan={11} className="px-4 py-10 text-center text-bp-muted">
+                          <td colSpan={12} className="px-4 py-10 text-center text-bp-muted">
                             No salary or payment records calculated for this period.
                           </td>
                         </tr>
@@ -1859,6 +1870,21 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                             </td>
                             <td className="px-3 py-3 text-right font-mono font-bold text-sm bg-slate-50 text-bp-text">
                               ₹{s.net_payable_balance.toLocaleString()}
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              {canManage && (
+                                <button
+                                  onClick={() => {
+                                    const empObj = employees.find(e => e.id === s.employee_id) || null;
+                                    setEditingPayrollEmployee(empObj);
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-bp-border-strong px-2.5 py-1 text-xs font-semibold text-bp-navy transition-colors hover:bg-bp-background"
+                                  aria-label={`Edit payroll for ${s.employee_name}`}
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                  Edit
+                                </button>
+                              )}
                             </td>
                             <td className="px-3 py-3 text-center">
                               {canManage && (
@@ -2233,6 +2259,38 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         suggestedAmount={paymentSuggestedAmount}
         onUploadFile={(file) => dataService.uploadAttachment(file, selectedGroupId || 'attendance')}
       />
+
+      {editingPayrollEmployee && (() => {
+        const summary = salarySummaries.find(item => item.employee_id === editingPayrollEmployee.id);
+        if (!summary) return null;
+        const matchesSalaryGroup = (record: { group_id?: string }) =>
+          !selectedGroupId || selectedGroupId === 'all' || record.group_id === selectedGroupId;
+        const scopedAttendance = attendanceRecords.filter(record =>
+          record.employee_id === editingPayrollEmployee.id
+          && record.date >= salaryDateRange.fromDate
+          && record.date <= salaryDateRange.toDate
+          && matchesSalaryGroup(record)
+        );
+        const scopedPayments = paymentRecords.filter(payment =>
+          payment.employee_id === editingPayrollEmployee.id
+          && payment.payment_date >= salaryDateRange.fromDate
+          && payment.payment_date <= salaryDateRange.toDate
+          && matchesSalaryGroup(payment)
+        );
+        return (
+          <EditWorkerPayrollModal
+            key={`${editingPayrollEmployee.id}:${salaryPeriod}`}
+            employee={editingPayrollEmployee}
+            groupId={selectedGroupId === 'all' ? undefined : selectedGroupId || undefined}
+            period={salaryDateRange}
+            attendanceRecords={scopedAttendance}
+            paymentRecords={scopedPayments}
+            onUploadFile={(file) => dataService.uploadAttachment(file, selectedGroupId || 'attendance')}
+            onClose={() => setEditingPayrollEmployee(null)}
+            onSubmit={handleSaveWorkerPayroll}
+          />
+        );
+      })()}
 
     </div>
   );

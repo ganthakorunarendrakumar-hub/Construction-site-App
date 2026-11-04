@@ -9,7 +9,8 @@ import {
   AttendanceStatus,
   SalaryType,
   EmployeeJobType,
-  Project
+  Project,
+  WorkerPayrollEditInput
 } from '../types';
 import { getLocalDateString } from '../utils/dateUtils';
 import { getNextEmployeeCode, recordIssuedEmployeeCode } from '../utils/employeeCode';
@@ -1412,6 +1413,32 @@ class AttendanceService {
     if (dataService.isCloudConnected()) await dataService.syncCloudState();
   }
 
+  private async refreshPayrollBeforeWrite(): Promise<void> {
+    if (dataService.isCloudConfigured() && !dataService.isCloudConnected()) {
+      throw new Error('Supabase is configured but not connected. Payroll was not saved; restore the cloud connection and retry.');
+    }
+    if (dataService.isCloudConnected()) await dataService.syncCloudState();
+  }
+
+  private isValidPayrollDate(date: string): boolean {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+    if (!match) return false;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const parsed = new Date(year, month - 1, day);
+    return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
+  }
+
+  private salaryPaymentDuplicateKey(payment: Pick<SalaryPaymentRecord,
+    'company_id' | 'employee_id' | 'group_id' | 'payment_date' | 'amount' | 'payment_method' | 'payment_type' | 'reference_no'>): string {
+    const base = `${payment.company_id}|${payment.employee_id}|${payment.group_id || ''}|`;
+    const reference = payment.reference_no?.trim().toLowerCase();
+    return reference
+      ? `${base}ref:${reference}`
+      : `${base}${payment.payment_date}|${payment.amount}|${payment.payment_method}|${payment.payment_type}`;
+  }
+
   private validateAttendanceDate(date: string): void {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
     if (!match) throw new Error('Select a valid attendance date.');
@@ -1646,25 +1673,38 @@ class AttendanceService {
       throw new Error('Access Denied: Only Administrators and Project Managers can disburse salary payments.');
     }
 
+    await this.refreshPayrollBeforeWrite();
+
     const amt = Number(input.amount);
-    if (isNaN(amt) || amt <= 0) {
+    if (!Number.isFinite(amt) || amt <= 0) {
       throw new Error('Payment amount must be greater than zero.');
     }
 
+    const paymentDate = input.payment_date || getLocalDateString();
+    const paymentType = input.payment_type || 'salary';
+    if (!this.isValidPayrollDate(paymentDate)) throw new Error('Enter a valid payment date.');
+    if (!['salary', 'advance', 'bonus', 'deduction'].includes(paymentType)) throw new Error('Select a valid payment type.');
+    if (!['Cash', 'Bank Transfer', 'UPI', 'Cheque'].includes(input.payment_method)) throw new Error('Select a valid payment method.');
+
     const employee = await this.getEmployeeById(input.employee_id);
     if (!employee) throw new Error('Employee not found.');
+    if (employee.company_id !== currentUser.company_id) throw new Error('Select an employee from your company.');
+
+    const stored = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
+    const all: SalaryPaymentRecord[] = stored ? JSON.parse(stored) : [];
+    if (!Array.isArray(all)) throw new Error('Saved payment data could not be read. Refresh and try again.');
 
     const newPayment: SalaryPaymentRecord = {
       id: `pay-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
-      company_id: 'comp-apex-01',
+      company_id: currentUser.company_id,
       group_id: input.group_id,
       employee_id: employee.id,
       employee_name: employee.full_name,
       employee_code: employee.employee_code,
-      payment_date: input.payment_date || getLocalDateString(),
+      payment_date: paymentDate,
       amount: amt,
       payment_method: input.payment_method,
-      payment_type: input.payment_type || 'salary',
+      payment_type: paymentType,
       reference_no: input.reference_no?.trim(),
       remarks: input.remarks?.trim(),
       attachments: input.attachments,
@@ -1673,8 +1713,13 @@ class AttendanceService {
       created_at: new Date().toISOString()
     };
 
-    const stored = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
-    const all: SalaryPaymentRecord[] = stored ? JSON.parse(stored) : [];
+    const duplicate = all.find(payment =>
+      this.salaryPaymentDuplicateKey(payment) === this.salaryPaymentDuplicateKey(newPayment)
+    );
+    if (duplicate) {
+      throw new Error(`A matching ${paymentType} payment is already recorded for ${employee.full_name} on ${paymentDate}. Review the payment history before recording it again.`);
+    }
+
     all.unshift(newPayment);
     localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(all));
 
@@ -1687,6 +1732,226 @@ class AttendanceService {
     await dataService.persistCloudState();
 
     return newPayment;
+  }
+
+  /** Updates the existing worker, attendance, and payment records used by one salary summary. */
+  public async updateWorkerPayroll(input: WorkerPayrollEditInput): Promise<void> {
+    const currentUser = dataService.getCurrentUser();
+    if (currentUser.role !== 'admin' && currentUser.role !== 'project_manager') {
+      throw new Error('Access Denied: Only Administrators and Project Managers can edit worker payroll.');
+    }
+    if (!this.isValidPayrollDate(input.period_from) || !this.isValidPayrollDate(input.period_to)
+      || input.period_from > input.period_to) {
+      throw new Error('Select a valid payroll period before editing this worker.');
+    }
+
+    await this.refreshPayrollBeforeWrite();
+    this.ensureInitialized();
+
+    const employeesRaw = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
+    const attendanceRaw = localStorage.getItem(STORAGE_KEYS.ATTENDANCE_RECORDS);
+    const paymentsRaw = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
+    const employees: Employee[] = employeesRaw ? JSON.parse(employeesRaw) : [];
+    const attendanceRecords: DailyAttendanceRecord[] = attendanceRaw ? JSON.parse(attendanceRaw) : [];
+    const payments: SalaryPaymentRecord[] = paymentsRaw ? JSON.parse(paymentsRaw) : [];
+    if (!Array.isArray(employees) || !Array.isArray(attendanceRecords) || !Array.isArray(payments)) {
+      throw new Error('Saved payroll data could not be read. Refresh and try again.');
+    }
+
+    const employeeIndex = employees.findIndex(employee =>
+      employee.id === input.employee_id && employee.company_id === currentUser.company_id
+    );
+    if (employeeIndex < 0) throw new Error('Worker not found in your company. Refresh and try again.');
+    const existingEmployee = employees[employeeIndex];
+    const fullName = input.employee.full_name.trim();
+    const employeeCode = input.employee.employee_code.trim();
+    const jobType = input.employee.job_type.trim();
+    const salaryAmount = Number(input.employee.salary_amount);
+    const standardHours = Number(input.employee.standard_hours_per_day);
+    const overtimeRate = Number(input.employee.overtime_rate_per_hour);
+    if (!fullName) throw new Error('Worker name is required.');
+    if (!employeeCode) throw new Error('Employee code is required.');
+    if (employees.some((employee, index) => index !== employeeIndex
+      && employee.company_id === currentUser.company_id
+      && employee.employee_code.toLowerCase() === employeeCode.toLowerCase())) {
+      throw new Error(`Employee code "${employeeCode}" is already in use by another worker.`);
+    }
+    if (!jobType) throw new Error('Trade is required.');
+    if (!['daily_wage', 'monthly_salary', 'contract'].includes(input.employee.salary_type)) {
+      throw new Error('Select a valid salary type.');
+    }
+    if (!Number.isFinite(salaryAmount) || salaryAmount <= 0) {
+      throw new Error('Daily wage / salary rate must be greater than zero.');
+    }
+    if (!Number.isFinite(standardHours) || standardHours <= 0 || standardHours > 24) {
+      throw new Error('Standard working hours must be greater than zero and no more than 24.');
+    }
+    if (!Number.isFinite(overtimeRate) || overtimeRate < 0) {
+      throw new Error('Overtime rate cannot be negative or invalid.');
+    }
+
+    const inPeriod = (date: string) => date >= input.period_from && date <= input.period_to;
+    const matchesGroup = (record: { group_id?: string }) => !input.group_id || record.group_id === input.group_id;
+    const targetAttendance = attendanceRecords.filter(record =>
+      record.company_id === currentUser.company_id
+      && record.employee_id === existingEmployee.id
+      && inPeriod(record.date)
+      && matchesGroup(record)
+    );
+    const targetPayments = payments.filter(payment =>
+      payment.company_id === currentUser.company_id
+      && payment.employee_id === existingEmployee.id
+      && inPeriod(payment.payment_date)
+      && matchesGroup(payment)
+    );
+    const attendanceIds = input.attendance.map(record => record.id);
+    const paymentIds = input.payments.map(payment => payment.id);
+    const hasUniqueIds = (ids: string[]) => new Set(ids).size === ids.length;
+    const hasSameIds = (left: string[], right: string[]) => left.length === right.length
+      && left.every(id => right.includes(id));
+    if (!hasUniqueIds(attendanceIds) || !hasSameIds(attendanceIds, targetAttendance.map(record => record.id))) {
+      throw new Error('Attendance changed while this form was open. Refresh the payroll table and try again.');
+    }
+    if (!hasUniqueIds(paymentIds) || !hasSameIds(paymentIds, targetPayments.map(payment => payment.id))) {
+      throw new Error('Payment history changed while this form was open. Refresh the payroll table and try again.');
+    }
+
+    const validStatuses: AttendanceStatus[] = ['Present', 'Absent', 'Half Day', 'Leave', 'Weekly Off', 'Holiday'];
+    const now = new Date().toISOString();
+    const attendanceUpdates = new Map(input.attendance.map(record => [record.id, record]));
+    const updatedAttendance = attendanceRecords.map(record => {
+      if (record.company_id !== currentUser.company_id || record.employee_id !== existingEmployee.id) return record;
+      const edit = attendanceUpdates.get(record.id);
+      const commonMetadata = {
+        employee_name: fullName,
+        employee_code: employeeCode,
+        job_type: jobType
+      };
+      if (!edit) return { ...record, ...commonMetadata };
+
+      if (!validStatuses.includes(edit.status)) throw new Error(`Select a valid attendance status for ${record.date}.`);
+      const workingHours = Number(edit.working_hours);
+      const overtimeHours = Number(edit.overtime_hours);
+      if (!Number.isFinite(workingHours) || workingHours < 0 || workingHours > 24) {
+        throw new Error(`Working hours for ${record.date} must be between 0 and 24.`);
+      }
+      if (!Number.isFinite(overtimeHours) || overtimeHours < 0 || overtimeHours > 24) {
+        throw new Error(`Overtime hours for ${record.date} must be between 0 and 24.`);
+      }
+      const paidAttendance = edit.status === 'Present' || edit.status === 'Half Day';
+      if (paidAttendance && workingHours <= 0) {
+        throw new Error(`Enter working hours for ${record.date} when attendance is ${edit.status.toLowerCase()}.`);
+      }
+      if (!paidAttendance && (workingHours !== 0 || overtimeHours !== 0)) {
+        throw new Error(`Non-working attendance on ${record.date} must have zero hours and overtime.`);
+      }
+      if (overtimeHours > 0 && !paidAttendance) {
+        throw new Error(`Overtime on ${record.date} requires present or half-day attendance.`);
+      }
+
+      const earnings = this.calculateDailyEarnings(
+        edit.status,
+        input.employee.salary_type,
+        salaryAmount,
+        overtimeHours,
+        overtimeRate
+      );
+      return {
+        ...record,
+        ...commonMetadata,
+        status: edit.status,
+        working_hours: workingHours,
+        overtime_hours: overtimeHours,
+        salary_type: input.employee.salary_type,
+        salary_rate: salaryAmount,
+        payable_days: earnings.payableDays,
+        daily_earnings: earnings.dailyEarnings,
+        remarks: edit.remarks?.trim() || undefined,
+        recorded_by: currentUser.id,
+        recorded_by_name: currentUser.full_name,
+        updated_at: now
+      };
+    });
+
+    const paymentUpdates = new Map(input.payments.map(payment => [payment.id, payment]));
+    const originalPaymentsById = new Map(payments.map(payment => [payment.id, payment]));
+    const updatedPayments = payments.map(payment => {
+      if (payment.company_id !== currentUser.company_id || payment.employee_id !== existingEmployee.id) return payment;
+      const commonMetadata = { employee_name: fullName, employee_code: employeeCode };
+      const edit = paymentUpdates.get(payment.id);
+      if (!edit) return { ...payment, ...commonMetadata };
+
+      const amount = Number(edit.amount);
+      if (!Number.isFinite(amount) || amount <= 0) throw new Error('Payment amounts must be greater than zero.');
+      if (!this.isValidPayrollDate(edit.payment_date)) throw new Error('Enter a valid payment date for every payment.');
+      if (!['Cash', 'Bank Transfer', 'UPI', 'Cheque'].includes(edit.payment_method)) {
+        throw new Error('Select a valid payment method.');
+      }
+      if (!['salary', 'advance', 'bonus', 'deduction'].includes(edit.payment_type)) {
+        throw new Error('Select a valid payment type.');
+      }
+      return {
+        ...payment,
+        ...commonMetadata,
+        payment_date: edit.payment_date,
+        amount,
+        payment_method: edit.payment_method,
+        payment_type: edit.payment_type,
+        reference_no: edit.reference_no?.trim() || undefined,
+        remarks: edit.remarks?.trim() || undefined,
+        attachments: edit.attachments
+      };
+    });
+
+    for (const payment of updatedPayments) {
+      const previous = originalPaymentsById.get(payment.id);
+      if (!previous || this.salaryPaymentDuplicateKey(payment) === this.salaryPaymentDuplicateKey(previous)) continue;
+      const duplicate = updatedPayments.find(other =>
+        other.id !== payment.id
+        && this.salaryPaymentDuplicateKey(other) === this.salaryPaymentDuplicateKey(payment)
+      );
+      if (duplicate) {
+        throw new Error(`This change duplicates payment ${duplicate.id}. Check the payment date, amount, type, method, and reference.`);
+      }
+    }
+
+    const updatedEmployee: Employee = {
+      ...existingEmployee,
+      employee_code: employeeCode,
+      full_name: fullName,
+      phone: input.employee.phone?.trim() || undefined,
+      address: input.employee.address?.trim() || undefined,
+      job_type: jobType,
+      salary_type: input.employee.salary_type,
+      salary_amount: salaryAmount,
+      standard_hours_per_day: standardHours,
+      overtime_rate_per_hour: overtimeRate,
+      remarks: input.employee.remarks?.trim() || undefined,
+      updated_at: now
+    };
+    employees[employeeIndex] = updatedEmployee;
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+      localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, JSON.stringify(updatedAttendance));
+      localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(updatedPayments));
+    } catch {
+      if (employeesRaw === null) localStorage.removeItem(STORAGE_KEYS.EMPLOYEES);
+      else localStorage.setItem(STORAGE_KEYS.EMPLOYEES, employeesRaw);
+      if (attendanceRaw === null) localStorage.removeItem(STORAGE_KEYS.ATTENDANCE_RECORDS);
+      else localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, attendanceRaw);
+      if (paymentsRaw === null) localStorage.removeItem(STORAGE_KEYS.PAYMENTS);
+      else localStorage.setItem(STORAGE_KEYS.PAYMENTS, paymentsRaw);
+      throw new Error('Payroll changes could not be stored locally. No payment history was intentionally removed.');
+    }
+
+    this.recordAudit('edit_worker_payroll', existingEmployee.id, {
+      attendance_record_count: input.attendance.length,
+      payment_record_count: input.payments.length,
+      salary_rate: salaryAmount,
+      salary_type: input.employee.salary_type
+    });
+    await dataService.persistCloudState();
   }
 
   /**
