@@ -92,12 +92,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [addEmployeeDefaultGroupId, setAddEmployeeDefaultGroupId] = useState<string | undefined>(undefined);
-  const [assignSuccessMessage, setAssignSuccessMessage] = useState<string | null>(null);
+  const [groupAssignmentMessage, setGroupAssignmentMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
   const [paymentTargetEmployee, setPaymentTargetEmployee] = useState<Employee | null>(null);
   const [paymentSuggestedAmount, setPaymentSuggestedAmount] = useState<number | undefined>(undefined);
   const [editingPayrollEmployee, setEditingPayrollEmployee] = useState<Employee | null>(null);
+  const [payrollEditMessage, setPayrollEditMessage] = useState<string | null>(null);
 
   // Group Search & Filter
   const [groupSearch, setGroupSearch] = useState('');
@@ -397,28 +398,44 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
   // Handlers for Employee CRUD
   const handleSaveEmployee = async (employeeData: any) => {
+    const removedFromGroup = Boolean(editingEmployee?.group_id && !employeeData.group_id);
+    const previousGroupName = editingEmployee?.group_name;
+    let savedEmployee: Employee;
     if (editingEmployee) {
-      await attendanceService.updateEmployee(editingEmployee.id, employeeData);
+      savedEmployee = await attendanceService.updateEmployee(editingEmployee.id, employeeData);
     } else {
-      await attendanceService.createEmployee(employeeData);
+      savedEmployee = await attendanceService.createEmployee(employeeData);
     }
+    setEmployees(current => current.some(employee => employee.id === savedEmployee.id)
+      ? current.map(employee => employee.id === savedEmployee.id ? savedEmployee : employee)
+      : [savedEmployee, ...current]);
     await loadData();
+    if (removedFromGroup && editingEmployee) {
+      setGroupAssignmentMessage({
+        kind: 'success',
+        text: `${editingEmployee.full_name} (${editingEmployee.employee_code}) was removed from ${previousGroupName || 'the group'} and is now available in Individual Attendance. Historical attendance and payroll records were preserved.`
+      });
+    }
     setEditingEmployee(null);
     setAddEmployeeDefaultGroupId(undefined);
   };
 
   // Handler for assigning an ungrouped employee to an existing group
   const handleAssignGroup = async (employeeId: string, targetGroupId: string) => {
+    setGroupAssignmentMessage(null);
+    const previousEmployee = employees.find(employee => employee.id === employeeId);
     try {
       const updated = await attendanceService.assignEmployeeToGroup(employeeId, targetGroupId);
+      setEmployees(current => current.map(employee => employee.id === updated.id ? updated : employee));
       await loadData();
-      const targetGroup = groups.find(g => g.id === targetGroupId);
-      setAssignSuccessMessage(
-        `${updated.full_name} (${updated.employee_code}) was successfully assigned to ${targetGroup ? targetGroup.name : 'the group'}! Historical attendance & payroll records preserved.`
-      );
-      setTimeout(() => setAssignSuccessMessage(null), 6000);
+      const targetGroup = groups.find(group => group.id === targetGroupId);
+      const text = targetGroupId
+        ? `${updated.full_name} (${updated.employee_code}) was assigned to ${targetGroup?.name || 'the group'}. Historical attendance and payroll records were preserved.`
+        : `${updated.full_name} (${updated.employee_code}) was removed from ${previousEmployee?.group_name || 'the group'} and is now available in Individual Attendance. Historical attendance and payroll records were preserved.`;
+      setGroupAssignmentMessage({ kind: 'success', text });
+      window.setTimeout(() => setGroupAssignmentMessage(null), 6000);
     } catch (err: any) {
-      alert(err.message || 'Failed to assign group.');
+      setGroupAssignmentMessage({ kind: 'error', text: err.message || 'Worker group assignment was not saved.' });
     }
   };
 
@@ -534,6 +551,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     await attendanceService.updateWorkerPayroll(payrollData);
     await loadData();
     setEditingPayrollEmployee(null);
+    setPayrollEditMessage('Worker payroll changes were saved and the payment summary was refreshed.');
+    window.setTimeout(() => setPayrollEditMessage(null), 6000);
+  };
+
+  const handleDeleteWorkerPayment = async (paymentId: string, employeeId: string, groupId?: string) => {
+    await attendanceService.deleteSalaryPayment(paymentId, employeeId, groupId);
+    await loadData();
   };
 
   // CSV Export for Reports Tab
@@ -634,6 +658,18 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           </span>
         )}
       </nav>
+
+      {groupAssignmentMessage && (
+        <div
+          role={groupAssignmentMessage.kind === 'success' ? 'status' : 'alert'}
+          className={`rounded-xl border p-3 text-xs ${groupAssignmentMessage.kind === 'success'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+            : 'border-rose-200 bg-rose-50 text-rose-800'}`}
+        >
+          {groupAssignmentMessage.text}
+        </div>
+      )}
+      {payrollEditMessage && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{payrollEditMessage}</div>}
 
       {/* ======================================================== */}
       {/* SCREEN 1: ATTENDANCE GROUPS HOME SCREEN */}
@@ -969,13 +1005,6 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 )}
               </div>
             </div>
-
-            {assignSuccessMessage && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2 animate-in fade-in">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span className="font-medium">{assignSuccessMessage}</span>
-              </div>
-            )}
 
             {/* Individual Employees Table */}
             {individualEmployees.length === 0 ? (
@@ -1632,6 +1661,14 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     {canManage && (
                       <div className="pt-2 border-t border-bp-border flex items-center justify-end gap-2">
                         <button
+                          type="button"
+                          onClick={() => void handleAssignGroup(emp.id, '')}
+                          className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-xs font-semibold text-rose-700 rounded-xl transition-colors"
+                          title={`Remove ${emp.full_name} from ${activeGroup?.name || 'this group'} without deleting employee or history`}
+                        >
+                          Remove from Group
+                        </button>
+                        <button
                           onClick={() => {
                             setEditingEmployee(emp);
                             setIsAddEmployeeOpen(true);
@@ -2287,6 +2324,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             attendanceRecords={scopedAttendance}
             paymentRecords={scopedPayments}
             onUploadFile={(file) => dataService.uploadAttachment(file, selectedGroupId || 'attendance')}
+            onDeletePayment={paymentId => handleDeleteWorkerPayment(
+              paymentId,
+              editingPayrollEmployee.id,
+              selectedGroupId === 'all' ? undefined : selectedGroupId || undefined
+            )}
             onClose={() => setEditingPayrollEmployee(null)}
             onSubmit={handleSaveWorkerPayroll}
           />

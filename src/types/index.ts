@@ -841,7 +841,7 @@ export interface WorkerPayrollEditInput {
   employee: Pick<Employee,
     'employee_code' | 'full_name' | 'phone' | 'address' | 'job_type' | 'salary_type' |
     'salary_amount' | 'standard_hours_per_day' | 'overtime_rate_per_hour' | 'remarks'>;
-  attendance: Array<Pick<DailyAttendanceRecord, 'id' | 'status' | 'working_hours' | 'overtime_hours' | 'remarks'>>;
+  attendance: Array<Pick<DailyAttendanceRecord, 'id' | 'date' | 'status' | 'working_hours' | 'overtime_hours' | 'remarks'>>;
   payments: Array<Pick<SalaryPaymentRecord,
     'id' | 'payment_date' | 'amount' | 'payment_method' | 'payment_type' | 'reference_no' | 'remarks' | 'attachments'>>;
 }

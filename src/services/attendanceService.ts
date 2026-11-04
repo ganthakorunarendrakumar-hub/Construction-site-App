@@ -893,6 +893,13 @@ class AttendanceService {
     return employees.find(e => e.id === employeeId) || null;
   }
 
+  private async refreshEmployeeDataBeforeWrite(): Promise<void> {
+    if (dataService.isCloudConfigured() && !dataService.isCloudConnected()) {
+      throw new Error('Supabase is configured but not connected. The employee change was not saved; restore the cloud connection and retry.');
+    }
+    if (dataService.isCloudConnected()) await dataService.syncCloudState();
+  }
+
   public async createEmployee(input: {
     employee_code?: string;
     full_name: string;
@@ -1011,8 +1018,11 @@ class AttendanceService {
       throw new Error('Access Denied: Only Administrators and Project Managers can update employee records.');
     }
 
+    await this.refreshEmployeeDataBeforeWrite();
+    const previousEmployees = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
+    const previousAuditLog = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
     const employees = await this.getEmployees();
-    const idx = employees.findIndex(e => e.id === employeeId);
+    const idx = employees.findIndex(e => e.id === employeeId && e.company_id === currentUser.company_id);
     if (idx === -1) throw new Error('Employee not found.');
 
     const trimmedName = input.full_name.trim();
@@ -1033,8 +1043,9 @@ class AttendanceService {
     if (input.group_id !== undefined) {
       if (input.group_id && input.group_id !== 'ungrouped') {
         const groups = await this.getGroups();
-        const g = groups.find(grp => grp.id === input.group_id);
-        if (g) targetGroupName = g.name;
+        const g = groups.find(grp => grp.id === input.group_id && grp.company_id === currentUser.company_id);
+        if (!g) throw new Error('Select a worker group from your company.');
+        targetGroupName = g.name;
       } else {
         targetGroupId = '';
         targetGroupName = undefined;
@@ -1069,9 +1080,19 @@ class AttendanceService {
     };
 
     employees[idx] = updatedEmp;
-    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
-    this.recordAudit('update_employee', employeeId, { name: updatedEmp.full_name, group: targetGroupName || 'Individual' });
-    await dataService.persistCloudState();
+    try {
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+      this.recordAudit('update_employee', employeeId, { name: updatedEmp.full_name, group: targetGroupName || 'Individual' });
+      await dataService.persistCloudState();
+    } catch (error) {
+      if (previousEmployees === null) localStorage.removeItem(STORAGE_KEYS.EMPLOYEES);
+      else localStorage.setItem(STORAGE_KEYS.EMPLOYEES, previousEmployees);
+      if (previousAuditLog === null) localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
+      else localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, previousAuditLog);
+      throw new Error(error instanceof Error
+        ? `Employee changes were not saved to Supabase. The previous assignment has been restored. ${error.message}`
+        : 'Employee changes were not saved to Supabase. The previous assignment has been restored.');
+    }
     return updatedEmp;
   }
 
@@ -1133,8 +1154,16 @@ class AttendanceService {
    * Preserves all past attendance, salary, and payment history!
    */
   public async assignEmployeeToGroup(employeeId: string, groupId: string): Promise<Employee> {
+    const currentUser = dataService.getCurrentUser();
+    if (currentUser.role !== 'admin' && currentUser.role !== 'project_manager') {
+      throw new Error('Access Denied: Only Administrators and Project Managers can change worker group assignments.');
+    }
+
+    await this.refreshEmployeeDataBeforeWrite();
+    const previousEmployees = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
+    const previousAuditLog = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
     const employees = await this.getEmployees();
-    const idx = employees.findIndex(e => e.id === employeeId);
+    const idx = employees.findIndex(e => e.id === employeeId && e.company_id === currentUser.company_id);
     if (idx === -1) throw new Error('Employee not found.');
 
     const emp = employees[idx];
@@ -1145,7 +1174,7 @@ class AttendanceService {
 
     if (groupId && groupId !== 'ungrouped') {
       const groups = await this.getGroups();
-      const targetGroup = groups.find(g => g.id === groupId);
+      const targetGroup = groups.find(g => g.id === groupId && g.company_id === currentUser.company_id);
       if (!targetGroup) throw new Error('Selected group does not exist.');
       targetGroupId = targetGroup.id;
       targetGroupName = targetGroup.name;
@@ -1165,12 +1194,22 @@ class AttendanceService {
     };
 
     employees[idx] = updatedEmp;
-    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
-    this.recordAudit('assign_employee_group', employeeId, {
-      name: updatedEmp.full_name,
-      newGroup: targetGroupName || 'Ungrouped / Individual'
-    });
-    await dataService.persistCloudState();
+    try {
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+      this.recordAudit('assign_employee_group', employeeId, {
+        name: updatedEmp.full_name,
+        newGroup: targetGroupName || 'Ungrouped / Individual'
+      });
+      await dataService.persistCloudState();
+    } catch (error) {
+      if (previousEmployees === null) localStorage.removeItem(STORAGE_KEYS.EMPLOYEES);
+      else localStorage.setItem(STORAGE_KEYS.EMPLOYEES, previousEmployees);
+      if (previousAuditLog === null) localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
+      else localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, previousAuditLog);
+      throw new Error(error instanceof Error
+        ? `Worker group assignment was not saved to Supabase. The previous assignment has been restored. ${error.message}`
+        : 'Worker group assignment was not saved to Supabase. The previous assignment has been restored.');
+    }
     return updatedEmp;
   }
 
@@ -1737,6 +1776,45 @@ class AttendanceService {
     return newPayment;
   }
 
+  public async deleteSalaryPayment(paymentId: string, employeeId: string, groupId?: string): Promise<void> {
+    const currentUser = dataService.getCurrentUser();
+    if (currentUser.role !== 'admin' && currentUser.role !== 'project_manager') {
+      throw new Error('Access Denied: Only Administrators and Project Managers can delete salary transactions.');
+    }
+    await this.refreshPayrollBeforeWrite();
+
+    const paymentsRaw = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
+    const auditRaw = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
+    const payments: SalaryPaymentRecord[] = paymentsRaw ? JSON.parse(paymentsRaw) : [];
+    if (!Array.isArray(payments)) throw new Error('Saved payment data could not be read. Refresh and try again.');
+    const index = payments.findIndex(payment =>
+      payment.id === paymentId
+      && payment.employee_id === employeeId
+      && payment.company_id === currentUser.company_id
+      && (!groupId || groupId === 'all' || payment.group_id === groupId)
+    );
+    if (index < 0) throw new Error('Payment transaction not found. Refresh the payroll table and try again.');
+
+    const [deleted] = payments.splice(index, 1);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(payments));
+      this.recordAudit('delete_salary_payment', deleted.id, {
+        employee_id: deleted.employee_id,
+        amount: deleted.amount,
+        payment_type: deleted.payment_type
+      });
+      await dataService.persistCloudState();
+    } catch (error) {
+      if (paymentsRaw === null) localStorage.removeItem(STORAGE_KEYS.PAYMENTS);
+      else localStorage.setItem(STORAGE_KEYS.PAYMENTS, paymentsRaw);
+      if (auditRaw === null) localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
+      else localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, auditRaw);
+      throw new Error(error instanceof Error
+        ? `Payment deletion was not saved to Supabase. The transaction has been restored. ${error.message}`
+        : 'Payment deletion was not saved to Supabase. The transaction has been restored.');
+    }
+  }
+
   /** Updates the existing worker, attendance, and payment records used by one salary summary. */
   public async updateWorkerPayroll(input: WorkerPayrollEditInput): Promise<void> {
     const currentUser = dataService.getCurrentUser();
@@ -1754,6 +1832,7 @@ class AttendanceService {
     const employeesRaw = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
     const attendanceRaw = localStorage.getItem(STORAGE_KEYS.ATTENDANCE_RECORDS);
     const paymentsRaw = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
+    const auditRaw = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
     const employees: Employee[] = employeesRaw ? JSON.parse(employeesRaw) : [];
     const attendanceRecords: DailyAttendanceRecord[] = attendanceRaw ? JSON.parse(attendanceRaw) : [];
     const payments: SalaryPaymentRecord[] = paymentsRaw ? JSON.parse(paymentsRaw) : [];
@@ -1822,6 +1901,7 @@ class AttendanceService {
     const validStatuses: AttendanceStatus[] = ['Present', 'Absent', 'Half Day', 'Leave', 'Weekly Off', 'Holiday'];
     const now = new Date().toISOString();
     const attendanceUpdates = new Map(input.attendance.map(record => [record.id, record]));
+    const originalAttendanceById = new Map(attendanceRecords.map(record => [record.id, record]));
     const updatedAttendance = attendanceRecords.map(record => {
       if (record.company_id !== currentUser.company_id || record.employee_id !== existingEmployee.id) return record;
       const edit = attendanceUpdates.get(record.id);
@@ -1833,6 +1913,10 @@ class AttendanceService {
       if (!edit) return { ...record, ...commonMetadata };
 
       if (!validStatuses.includes(edit.status)) throw new Error(`Select a valid attendance status for ${record.date}.`);
+      if (!this.isValidPayrollDate(edit.date)) throw new Error(`Enter a valid attendance date for ${record.id}.`);
+      if (existingEmployee.joining_date && edit.date < existingEmployee.joining_date) {
+        throw new Error(`Attendance date ${edit.date} cannot be earlier than the worker's joining date.`);
+      }
       const workingHours = Number(edit.working_hours);
       const overtimeHours = Number(edit.overtime_hours);
       if (!Number.isFinite(workingHours) || workingHours < 0 || workingHours > 24) {
@@ -1862,6 +1946,7 @@ class AttendanceService {
       return {
         ...record,
         ...commonMetadata,
+        date: edit.date,
         status: edit.status,
         working_hours: workingHours,
         overtime_hours: overtimeHours,
@@ -1876,6 +1961,29 @@ class AttendanceService {
       };
     });
 
+    const groups = await this.getGroups();
+    const projectForAttendance = (record: DailyAttendanceRecord) => record.project_id
+      || groups.find(group => group.id === record.group_id)?.project_id
+      || existingEmployee.project_id
+      || '';
+    for (const edit of input.attendance) {
+      const previous = originalAttendanceById.get(edit.id);
+      if (!previous || previous.date === edit.date) continue;
+      const updated = updatedAttendance.find(record => record.id === edit.id);
+      if (!updated) continue;
+      const projectId = projectForAttendance(updated);
+      const duplicate = updatedAttendance.find(record =>
+        record.id !== updated.id
+        && record.company_id === currentUser.company_id
+        && record.employee_id === existingEmployee.id
+        && record.date === updated.date
+        && projectForAttendance(record) === projectId
+      );
+      if (duplicate) {
+        throw new Error(`Attendance already exists for ${updated.date} on this project. Choose another date or edit the existing record.`);
+      }
+    }
+
     const paymentUpdates = new Map(input.payments.map(payment => [payment.id, payment]));
     const originalPaymentsById = new Map(payments.map(payment => [payment.id, payment]));
     const updatedPayments = payments.map(payment => {
@@ -1884,6 +1992,9 @@ class AttendanceService {
       const edit = paymentUpdates.get(payment.id);
       if (!edit) return { ...payment, ...commonMetadata };
 
+      if (edit.amount === null || edit.amount === undefined || String(edit.amount).trim() === '') {
+        throw new Error(`Enter the saved amount for payment ${payment.id}; an empty amount cannot be treated as zero.`);
+      }
       const amount = Number(edit.amount);
       if (!Number.isFinite(amount) || amount <= 0) throw new Error('Payment amounts must be greater than zero.');
       if (!this.isValidPayrollDate(edit.payment_date)) throw new Error('Enter a valid payment date for every payment.');
@@ -1902,7 +2013,7 @@ class AttendanceService {
         payment_type: edit.payment_type,
         reference_no: edit.reference_no?.trim() || undefined,
         remarks: edit.remarks?.trim() || undefined,
-        attachments: edit.attachments
+        attachments: edit.attachments !== undefined ? edit.attachments : payment.attachments
       };
     });
 
@@ -1938,23 +2049,55 @@ class AttendanceService {
       localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
       localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, JSON.stringify(updatedAttendance));
       localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(updatedPayments));
-    } catch {
+      this.recordAudit('edit_worker_payroll', existingEmployee.id, {
+        attendance_record_count: input.attendance.length,
+        payment_record_count: input.payments.length,
+        salary_rate: salaryAmount,
+        salary_type: input.employee.salary_type
+      });
+      await dataService.persistCloudState();
+    } catch (error) {
       if (employeesRaw === null) localStorage.removeItem(STORAGE_KEYS.EMPLOYEES);
       else localStorage.setItem(STORAGE_KEYS.EMPLOYEES, employeesRaw);
       if (attendanceRaw === null) localStorage.removeItem(STORAGE_KEYS.ATTENDANCE_RECORDS);
       else localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, attendanceRaw);
       if (paymentsRaw === null) localStorage.removeItem(STORAGE_KEYS.PAYMENTS);
       else localStorage.setItem(STORAGE_KEYS.PAYMENTS, paymentsRaw);
-      throw new Error('Payroll changes could not be stored locally. No payment history was intentionally removed.');
+      if (auditRaw === null) localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
+      else localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, auditRaw);
+      throw new Error(error instanceof Error
+        ? `Payroll changes were not saved to Supabase. The prior records have been restored. ${error.message}`
+        : 'Payroll changes were not saved to Supabase. The prior records have been restored.');
     }
+  }
 
-    this.recordAudit('edit_worker_payroll', existingEmployee.id, {
-      attendance_record_count: input.attendance.length,
-      payment_record_count: input.payments.length,
-      salary_rate: salaryAmount,
-      salary_type: input.employee.salary_type
-    });
-    await dataService.persistCloudState();
+  public calculatePaymentTotals(
+    paymentRows: Array<Pick<SalaryPaymentRecord, 'amount' | 'payment_date' | 'payment_type'>>,
+    fromDate?: string,
+    toDate?: string
+  ): { advances: number; deductions: number; paid: number; invalidCount: number } {
+    let advances = 0;
+    let deductions = 0;
+    let paid = 0;
+    let invalidCount = 0;
+    for (const payment of paymentRows) {
+      if (!this.isValidPayrollDate(payment.payment_date)
+        || !['salary', 'advance', 'bonus', 'deduction'].includes(payment.payment_type)) {
+        invalidCount++;
+        continue;
+      }
+      if ((fromDate && payment.payment_date < fromDate) || (toDate && payment.payment_date > toDate)) continue;
+      const amount = Number(payment.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        invalidCount++;
+        continue;
+      }
+      if (payment.payment_type === 'advance') advances += amount;
+      else if (payment.payment_type === 'deduction') deductions += amount;
+      else if (payment.payment_type === 'salary' || payment.payment_type === 'bonus') paid += amount;
+      else invalidCount++;
+    }
+    return { advances, deductions, paid, invalidCount };
   }
 
   /**
@@ -2017,15 +2160,10 @@ class AttendanceService {
         grossEarnings += (r.daily_earnings || 0);
       }
 
-      let totalAdvances = 0;
-      let totalDeductions = 0;
-      let totalPaid = 0;
-
-      for (const p of empPayments) {
-        if (p.payment_type === 'advance') totalAdvances += p.amount;
-        else if (p.payment_type === 'deduction') totalDeductions += p.amount;
-        else totalPaid += p.amount; // salary & bonus
-      }
+      const paymentTotals = this.calculatePaymentTotals(empPayments);
+      const totalAdvances = paymentTotals.advances;
+      const totalDeductions = paymentTotals.deductions;
+      const totalPaid = paymentTotals.paid;
 
       const netPayableBalance = grossEarnings - (totalPaid + totalAdvances + totalDeductions);
 

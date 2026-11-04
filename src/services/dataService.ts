@@ -944,6 +944,9 @@ class DataService {
   private cloudStateSyncTimer: ReturnType<typeof setTimeout> | null = null;
   private isRestoringCloudState = false;
   private storageSyncInstalled = false;
+  private cloudStateLocalRevision = 0;
+  private cloudStatePersistedRevision = 0;
+  private cloudStatePushQueue: Promise<void> = Promise.resolve();
   private cloudStateSyncWarning: string | null = null;
 
   constructor() {
@@ -1347,6 +1350,7 @@ class DataService {
     storage.setItem = (key: string, value: string) => {
       originalSetItem(key, value);
       if (!this.isRestoringCloudState && shouldQueueCloudStateSync(key)) {
+        this.cloudStateLocalRevision += 1;
         this.queueCloudStateSync();
       }
     };
@@ -1363,7 +1367,13 @@ class DataService {
     }, 500);
   }
 
-  private async pushCloudState(verifiedCompanyId?: string): Promise<void> {
+  private pushCloudState(verifiedCompanyId?: string): Promise<void> {
+    const push = this.cloudStatePushQueue.then(() => this.performCloudStatePush(verifiedCompanyId));
+    this.cloudStatePushQueue = push.catch(() => undefined);
+    return push;
+  }
+
+  private async performCloudStatePush(verifiedCompanyId?: string): Promise<void> {
     if (!this.config.url.trim() && !this.config.anonKey.trim()) return;
     if (!this.supabase) {
       throw new Error('Supabase is configured but the client could not be initialized. Check the project URL and public key.');
@@ -1371,16 +1381,22 @@ class DataService {
     if (!this.config.isConnected) {
       throw new Error('Supabase is configured but not connected. Verify the cloud connection before saving changes.');
     }
-    const companyId = verifiedCompanyId || await this.verifyCloudSyncIdentity();
+    const companyId = await this.verifyCloudSyncIdentity();
+    if (verifiedCompanyId && verifiedCompanyId !== companyId) {
+      throw new Error('The active company changed before cloud sync completed. Refresh and retry the save.');
+    }
+    const snapshotRevision = this.cloudStateLocalRevision;
+    const state = this.getCloudStateSnapshot();
     const { error } = await this.supabase.from('app_state').upsert({
       company_id: companyId,
-      state: this.getCloudStateSnapshot(),
+      state,
       updated_at: new Date().toISOString()
     }, { onConflict: 'company_id' });
     if (error) {
       this.cloudStateSyncWarning = 'Shared application data could not be saved to Supabase. Check the cloud connection and retry.';
       throw new Error(`Cloud state sync failed: ${error.message}`);
     }
+    this.cloudStatePersistedRevision = Math.max(this.cloudStatePersistedRevision, snapshotRevision);
     this.cloudStateSyncWarning = null;
   }
 
@@ -1441,6 +1457,8 @@ class DataService {
 
   public async syncCloudState(): Promise<void> {
     if (!this.supabase || !this.config.isConnected) return;
+    const localRevisionAtStart = this.cloudStateLocalRevision;
+    if (localRevisionAtStart > this.cloudStatePersistedRevision) return;
     this.installCloudStateSync();
     const companyId = await this.verifyCloudSyncIdentity();
     const { data, error } = await this.supabase
@@ -1451,6 +1469,10 @@ class DataService {
     if (error) throw new Error(`Cloud state read failed: ${error.message}`);
 
     if (data?.state && Object.keys(data.state).length > 0) {
+      // A local employee or other record may have been saved while this cloud
+      // read was in flight. Do not let that older snapshot undo the local edit.
+      if (localRevisionAtStart !== this.cloudStateLocalRevision
+        || this.cloudStateLocalRevision > this.cloudStatePersistedRevision) return;
       this.isRestoringCloudState = true;
       try {
         restoreCloudStateSnapshot(data.state as Record<string, unknown>, localStorage);
