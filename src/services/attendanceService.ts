@@ -944,6 +944,9 @@ class AttendanceService {
     const projId = input.project_id || targetGroup?.project_id;
     if (projId) {
       const p = await dataService.getProjectById(projId);
+      if (!p || p.company_id !== currentUser.company_id) {
+        throw new Error('Select a project from your company.');
+      }
       projectName = p?.name;
     }
 
@@ -954,7 +957,7 @@ class AttendanceService {
 
     const newEmp: Employee = {
       id: `emp-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
-      company_id: 'comp-apex-01',
+      company_id: currentUser.company_id,
       employee_code: empCode,
       full_name: trimmedName,
       photo_url: input.photo_url,

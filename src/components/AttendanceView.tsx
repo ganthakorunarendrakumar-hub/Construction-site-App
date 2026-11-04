@@ -641,6 +641,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       {attendanceMode === 'individual' ? (
         <IndividualAttendanceView
           currentUser={currentUser}
+          employees={employees}
           onRecordsChanged={loadData}
           onOpenGroupRecord={record => {
             setAttendanceMode('group');

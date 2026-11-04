@@ -21,6 +21,7 @@ const PRIMARY_PROJECT_SITE = '__primary_project_site__';
 
 interface IndividualAttendanceViewProps {
   currentUser: UserProfile;
+  employees: Employee[];
   onRecordsChanged: () => Promise<void>;
   onOpenGroupRecord: (record: DailyAttendanceRecord) => void;
 }
@@ -29,10 +30,10 @@ const INDIVIDUAL_STATUSES: IndividualAttendanceStatus[] = ['Present', 'Absent', 
 
 export const IndividualAttendanceView: React.FC<IndividualAttendanceViewProps> = ({
   currentUser,
+  employees,
   onRecordsChanged,
   onOpenGroupRecord
 }) => {
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [records, setRecords] = useState<DailyAttendanceRecord[]>([]);
   const [sites, setSites] = useState<MaterialLocation[]>([]);
@@ -62,12 +63,10 @@ export const IndividualAttendanceView: React.FC<IndividualAttendanceViewProps> =
     if (showLoading) setIsLoading(true);
     try {
       if (dataService.isCloudConnected()) await dataService.syncCloudState();
-      const [employeeRows, projectRows, attendanceRows] = await Promise.all([
-        attendanceService.getEmployees(),
+      const [projectRows, attendanceRows] = await Promise.all([
         dataService.getProjects(),
         attendanceService.getAttendanceRecords()
       ]);
-      setEmployees(employeeRows.filter(employee => employee.company_id === currentUser.company_id));
       setProjects(projectRows.filter(project => project.company_id === currentUser.company_id));
       setRecords(attendanceRows.filter(record => record.company_id === currentUser.company_id));
       setError(null);
@@ -121,12 +120,19 @@ export const IndividualAttendanceView: React.FC<IndividualAttendanceViewProps> =
     return () => { active = false; };
   }, [projectId, currentUser.company_id]);
 
-  const activeEmployees = useMemo(
-    () => employees.filter(employee => employee.status === 'active'),
-    [employees]
+  const companyEmployees = useMemo(
+    () => employees.filter(employee => employee.company_id === currentUser.company_id),
+    [employees, currentUser.company_id]
   );
-  const selectedEmployee = employees.find(employee => employee.id === employeeId);
+  const activeEmployees = useMemo(
+    () => companyEmployees.filter(employee => employee.status === 'active'),
+    [companyEmployees]
+  );
+  const selectedEmployee = companyEmployees.find(employee => employee.id === employeeId);
   const selectedProject = projects.find(project => project.id === projectId);
+  const assignedProject = projects.find(project => project.id === selectedEmployee?.project_id);
+  const selectedSiteName = sites.find(site => site.id === siteId)?.name
+    || (siteId === PRIMARY_PROJECT_SITE ? selectedProject?.location || selectedProject?.name : undefined);
   const canManageSelectedProject = Boolean(projectId && attendanceService.canManageAttendance(projectId));
 
   const filteredRecords = useMemo(() => records.filter(record => {
@@ -177,12 +183,11 @@ export const IndividualAttendanceView: React.FC<IndividualAttendanceViewProps> =
 
   const handleEmployeeChange = (nextEmployeeId: string) => {
     setEmployeeId(nextEmployeeId);
-    const employee = employees.find(item => item.id === nextEmployeeId);
-    if (employee?.project_id && projects.some(project => project.id === employee.project_id)) {
-      setProjectId(employee.project_id);
-    } else if (!projectId && projects.length > 0) {
-      setProjectId(projects[0].id);
-    }
+    const employee = companyEmployees.find(item => item.id === nextEmployeeId);
+    const assignedProjectId = employee?.project_id && projects.some(project => project.id === employee.project_id)
+      ? employee.project_id
+      : projects[0]?.id || '';
+    setProjectId(assignedProjectId);
     if (employee) setWorkingHours(String(employee.standard_hours_per_day || 8));
   };
 
@@ -279,7 +284,10 @@ export const IndividualAttendanceView: React.FC<IndividualAttendanceViewProps> =
             <span className="inline-flex items-center gap-1.5"><UserRound className="h-4 w-4 text-bp-blue" /> Employee *</span>
             <select required value={employeeId} onChange={event => handleEmployeeChange(event.target.value)} disabled={isSaving || Boolean(editingRecordId)} className="min-h-11 w-full rounded-xl border border-bp-border-strong bg-white px-3 text-sm disabled:bg-bp-background">
               <option value="">Select employee</option>
-              {activeEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.full_name} · {employee.employee_code}</option>)}
+              {activeEmployees.map(employee => {
+                const projectName = employee.project_name || projects.find(project => project.id === employee.project_id)?.name || 'No project assigned';
+                return <option key={employee.id} value={employee.id}>{employee.full_name} · {employee.employee_code} · {employee.job_type} · {projectName}</option>;
+              })}
             </select>
           </label>
           <label className="space-y-1.5 text-sm font-medium text-bp-text">
@@ -319,7 +327,13 @@ export const IndividualAttendanceView: React.FC<IndividualAttendanceViewProps> =
           </label>
         </div>
 
-        {selectedEmployee && <p className="mt-3 text-xs text-bp-muted">Salary calculation uses {selectedEmployee.salary_type.replace('_', ' ')} rate {selectedEmployee.salary_amount.toLocaleString()} and the existing overtime rate.</p>}
+        {selectedEmployee && (
+          <div className="mt-3 space-y-1 text-xs text-bp-muted">
+            <p>Employee ID: <strong className="text-bp-text">{selectedEmployee.employee_code}</strong> · Trade: <strong className="text-bp-text">{selectedEmployee.job_type}</strong> · Assigned project: <strong className="text-bp-text">{assignedProject?.name || selectedEmployee.project_name || 'Not assigned'}</strong></p>
+            <p>Attendance location: <strong className="text-bp-text">{selectedProject?.name || 'Select a project'}{selectedSiteName ? ` · ${selectedSiteName}` : ''}</strong></p>
+            <p>Salary calculation uses {selectedEmployee.salary_type.replace('_', ' ')} rate {selectedEmployee.salary_amount.toLocaleString()} and the existing overtime rate.</p>
+          </div>
+        )}
 
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-bp-border pt-4">
           {!canManageSelectedProject && <p className="mr-auto text-xs text-bp-muted">Select a project you are authorized to manage.</p>}
@@ -340,7 +354,7 @@ export const IndividualAttendanceView: React.FC<IndividualAttendanceViewProps> =
             <label className="text-xs font-semibold text-bp-muted">Employee
               <select value={filterEmployeeId} onChange={event => setFilterEmployeeId(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-bp-border-strong bg-white px-2.5 text-sm text-bp-text">
                 <option value="all">All employees</option>
-                {employees.map(employee => <option key={employee.id} value={employee.id}>{employee.full_name} · {employee.employee_code}</option>)}
+                {companyEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.full_name} · {employee.employee_code}</option>)}
               </select>
             </label>
             <label className="text-xs font-semibold text-bp-muted">Project
