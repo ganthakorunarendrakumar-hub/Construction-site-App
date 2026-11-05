@@ -6,8 +6,6 @@ import {
   Wrench,
   FileSpreadsheet,
   ChevronRight,
-  ChevronDown,
-  ChevronUp,
   Mountain,
   Boxes,
   Gem,
@@ -37,8 +35,6 @@ import { dataService } from '../services/dataService';
 import { authService } from '../services/authService';
 import { ReportsView } from './ReportsView';
 import { AttendanceView } from './AttendanceView';
-
-const PROJECT_MODULES_VISIBILITY_KEY = 'bp.projectsWorkspace.showAllModules.v1';
 
 interface ProjectWorkspaceProps {
   project: Project;
@@ -72,14 +68,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   onNavigateProjects
 }) => {
   const [activeTab, setActiveTab] = useState<'materials' | 'reports' | 'attendance'>('materials');
-  const [showAllModules, setShowAllModules] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return window.localStorage.getItem(PROJECT_MODULES_VISIBILITY_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  });
   const [categories, setCategories] = useState<MaterialCategoryDef[]>([]);
   const [isAddCatModalOpen, setIsAddCatModalOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -124,14 +112,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   useEffect(() => {
     loadCategoriesAndStats();
   }, [project.id]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(PROJECT_MODULES_VISIBILITY_KEY, String(showAllModules));
-    } catch {
-      // Keep the workspace usable when browser storage is unavailable.
-    }
-  }, [showAllModules]);
 
   const openAddCategory = () => {
     setNewCatName('');
@@ -222,9 +202,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       if (pA !== pB) return pA - pB;
       return a.name.localeCompare(b.name);
     });
-  const visibleCategories = showAllModules
-    ? expandableCategories
-    : expandableCategories.filter(category => category.id === 'regular_site_use');
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
@@ -495,33 +472,20 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 </h2>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 self-stretch sm:self-auto">
+              {isAdmin && (
                 <button
-                  type="button"
-                  aria-expanded={showAllModules}
-                  aria-controls="project-material-category-grid"
-                  onClick={() => setShowAllModules(expanded => !expanded)}
-                  className="min-h-10 w-full sm:w-auto px-3.5 py-2 border border-bp-border bg-white hover:bg-bp-background text-bp-text text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
+                  onClick={openAddCategory}
+                  className="px-3.5 py-1.5 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs self-start sm:self-auto"
                 >
-                  {showAllModules ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  {showAllModules ? 'Hide Extra Modules' : 'Show All Modules'}
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Category
                 </button>
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={openAddCategory}
-                    className="min-h-10 w-full sm:w-auto px-3.5 py-2 bg-bp-cyan hover:bg-bp-blue text-bp-text text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-xs whitespace-nowrap"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Add Category
-                  </button>
-                )}
-              </div>
+              )}
             </div>
 
             {/* Material categories with hire modules after site-use materials */}
-            <div id="project-material-category-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visibleCategories.map((cat) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {expandableCategories.map((cat) => (
                 <React.Fragment key={cat.id}>
                   <div
                     role="button"

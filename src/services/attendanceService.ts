@@ -893,28 +893,6 @@ class AttendanceService {
     return employees.find(e => e.id === employeeId) || null;
   }
 
-  private normalizeEmployeeReference(value?: string): string {
-    return value?.trim().toLocaleLowerCase() || '';
-  }
-
-  private companyIdsMatch(left?: string, right?: string): boolean {
-    const leftId = left?.trim();
-    const rightId = right?.trim();
-    return Boolean(leftId && rightId && leftId === rightId);
-  }
-
-  private employeeMatchesReference(employee: Employee, reference: string): boolean {
-    return employee.id === reference
-      || this.normalizeEmployeeReference(employee.employee_code) === this.normalizeEmployeeReference(reference);
-  }
-
-  private paymentBelongsToEmployee(payment: SalaryPaymentRecord, employee: Employee): boolean {
-    return this.companyIdsMatch(payment.company_id, employee.company_id)
-      && (payment.employee_id === employee.id
-        || this.normalizeEmployeeReference(payment.employee_id) === this.normalizeEmployeeReference(employee.employee_code)
-        || this.normalizeEmployeeReference(payment.employee_code) === this.normalizeEmployeeReference(employee.employee_code));
-  }
-
   private async refreshEmployeeDataBeforeWrite(): Promise<void> {
     if (dataService.isCloudConfigured() && !dataService.isCloudConnected()) {
       throw new Error('Supabase is configured but not connected. The employee change was not saved; restore the cloud connection and retry.');
@@ -1705,16 +1683,7 @@ class AttendanceService {
         list = list.filter(p => p.group_id === filters.groupId);
       }
       if (filters?.employeeId && filters.employeeId !== 'all') {
-        const currentCompanyId = dataService.getCurrentUser().company_id;
-        const employee = (await this.getEmployees()).find(item =>
-          this.companyIdsMatch(item.company_id, currentCompanyId)
-          && this.employeeMatchesReference(item, filters.employeeId!)
-        );
-        list = list.filter(payment =>
-          this.companyIdsMatch(payment.company_id, currentCompanyId)
-          && (payment.employee_id === filters.employeeId
-            || Boolean(employee && this.paymentBelongsToEmployee(payment, employee)))
-        );
+        list = list.filter(p => p.employee_id === filters.employeeId);
       }
       if (filters?.fromDate) {
         list = list.filter(p => p.payment_date >= filters.fromDate!);
@@ -1818,14 +1787,10 @@ class AttendanceService {
     const auditRaw = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
     const payments: SalaryPaymentRecord[] = paymentsRaw ? JSON.parse(paymentsRaw) : [];
     if (!Array.isArray(payments)) throw new Error('Saved payment data could not be read. Refresh and try again.');
-    const employee = (await this.getEmployees()).find(item =>
-      this.companyIdsMatch(item.company_id, currentUser.company_id)
-      && this.employeeMatchesReference(item, employeeId)
-    );
-    if (!employee) throw new Error('Worker not found in your company. Refresh and try again.');
     const index = payments.findIndex(payment =>
       payment.id === paymentId
-      && this.paymentBelongsToEmployee(payment, employee)
+      && payment.employee_id === employeeId
+      && payment.company_id === currentUser.company_id
       && (!groupId || groupId === 'all' || payment.group_id === groupId)
     );
     if (index < 0) throw new Error('Payment transaction not found. Refresh the payroll table and try again.');
@@ -1876,8 +1841,7 @@ class AttendanceService {
     }
 
     const employeeIndex = employees.findIndex(employee =>
-      this.companyIdsMatch(employee.company_id, currentUser.company_id)
-      && this.employeeMatchesReference(employee, input.employee_id)
+      employee.id === input.employee_id && employee.company_id === currentUser.company_id
     );
     if (employeeIndex < 0) throw new Error('Worker not found in your company. Refresh and try again.');
     const existingEmployee = employees[employeeIndex];
@@ -1910,18 +1874,15 @@ class AttendanceService {
 
     const inPeriod = (date: string) => date >= input.period_from && date <= input.period_to;
     const matchesGroup = (record: { group_id?: string }) => !input.group_id || record.group_id === input.group_id;
-    const attendanceBelongsToEmployee = (record: DailyAttendanceRecord) =>
-      this.companyIdsMatch(record.company_id, currentUser.company_id)
-      && (record.employee_id === existingEmployee.id
-        || this.normalizeEmployeeReference(record.employee_id) === this.normalizeEmployeeReference(existingEmployee.employee_code)
-        || this.normalizeEmployeeReference(record.employee_code) === this.normalizeEmployeeReference(existingEmployee.employee_code));
     const targetAttendance = attendanceRecords.filter(record =>
-      attendanceBelongsToEmployee(record)
+      record.company_id === currentUser.company_id
+      && record.employee_id === existingEmployee.id
       && inPeriod(record.date)
       && matchesGroup(record)
     );
     const targetPayments = payments.filter(payment =>
-      this.paymentBelongsToEmployee(payment, existingEmployee)
+      payment.company_id === currentUser.company_id
+      && payment.employee_id === existingEmployee.id
       && inPeriod(payment.payment_date)
       && matchesGroup(payment)
     );
@@ -1942,7 +1903,7 @@ class AttendanceService {
     const attendanceUpdates = new Map(input.attendance.map(record => [record.id, record]));
     const originalAttendanceById = new Map(attendanceRecords.map(record => [record.id, record]));
     const updatedAttendance = attendanceRecords.map(record => {
-      if (!attendanceBelongsToEmployee(record)) return record;
+      if (record.company_id !== currentUser.company_id || record.employee_id !== existingEmployee.id) return record;
       const edit = attendanceUpdates.get(record.id);
       const commonMetadata = {
         employee_name: fullName,
@@ -2013,10 +1974,8 @@ class AttendanceService {
       const projectId = projectForAttendance(updated);
       const duplicate = updatedAttendance.find(record =>
         record.id !== updated.id
-        && this.companyIdsMatch(record.company_id, currentUser.company_id)
-        && (record.employee_id === existingEmployee.id
-          || this.normalizeEmployeeReference(record.employee_id) === this.normalizeEmployeeReference(existingEmployee.employee_code)
-          || this.normalizeEmployeeReference(record.employee_code) === this.normalizeEmployeeReference(existingEmployee.employee_code))
+        && record.company_id === currentUser.company_id
+        && record.employee_id === existingEmployee.id
         && record.date === updated.date
         && projectForAttendance(record) === projectId
       );
@@ -2028,7 +1987,7 @@ class AttendanceService {
     const paymentUpdates = new Map(input.payments.map(payment => [payment.id, payment]));
     const originalPaymentsById = new Map(payments.map(payment => [payment.id, payment]));
     const updatedPayments = payments.map(payment => {
-      if (!this.paymentBelongsToEmployee(payment, existingEmployee)) return payment;
+      if (payment.company_id !== currentUser.company_id || payment.employee_id !== existingEmployee.id) return payment;
       const commonMetadata = { employee_name: fullName, employee_code: employeeCode };
       const edit = paymentUpdates.get(payment.id);
       if (!edit) return { ...payment, ...commonMetadata };
@@ -2151,10 +2110,7 @@ class AttendanceService {
     toDate?: string;
     upToDate?: string;
   }): Promise<EmployeeSalarySummary[]> {
-    const currentCompanyId = dataService.getCurrentUser().company_id;
-    const employees = (await this.getEmployees(params.groupId)).filter(employee =>
-      this.companyIdsMatch(employee.company_id, currentCompanyId)
-    );
+    const employees = await this.getEmployees(params.groupId);
     const targetEmployees = params.employeeId && params.employeeId !== 'all'
       ? employees.filter(e => e.id === params.employeeId)
       : employees;
@@ -2166,7 +2122,6 @@ class AttendanceService {
       fromDate: params.fromDate,
       toDate: params.toDate || params.upToDate
     });
-    records = records.filter(record => this.companyIdsMatch(record.company_id, currentCompanyId));
 
     // Filter payment records
     let payments = await this.getPayments({
@@ -2175,16 +2130,10 @@ class AttendanceService {
       fromDate: params.fromDate,
       toDate: params.toDate || params.upToDate
     });
-    payments = payments.filter(payment => this.companyIdsMatch(payment.company_id, currentCompanyId));
 
     const summaries: EmployeeSalarySummary[] = targetEmployees.map(emp => {
-      const empRecords = records.filter(record =>
-        this.companyIdsMatch(record.company_id, emp.company_id)
-        && (record.employee_id === emp.id
-          || this.normalizeEmployeeReference(record.employee_id) === this.normalizeEmployeeReference(emp.employee_code)
-          || this.normalizeEmployeeReference(record.employee_code) === this.normalizeEmployeeReference(emp.employee_code))
-      );
-      const empPayments = payments.filter(payment => this.paymentBelongsToEmployee(payment, emp));
+      const empRecords = records.filter(r => r.employee_id === emp.id);
+      const empPayments = payments.filter(p => p.employee_id === emp.id);
 
       let presentDays = 0;
       let halfDays = 0;
