@@ -339,16 +339,17 @@ test('payroll edits recalculate attendance and payment totals, preserve transact
       attendance('attendance-hours', '2026-11-03', 'Present', 6)
     ];
     const paymentRows: SalaryPaymentRecord[] = [
-      payment('advance-5000', 5000, 'advance', '2026-11-02'),
+      { ...payment('advance-1000', 1000, 'advance', '2026-11-02'), amount: '₹1,000' as unknown as number, employee_id: employee.employee_code },
       { ...payment('salary-10000', 10000, 'salary', '2026-11-03'), payment_method: 'Bank Transfer', attachments: { invoice, dc, images: [image] } },
       payment('bonus-500', 500, 'bonus', '2026-11-04'),
       payment('deduction-200', 200, 'deduction', '2026-11-04')
     ];
+    values.set('buildpulse_employees_v1', JSON.stringify([{ ...employee, company_id: 'company-test ' }]));
     values.set('buildpulse_attendance_records_v1', JSON.stringify(attendanceRows));
     values.set('buildpulse_salary_payments_v1', JSON.stringify(paymentRows));
 
     const edit: WorkerPayrollEditInput = {
-      employee_id: employee.id,
+      employee_id: employee.employee_code,
       group_id: 'group-1',
       period_from: '2026-11-01',
       period_to: '2026-11-30',
@@ -369,12 +370,25 @@ test('payroll edits recalculate attendance and payment totals, preserve transact
         { id: 'attendance-hours', date: '2026-11-05', status: 'Present', working_hours: 7.5, overtime_hours: 0, remarks: 'Hours corrected' }
       ],
       payments: [
-        { id: 'advance-5000', amount: 3000, payment_date: '2026-11-02', payment_method: 'Cash', payment_type: 'advance' },
+        { id: 'advance-1000', amount: 3000, payment_date: '2026-11-02', payment_method: 'Cash', payment_type: 'advance' },
         { id: 'salary-10000', amount: 8000, payment_date: '2026-11-08', payment_method: 'UPI', payment_type: 'salary', reference_no: 'UPI-008', remarks: 'Corrected salary disbursement', attachments: { invoice, dc, images: [image] } },
         { id: 'bonus-500', amount: 750, payment_date: '2026-11-09', payment_method: 'Cash', payment_type: 'advance' },
         { id: 'deduction-200', amount: 200, payment_date: '2026-11-04', payment_method: 'Cash', payment_type: 'deduction' }
       ]
     };
+
+    const editorBeforeCorrection = renderToStaticMarkup(createElement(EditWorkerPayrollModal, {
+      employee,
+      groupId: 'group-1',
+      period: { fromDate: '2026-11-01', toDate: '2026-11-30' },
+      attendanceRecords: attendanceRows,
+      paymentRecords: paymentRows,
+      onUploadFile: async file => ({ url: file.name, name: file.name, size: file.size }),
+      onDeletePayment: async () => undefined,
+      onClose: () => undefined,
+      onSubmit: async () => undefined
+    }));
+    assert.match(editorBeforeCorrection, /1,000/);
 
     await attendanceService.updateWorkerPayroll(edit);
 
@@ -384,7 +398,8 @@ test('payroll edits recalculate attendance and payment totals, preserve transact
     assert.equal(savedAttendance.find(record => record.id === 'attendance-hours')?.working_hours, 7.5);
     const savedPayments = await attendanceService.getPayments({ employeeId: employee.id });
     assert.deepEqual(savedPayments.map(record => record.id).sort(), paymentRows.map(record => record.id).sort());
-    assert.equal(savedPayments.find(record => record.id === 'advance-5000')?.amount, 3000);
+    assert.equal(savedPayments.find(record => record.id === 'advance-1000')?.amount, 3000);
+    assert.equal(savedPayments.find(record => record.id === 'advance-1000')?.employee_id, employee.employee_code);
     assert.equal(savedPayments.find(record => record.id === 'salary-10000')?.amount, 8000);
     assert.equal(savedPayments.find(record => record.id === 'salary-10000')?.payment_date, '2026-11-08');
     assert.equal(savedPayments.find(record => record.id === 'salary-10000')?.payment_method, 'UPI');
@@ -394,6 +409,7 @@ test('payroll edits recalculate attendance and payment totals, preserve transact
     assert.deepEqual(savedPayments.find(record => record.id === 'salary-10000')?.attachments, { invoice, dc, images: [image] });
     const savedEmployee = await attendanceService.getEmployeeById(employee.id);
     assert.equal(savedEmployee?.standard_hours_per_day, 8.5);
+    assert.equal(savedEmployee?.company_id, 'company-test ');
     const reopenedEditor = renderToStaticMarkup(createElement(EditWorkerPayrollModal, {
       employee: savedEmployee!,
       groupId: 'group-1',
@@ -407,7 +423,7 @@ test('payroll edits recalculate attendance and payment totals, preserve transact
     }));
     assert.match(reopenedEditor, /value="8\.5"/);
     assert.match(reopenedEditor, /min="0\.1"/);
-    assert.match(reopenedEditor, /step="0\.1"/);
+    assert.match(reopenedEditor, /step="any"/);
     assert.match(reopenedEditor, /3,000/);
     assert.match(reopenedEditor, /8,000/);
     for (const standardHours of [8, 8.5, 9]) {
@@ -423,7 +439,7 @@ test('payroll edits recalculate attendance and payment totals, preserve transact
         onSubmit: async () => undefined
       }));
       assert.ok(reopenedWithHours.includes(`value="${standardHours}"`));
-      assert.ok(reopenedWithHours.includes('step="0.1"'));
+      assert.ok(reopenedWithHours.includes('step="any"'));
     }
 
     let summaries = await attendanceService.computeSalarySummaries({
@@ -439,14 +455,19 @@ test('payroll edits recalculate attendance and payment totals, preserve transact
     assert.equal(summaries[0].total_paid, 8000);
     assert.equal(summaries[0].net_payable_balance, -10950);
 
+    const getCurrentUser = dataTarget.getCurrentUser;
+    dataTarget.getCurrentUser = () => ({ ...user, company_id: 'another-company' });
+    await assert.rejects(attendanceService.updateWorkerPayroll(edit), /Worker not found in your company/i);
+    dataTarget.getCurrentUser = getCurrentUser;
+
     await assert.rejects(
       attendanceService.updateWorkerPayroll({
         ...edit,
-        payments: edit.payments.map(row => row.id === 'advance-5000' ? { ...row, amount: '' as unknown as number } : row)
+        payments: edit.payments.map(row => row.id === 'advance-1000' ? { ...row, amount: '' as unknown as number } : row)
       }),
       /empty amount cannot be treated as zero/i
     );
-    assert.equal((await attendanceService.getPayments({ employeeId: employee.id })).find(row => row.id === 'advance-5000')?.amount, 3000);
+    assert.equal((await attendanceService.getPayments({ employeeId: employee.id })).find(row => row.id === 'advance-1000')?.amount, 3000);
 
     const originalGetCurrentUser = dataTarget.getCurrentUser;
     dataTarget.getCurrentUser = () => ({ ...user, role: 'accountant', role_title: 'Accountant' });

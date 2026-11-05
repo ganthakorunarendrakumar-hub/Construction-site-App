@@ -229,6 +229,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     return employees.filter(e => !e.group_id || e.group_id === '' || e.group_id === 'ungrouped');
   }, [employees]);
 
+  const currentCompanyPayments = useMemo(
+    () => paymentRecords.filter(payment => payment.company_id?.trim() === currentUser.company_id.trim()),
+    [paymentRecords, currentUser.company_id]
+  );
+
   // Load daily attendance register when activeGroup or attendanceDate changes
   useEffect(() => {
     if (!selectedGroupId || isLoading) return;
@@ -1913,8 +1918,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                               {canManage && (
                                 <button
                                   onClick={() => {
-                                    const empObj = employees.find(e => e.id === s.employee_id) || null;
+                                    const empObj = employees.find(e =>
+                                      e.company_id?.trim() === currentUser.company_id.trim()
+                                      && (e.id === s.employee_id || e.employee_code.trim().toLowerCase() === s.employee_code.trim().toLowerCase())
+                                    ) || null;
                                     setEditingPayrollEmployee(empObj);
+                                    if (!empObj) setPayrollEditMessage('Worker master data changed. Refresh payroll and try again.');
                                   }}
                                   className="inline-flex items-center gap-1 rounded-xl border border-bp-border-strong px-2.5 py-1 text-xs font-semibold text-bp-navy transition-colors hover:bg-bp-background"
                                   aria-label={`Edit payroll for ${s.employee_name}`}
@@ -1928,7 +1937,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                               {canManage && (
                                 <button
                                   onClick={() => {
-                                    const empObj = employees.find(e => e.id === s.employee_id) || null;
+                                    const empObj = employees.find(e =>
+                                      e.company_id?.trim() === currentUser.company_id.trim()
+                                      && (e.id === s.employee_id || e.employee_code.trim().toLowerCase() === s.employee_code.trim().toLowerCase())
+                                    ) || null;
                                     setPaymentTargetEmployee(empObj);
                                     setPaymentSuggestedAmount(Math.max(0, s.net_payable_balance));
                                     setIsRecordPaymentOpen(true);
@@ -1955,10 +1967,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 </h4>
 
                 <div className="divide-y divide-[#E2E8F0] text-xs">
-                  {paymentRecords.filter(p => p.group_id === selectedGroupId).length === 0 ? (
+                  {currentCompanyPayments.filter(p => p.group_id === selectedGroupId).length === 0 ? (
                     <p className="py-4 text-bp-muted text-center">No payment transactions recorded for this group yet.</p>
                   ) : (
-                    paymentRecords
+                    currentCompanyPayments
                       .filter(p => p.group_id === selectedGroupId)
                       .map(p => (
                         <div key={p.id} className="py-2.5 flex items-center justify-between gap-3">
@@ -2299,18 +2311,31 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       />
 
       {editingPayrollEmployee && (() => {
-        const summary = salarySummaries.find(item => item.employee_id === editingPayrollEmployee.id);
+        const summary = salarySummaries.find(item =>
+          item.employee_id === editingPayrollEmployee.id
+          || item.employee_code.trim().toLowerCase() === editingPayrollEmployee.employee_code.trim().toLowerCase()
+        );
         if (!summary) return null;
+        const normalizedCompanyId = (value?: string) => value?.trim() || '';
+        const normalizedEmployeeReference = (value?: string) => value?.trim().toLowerCase() || '';
+        const companyId = normalizedCompanyId(currentUser.company_id);
+        const employeeCode = normalizedEmployeeReference(editingPayrollEmployee.employee_code);
         const matchesSalaryGroup = (record: { group_id?: string }) =>
           !selectedGroupId || selectedGroupId === 'all' || record.group_id === selectedGroupId;
         const scopedAttendance = attendanceRecords.filter(record =>
-          record.employee_id === editingPayrollEmployee.id
+          normalizedCompanyId(record.company_id) === companyId
+          && (record.employee_id === editingPayrollEmployee.id
+            || normalizedEmployeeReference(record.employee_id) === employeeCode
+            || normalizedEmployeeReference(record.employee_code) === employeeCode)
           && record.date >= salaryDateRange.fromDate
           && record.date <= salaryDateRange.toDate
           && matchesSalaryGroup(record)
         );
         const scopedPayments = paymentRecords.filter(payment =>
-          payment.employee_id === editingPayrollEmployee.id
+          normalizedCompanyId(payment.company_id) === companyId
+          && (payment.employee_id === editingPayrollEmployee.id
+            || normalizedEmployeeReference(payment.employee_id) === employeeCode
+            || normalizedEmployeeReference(payment.employee_code) === employeeCode)
           && payment.payment_date >= salaryDateRange.fromDate
           && payment.payment_date <= salaryDateRange.toDate
           && matchesSalaryGroup(payment)
