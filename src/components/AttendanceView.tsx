@@ -99,6 +99,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const [paymentSuggestedAmount, setPaymentSuggestedAmount] = useState<number | undefined>(undefined);
   const [editingPayrollEmployee, setEditingPayrollEmployee] = useState<Employee | null>(null);
   const [payrollEditMessage, setPayrollEditMessage] = useState<string | null>(null);
+  const [employeeStatusMessage, setEmployeeStatusMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const [activatingEmployeeId, setActivatingEmployeeId] = useState<string | null>(null);
 
   // Group Search & Filter
   const [groupSearch, setGroupSearch] = useState('');
@@ -423,6 +425,52 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     }
     setEditingEmployee(null);
     setAddEmployeeDefaultGroupId(undefined);
+  };
+
+  const handleActivateWorker = async (employeeId: string) => {
+    if (!canManage) return;
+
+    const employee = employees.find(candidate =>
+      candidate.id === employeeId
+      && candidate.company_id?.trim() === currentUser.company_id.trim()
+      && candidate.group_id === selectedGroupId
+    );
+    if (!employee) {
+      setEmployeeStatusMessage({ kind: 'error', text: 'This worker is no longer available in the selected company group. Refresh the page and try again.' });
+      return;
+    }
+    if (employee.status !== 'inactive') {
+      setEmployeeStatusMessage({ kind: 'error', text: `${employee.full_name} is already active. Refresh the page to see the latest status.` });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Activate ${employee.full_name} (${employee.employee_code})? The existing employee ID, code, group and project assignments, and attendance, salary, advance, and payment history will be preserved.`
+    );
+    if (!confirmed) return;
+
+    setEmployeeStatusMessage(null);
+    setActivatingEmployeeId(employee.id);
+    try {
+      const updatedEmployee = await attendanceService.updateEmployee(employee.id, { status: 'active' });
+      setEmployees(current => current.map(candidate =>
+        candidate.id === updatedEmployee.id && candidate.company_id === updatedEmployee.company_id
+          ? updatedEmployee
+          : candidate
+      ));
+      await loadData();
+      setEmployeeStatusMessage({
+        kind: 'success',
+        text: `${employee.full_name} (${employee.employee_code}) is active. Employee, attendance, and salary data were refreshed.`
+      });
+    } catch (err) {
+      setEmployeeStatusMessage({
+        kind: 'error',
+        text: err instanceof Error ? err.message : 'The worker could not be activated.'
+      });
+    } finally {
+      setActivatingEmployeeId(null);
+    }
   };
 
   // Handler for assigning an ungrouped employee to an existing group
@@ -1812,6 +1860,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           {/* ======================================================== */}
           {activeTab === 'salary' && (
             <div className="space-y-4">
+              {employeeStatusMessage && (
+                <div
+                  role={employeeStatusMessage.kind === 'success' ? 'status' : 'alert'}
+                  className={`rounded-xl border p-3 text-xs ${employeeStatusMessage.kind === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-rose-200 bg-rose-50 text-rose-800'}`}
+                >
+                  {employeeStatusMessage.text}
+                </div>
+              )}
               
               {/* Controls & Record Payment button */}
               <div className="bg-white rounded-2xl border border-bp-border p-4 sm:p-5 shadow-xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -1864,6 +1922,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     <thead className="bg-bp-navy text-white uppercase font-bold text-[11px]">
                       <tr>
                         <th className="px-4 py-3">Worker Name</th>
+                        <th className="px-3 py-3 text-center">Employment Status</th>
                         <th className="px-3 py-3">Trade</th>
                         <th className="px-2 py-3 text-center">Rate</th>
                         <th className="px-2 py-3 text-center">P / HD / A</th>
@@ -1880,16 +1939,34 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     <tbody className="divide-y divide-[#E2E8F0]">
                       {salarySummaries.length === 0 ? (
                         <tr>
-                          <td colSpan={12} className="px-4 py-10 text-center text-bp-muted">
+                          <td colSpan={13} className="px-4 py-10 text-center text-bp-muted">
                             No salary or payment records calculated for this period.
                           </td>
                         </tr>
                       ) : (
-                        salarySummaries.map(s => (
+                        salarySummaries.map(s => {
+                          const salaryEmployee = employees.find(employee =>
+                            employee.id === s.employee_id
+                            && employee.company_id?.trim() === currentUser.company_id.trim()
+                            && employee.group_id === selectedGroupId
+                          );
+
+                          return (
                           <tr key={s.employee_id} className="hover:bg-bp-background transition-colors">
                             <td className="px-4 py-3 font-semibold text-bp-text">
                               {s.employee_name}
                               <span className="block text-[10px] text-bp-muted font-mono">{s.employee_code}</span>
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              {salaryEmployee ? (
+                                <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${salaryEmployee.status === 'active'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-slate-100 text-slate-700'}`}>
+                                  {salaryEmployee.status === 'active' ? 'Active' : 'Inactive'}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-bp-muted">Unavailable</span>
+                              )}
                             </td>
                             <td className="px-3 py-3 text-bp-text-subtle">{s.job_type}</td>
                             <td className="px-2 py-3 text-center font-mono">₹{s.salary_rate}</td>
@@ -1935,24 +2012,37 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                             </td>
                             <td className="px-3 py-3 text-center">
                               {canManage && (
-                                <button
-                                  onClick={() => {
-                                    const empObj = employees.find(e =>
-                                      e.company_id?.trim() === currentUser.company_id.trim()
-                                      && (e.id === s.employee_id || e.employee_code.trim().toLowerCase() === s.employee_code.trim().toLowerCase())
-                                    ) || null;
-                                    setPaymentTargetEmployee(empObj);
-                                    setPaymentSuggestedAmount(Math.max(0, s.net_payable_balance));
-                                    setIsRecordPaymentOpen(true);
-                                  }}
-                                  className="px-2.5 py-1 text-xs font-semibold bg-bp-navy text-bp-cyan hover:bg-bp-navy-light rounded-xl transition-colors shadow-xs"
-                                >
-                                  Pay
-                                </button>
+                                <div className="flex flex-col items-center gap-1.5">
+                                  {salaryEmployee?.status === 'inactive' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleActivateWorker(s.employee_id)}
+                                      disabled={activatingEmployeeId === salaryEmployee.id}
+                                      className="whitespace-nowrap rounded-xl bg-emerald-700 px-2.5 py-1 text-[10px] font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60"
+                                    >
+                                      {activatingEmployeeId === salaryEmployee.id ? 'Activating…' : 'Activate Worker'}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      const empObj = employees.find(e =>
+                                        e.company_id?.trim() === currentUser.company_id.trim()
+                                        && (e.id === s.employee_id || e.employee_code.trim().toLowerCase() === s.employee_code.trim().toLowerCase())
+                                      ) || null;
+                                      setPaymentTargetEmployee(empObj);
+                                      setPaymentSuggestedAmount(Math.max(0, s.net_payable_balance));
+                                      setIsRecordPaymentOpen(true);
+                                    }}
+                                    className="px-2.5 py-1 text-xs font-semibold bg-bp-navy text-bp-cyan hover:bg-bp-navy-light rounded-xl transition-colors shadow-xs"
+                                  >
+                                    Pay
+                                  </button>
+                                </div>
                               )}
                             </td>
                           </tr>
-                        ))
+                          );
+                        })
                       )}
                     </tbody>
                   </table>

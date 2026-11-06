@@ -1018,22 +1018,22 @@ class AttendanceService {
   }
 
   public async updateEmployee(employeeId: string, input: {
-    employee_code?: string;
-    full_name: string;
-    photo_url?: string;
-    documents?: import('../types').EmployeeDocuments;
-    phone?: string;
-    address?: string;
-    job_type: EmployeeJobType | string;
-    group_id?: string;
-    project_id?: string;
-    joining_date?: string;
-    salary_type: SalaryType;
-    salary_amount: number;
-    standard_hours_per_day?: number;
-    overtime_rate_per_hour?: number;
-    status?: 'active' | 'inactive';
-    remarks?: string;
+    employee_code?: Employee['employee_code'];
+    full_name?: Employee['full_name'];
+    photo_url?: Employee['photo_url'];
+    documents?: Employee['documents'];
+    phone?: Employee['phone'];
+    address?: Employee['address'];
+    job_type?: Employee['job_type'];
+    group_id?: Employee['group_id'];
+    project_id?: Employee['project_id'];
+    joining_date?: Employee['joining_date'];
+    salary_type?: SalaryType;
+    salary_amount?: Employee['salary_amount'];
+    standard_hours_per_day?: Employee['standard_hours_per_day'];
+    overtime_rate_per_hour?: Employee['overtime_rate_per_hour'];
+    status?: Employee['status'];
+    remarks?: Employee['remarks'];
   }): Promise<Employee> {
     const currentUser = dataService.getCurrentUser();
     if (currentUser.role !== 'admin' && currentUser.role !== 'project_manager') {
@@ -1044,10 +1044,10 @@ class AttendanceService {
     const previousEmployees = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
     const previousAuditLog = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
     const employees = await this.getEmployees();
-    const idx = employees.findIndex(e => e.id === employeeId && e.company_id === currentUser.company_id);
+    const idx = employees.findIndex(e => e.id === employeeId && this.companyIdsMatch(e.company_id, currentUser.company_id));
     if (idx === -1) throw new Error('Employee not found.');
 
-    const trimmedName = input.full_name.trim();
+    const trimmedName = input.full_name === undefined ? employees[idx].full_name : input.full_name.trim();
     if (!trimmedName) throw new Error('Employee full name is required.');
 
     const empCode = input.employee_code?.trim() || employees[idx].employee_code;
@@ -1055,8 +1055,8 @@ class AttendanceService {
       throw new Error(`Employee Code "${empCode}" is already in use by another worker.`);
     }
 
-    const wage = Number(input.salary_amount);
-    if (isNaN(wage) || wage <= 0) {
+    const wage = input.salary_amount === undefined ? employees[idx].salary_amount : Number(input.salary_amount);
+    if (input.salary_amount !== undefined && (isNaN(wage) || wage <= 0)) {
       throw new Error('Salary rate must be greater than zero.');
     }
 
@@ -1074,7 +1074,9 @@ class AttendanceService {
       }
     }
 
-    const stdHours = Number(input.standard_hours_per_day) || employees[idx].standard_hours_per_day || 8;
+    const stdHours = input.standard_hours_per_day === undefined
+      ? employees[idx].standard_hours_per_day
+      : Number(input.standard_hours_per_day) || employees[idx].standard_hours_per_day || 8;
     const otRate = input.overtime_rate_per_hour !== undefined
       ? Number(input.overtime_rate_per_hour)
       : employees[idx].overtime_rate_per_hour;
@@ -1092,7 +1094,7 @@ class AttendanceService {
       group_name: targetGroupName,
       project_id: input.project_id !== undefined ? input.project_id : employees[idx].project_id,
       joining_date: input.joining_date || employees[idx].joining_date,
-      salary_type: input.salary_type,
+      salary_type: input.salary_type || employees[idx].salary_type,
       salary_amount: wage,
       standard_hours_per_day: stdHours,
       overtime_rate_per_hour: otRate,
