@@ -236,6 +236,57 @@ test('attendance permissions are enforced for both saves and deletion', async ()
   });
 });
 
+test('activating an existing worker changes only employee status and preserves attendance and payment history', async () => {
+  await withAttendanceHarness(async () => {
+    const inactiveEmployee = { ...employee, company_id: 'company-test ', status: 'inactive' as const };
+    values.set('buildpulse_employees_v1', JSON.stringify([inactiveEmployee]));
+    const attendanceHistory = [{
+      id: 'attendance-history-1',
+      employee_id: employee.id,
+      employee_code: employee.employee_code,
+      status: 'Present'
+    }];
+    const paymentHistory = [
+      { id: 'advance-history-1', employee_id: employee.id, payment_type: 'advance', amount: 500 },
+      { id: 'payment-history-1', employee_id: employee.id, payment_type: 'salary', amount: 1200 }
+    ];
+    values.set('buildpulse_attendance_records_v1', JSON.stringify(attendanceHistory));
+    values.set('buildpulse_salary_payments_v1', JSON.stringify(paymentHistory));
+    const attendanceBefore = values.get('buildpulse_attendance_records_v1');
+    const paymentsBefore = values.get('buildpulse_salary_payments_v1');
+
+    const updated = await attendanceService.updateEmployee(employee.id, { status: 'active' });
+
+    const { status, updated_at, ...updatedDetails } = updated;
+    const { status: previousStatus, updated_at: previousUpdatedAt, ...previousDetails } = inactiveEmployee;
+    assert.equal(status, 'active');
+    assert.equal(previousStatus, 'inactive');
+    assert.notEqual(updated_at, previousUpdatedAt);
+    assert.deepEqual(JSON.parse(JSON.stringify(updatedDetails)), previousDetails);
+    assert.equal(values.get('buildpulse_attendance_records_v1'), attendanceBefore);
+    assert.equal(values.get('buildpulse_salary_payments_v1'), paymentsBefore);
+    assert.equal(JSON.parse(values.get('buildpulse_employees_v1') || '[]').length, 1);
+  });
+});
+
+test('employee activation enforces update role permissions and company ownership', async () => {
+  await withAttendanceHarness(async () => {
+    const inactiveEmployee = { ...employee, status: 'inactive' as const };
+    values.set('buildpulse_employees_v1', JSON.stringify([inactiveEmployee]));
+    const statusOnlyChange = { status: 'active' as const };
+
+    dataTarget.getCurrentUser = () => ({ ...user, role: 'accountant', role_title: 'Accountant' });
+    await assert.rejects(
+      attendanceService.updateEmployee(employee.id, statusOnlyChange),
+      /Only Administrators and Project Managers/i
+    );
+
+    dataTarget.getCurrentUser = () => ({ ...user, company_id: 'another-company' });
+    await assert.rejects(attendanceService.updateEmployee(employee.id, statusOnlyChange), /Employee not found/i);
+    assert.equal(JSON.parse(values.get('buildpulse_employees_v1') || '[]')[0].status, 'inactive');
+  });
+});
+
 test('configured but disconnected cloud mode refuses to save a local-only attendance record', async () => {
   await withAttendanceHarness(async state => {
     values.set('buildpulse_projects_v1', JSON.stringify([project('project-1', 'Project One')]));
