@@ -23,6 +23,12 @@ const STORAGE_KEYS = {
   AUDIT_LOGS: 'buildpulse_attendance_audit_v1'
 };
 
+function companyIdsMatch(left?: string, right?: string): boolean {
+  const leftId = left?.trim();
+  const rightId = right?.trim();
+  return Boolean(leftId && rightId && leftId === rightId);
+}
+
 export class DuplicateAttendanceRecordError extends Error {
   public readonly existingRecord: DailyAttendanceRecord;
 
@@ -1022,7 +1028,7 @@ class AttendanceService {
     const previousEmployees = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
     const previousAuditLog = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
     const employees = await this.getEmployees();
-    const idx = employees.findIndex(e => e.id === employeeId && this.companyIdsMatch(e.company_id, currentUser.company_id));
+    const idx = employees.findIndex(e => e.id === employeeId && companyIdsMatch(e.company_id, currentUser.company_id));
     if (idx === -1) throw new Error('Employee not found.');
 
     const trimmedName = input.full_name === undefined ? employees[idx].full_name : input.full_name.trim();
@@ -1401,7 +1407,7 @@ class AttendanceService {
         id: existingIdx !== -1
           ? existingRecord!.id
           : `att-${emp.id}-${date.replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6)}`,
-        company_id: 'comp-apex-01',
+        company_id: currentUser.company_id,
         group_id: groupId,
         group_name: group.name,
         project_id: group.project_id,
@@ -1685,7 +1691,9 @@ class AttendanceService {
         list = list.filter(p => p.group_id === filters.groupId);
       }
       if (filters?.employeeId && filters.employeeId !== 'all') {
-        list = list.filter(p => p.employee_id === filters.employeeId);
+        const currentCompanyId = dataService.getCurrentUser().company_id;
+        list = list.filter(p => companyIdsMatch(p.company_id, currentCompanyId)
+          && p.employee_id === filters.employeeId);
       }
       if (filters?.fromDate) {
         list = list.filter(p => p.payment_date >= filters.fromDate!);
@@ -2112,7 +2120,10 @@ class AttendanceService {
     toDate?: string;
     upToDate?: string;
   }): Promise<EmployeeSalarySummary[]> {
-    const employees = await this.getEmployees(params.groupId);
+    const currentCompanyId = dataService.getCurrentUser().company_id;
+    const employees = (await this.getEmployees(params.groupId)).filter(employee =>
+      companyIdsMatch(employee.company_id, currentCompanyId)
+    );
     const targetEmployees = params.employeeId && params.employeeId !== 'all'
       ? employees.filter(e => e.id === params.employeeId)
       : employees;
@@ -2124,6 +2135,7 @@ class AttendanceService {
       fromDate: params.fromDate,
       toDate: params.toDate || params.upToDate
     });
+    records = records.filter(record => companyIdsMatch(record.company_id, currentCompanyId));
 
     // Filter payment records
     let payments = await this.getPayments({
@@ -2132,10 +2144,15 @@ class AttendanceService {
       fromDate: params.fromDate,
       toDate: params.toDate || params.upToDate
     });
+    payments = payments.filter(payment => companyIdsMatch(payment.company_id, currentCompanyId));
 
     const summaries: EmployeeSalarySummary[] = targetEmployees.map(emp => {
-      const empRecords = records.filter(r => r.employee_id === emp.id);
-      const empPayments = payments.filter(p => p.employee_id === emp.id);
+      const empRecords = records.filter(record =>
+        companyIdsMatch(record.company_id, emp.company_id) && record.employee_id === emp.id
+      );
+      const empPayments = payments.filter(payment =>
+        companyIdsMatch(payment.company_id, emp.company_id) && payment.employee_id === emp.id
+      );
 
       let presentDays = 0;
       let halfDays = 0;

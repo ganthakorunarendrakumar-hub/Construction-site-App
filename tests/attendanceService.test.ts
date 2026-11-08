@@ -287,6 +287,93 @@ test('employee activation enforces update role permissions and company ownership
   });
 });
 
+test('employee CRUD, status changes, attendance, and salary summaries work without an instance company matcher', async () => {
+  await withAttendanceHarness(async () => {
+    values.set('buildpulse_projects_v1', JSON.stringify([project('project-1', 'Project One')]));
+    values.set('buildpulse_employees_v1', JSON.stringify([
+      employee,
+      { ...employee, id: 'employee-other-company', company_id: 'company-other', employee_code: 'EMP-OTHER', full_name: 'Other Company Worker' }
+    ]));
+
+    const originalMatcher = Object.getOwnPropertyDescriptor(attendanceService, 'companyIdsMatch');
+    Object.defineProperty(attendanceService, 'companyIdsMatch', { configurable: true, value: undefined });
+    try {
+      assert.equal(serviceTarget.companyIdsMatch, undefined);
+
+      const created = await attendanceService.createEmployee({
+        full_name: 'New Test Worker',
+        job_type: 'Mason',
+        group_id: 'group-1',
+        project_id: 'project-1',
+        salary_type: 'daily_wage',
+        salary_amount: 850,
+        status: 'inactive'
+      });
+      assert.equal(created.company_id, user.company_id);
+      assert.equal(created.group_id, 'group-1');
+      assert.equal(created.project_id, 'project-1');
+      assert.equal(created.status, 'inactive');
+
+      const edited = await attendanceService.updateEmployee(employee.id, { full_name: 'Edited Test Worker' });
+      assert.equal(edited.id, employee.id);
+      assert.equal(edited.employee_code, employee.employee_code);
+      assert.equal(edited.full_name, 'Edited Test Worker');
+
+      const activated = await attendanceService.updateEmployee(created.id, { status: 'active' });
+      assert.equal(activated.id, created.id);
+      assert.equal(activated.employee_code, created.employee_code);
+      assert.equal(activated.group_id, created.group_id);
+      assert.equal(activated.project_id, created.project_id);
+      assert.equal(activated.status, 'active');
+
+      const deactivated = await attendanceService.updateEmployee(created.id, { status: 'inactive' });
+      assert.equal(deactivated.id, created.id);
+      assert.equal(deactivated.employee_code, created.employee_code);
+      assert.equal(deactivated.group_id, created.group_id);
+      assert.equal(deactivated.project_id, created.project_id);
+      assert.equal(deactivated.status, 'inactive');
+
+      const attendance = await attendanceService.saveIndividualAttendance(defaultInput);
+      assert.equal(attendance.company_id, user.company_id);
+      assert.equal(attendance.employee_id, employee.id);
+
+      const ownPayment: SalaryPaymentRecord = {
+        id: 'own-advance', company_id: user.company_id, group_id: 'group-1',
+        employee_id: employee.id, employee_name: edited.full_name, employee_code: employee.employee_code,
+        payment_date: '2026-11-04', amount: 250, payment_method: 'Cash', payment_type: 'advance',
+        recorded_by: user.id, recorded_by_name: user.full_name, created_at: '2026-11-04T00:00:00.000Z'
+      };
+      const otherCompanyPayment: SalaryPaymentRecord = {
+        ...ownPayment, id: 'other-company-advance', company_id: 'company-other', amount: 9000
+      };
+      values.set('buildpulse_salary_payments_v1', JSON.stringify([ownPayment, otherCompanyPayment]));
+
+      const foreignAttendance: DailyAttendanceRecord = {
+        ...attendance,
+        id: 'other-company-attendance',
+        company_id: 'company-other',
+        employee_id: 'employee-other-company',
+        employee_code: employee.employee_code,
+        daily_earnings: 50000
+      };
+      values.set('buildpulse_attendance_records_v1', JSON.stringify([attendance, foreignAttendance]));
+
+      const payments = await attendanceService.getPayments({ employeeId: employee.id });
+      assert.deepEqual(payments.map(payment => payment.id), ['own-advance']);
+
+      const summaries = await attendanceService.computeSalarySummaries({ employeeId: employee.id });
+      assert.equal(summaries.length, 1);
+      assert.equal(summaries[0].employee_id, employee.id);
+      assert.equal(summaries[0].present_days, 1);
+      assert.equal(summaries[0].gross_earnings, attendance.daily_earnings);
+      assert.equal(summaries[0].total_advances, ownPayment.amount);
+    } finally {
+      if (originalMatcher) Object.defineProperty(attendanceService, 'companyIdsMatch', originalMatcher);
+      else Reflect.deleteProperty(attendanceService, 'companyIdsMatch');
+    }
+  });
+});
+
 test('configured but disconnected cloud mode refuses to save a local-only attendance record', async () => {
   await withAttendanceHarness(async state => {
     values.set('buildpulse_projects_v1', JSON.stringify([project('project-1', 'Project One')]));
@@ -336,7 +423,23 @@ test('the existing group register updates an individual-source row in place and 
     assert.equal(groupResult[0].attendance_source, 'individual');
     assert.equal(groupResult[0].site_id, 'site-1');
     assert.equal(groupResult[0].site_name, 'North Site');
+    assert.equal(groupResult[0].company_id, user.company_id);
     assert.equal((JSON.parse(values.get('buildpulse_attendance_records_v1') || '[]') as DailyAttendanceRecord[]).length, 1);
+  });
+});
+
+test('group attendance writes the signed-in company ID instead of a fixed demo tenant', async () => {
+  await withAttendanceHarness(async () => {
+    values.set('buildpulse_projects_v1', JSON.stringify([project('project-1', 'Project One')]));
+    const saved = await attendanceService.saveDailyAttendanceRegister('group-1', defaultInput.date, [{
+      employee_id: employee.id,
+      status: 'Present',
+      working_hours: 8,
+      overtime_hours: 0
+    }]);
+
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].company_id, user.company_id);
   });
 });
 
