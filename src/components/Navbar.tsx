@@ -29,6 +29,7 @@ interface NavbarProps {
   onNavigateProjects?: () => void;
   onNavigateReports?: () => void;
   onNavigateAttendance?: () => void;
+  onNavigateEmployees?: () => void;
   onNavigateUserManagement?: () => void;
   onLogout: () => void;
   onProfileUpdated: (profile: UserProfile) => void;
@@ -54,6 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigateProjects,
   onNavigateReports,
   onNavigateAttendance,
+  onNavigateEmployees,
   onNavigateUserManagement,
   onLogout,
   onProfileUpdated,
@@ -123,6 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { label: 'Overview', icon: LayoutDashboard, onClick: onNavigateHome, active: activeView === 'home' },
     { label: 'Projects', icon: Building2, onClick: onNavigateProjects, active: projectsActive },
     { label: 'Attendance', icon: Users, onClick: onNavigateAttendance, active: activeView === 'attendance' },
+    { label: 'Employees', icon: Users, onClick: onNavigateEmployees, active: activeView === 'employees' },
     { label: 'Stock reports', icon: FileSpreadsheet, onClick: onNavigateReports, active: activeView === 'reports' },
     ...(currentUser.role === 'admin' && onNavigateUserManagement
       ? [{ label: 'User accounts', icon: ShieldCheck, onClick: onNavigateUserManagement, active: activeView === 'user_management' }]

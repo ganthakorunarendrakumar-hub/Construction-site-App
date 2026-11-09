@@ -746,7 +746,7 @@ export interface Employee {
   salary_amount: number;
   standard_hours_per_day: number;
   overtime_rate_per_hour?: number;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'resigned';
   remarks?: string;
   created_at: string;
   updated_at: string;

@@ -24,7 +24,7 @@ interface AddEmployeeModalProps {
     salary_amount: number;
     standard_hours_per_day?: number;
     overtime_rate_per_hour?: number;
-    status?: 'active' | 'inactive';
+    status?: 'active' | 'inactive' | 'resigned';
     remarks?: string;
   }) => Promise<void>;
   editingEmployee?: Employee | null;
@@ -74,7 +74,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   const [salaryAmount, setSalaryAmount] = useState('');
   const [standardHours, setStandardHours] = useState('8');
   const [overtimeRate, setOvertimeRate] = useState('0');
-  const [status, setStatus] = useState<'active' | 'inactive'>('active');
+  const [status, setStatus] = useState<'active' | 'inactive' | 'resigned'>('active');
   const [remarks, setRemarks] = useState('');
   const [aadhaarPdf, setAadhaarPdf] = useState<TransactionAttachment | null>(null);
   const [aadhaarFront, setAadhaarFront] = useState<TransactionAttachment | null>(null);
@@ -399,11 +399,12 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                   </label>
                   <select
                     value={status}
-                    onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}
+                    onChange={(e) => setStatus(e.target.value as 'active' | 'inactive' | 'resigned')}
                     className="w-full px-3 py-1.5 text-xs text-bp-text font-semibold rounded-xl border border-bp-border-strong focus:outline-none focus:border-bp-cyan bg-white"
                   >
                     <option value="active">Active Worker</option>
                     <option value="inactive">Inactive / On Leave</option>
+                    <option value="resigned">Resigned</option>
                   </select>
                 </div>
               </div>

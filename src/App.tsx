@@ -28,6 +28,7 @@ import { GenericEquipmentModule } from './components/GenericEquipmentModule';
 import { HireModule } from './components/HireModule';
 import { ReportsView } from './components/ReportsView';
 import { AttendanceView } from './components/AttendanceView';
+import { EmployeeDirectoryView } from './components/EmployeeDirectoryView';
 import { UserManagementView } from './components/UserManagementView';
 import { WorkerPortalView } from './components/WorkerPortalView';
 import { LoginPage } from './components/LoginPage';
@@ -55,6 +56,7 @@ type ViewMode =
   | 'machinery_hire'
   | 'reports'
   | 'attendance'
+  | 'employees'
   | 'user_management';
 
 export default function App() {
@@ -422,6 +424,7 @@ export default function App() {
         onNavigateProjects={() => setCurrentView('ongoing_projects')}
         onNavigateReports={canViewReports ? () => setCurrentView('reports') : undefined}
         onNavigateAttendance={canViewAttendance ? () => setCurrentView('attendance') : undefined}
+        onNavigateEmployees={canViewAttendance ? () => setCurrentView('employees') : undefined}
         onNavigateUserManagement={() => setCurrentView('user_management')}
         onLogout={handleLogout}
         onProfileUpdated={(profile) => {
@@ -638,6 +641,8 @@ export default function App() {
                 onNavigateProjects={() => setCurrentView('ongoing_projects')}
               />
             )}
+
+            {currentView === 'employees' && <EmployeeDirectoryView currentUser={currentUser} />}
 
             {/* VIEW 13: USER MANAGEMENT & SECURITY ACCOUNTS (Admin Only) */}
             {currentView === 'user_management' && (

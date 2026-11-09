@@ -227,6 +227,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     return employees.filter(e => e.group_id === selectedGroupId && e.status === 'active');
   }, [employees, selectedGroupId]);
 
+  // Management must retain visibility of inactive workers; attendance entry
+  // continues to use groupEmployees, which intentionally contains active staff only.
+  const allGroupEmployees = useMemo(() => {
+    if (!selectedGroupId) return [];
+    return employees.filter(e => e.group_id === selectedGroupId);
+  }, [employees, selectedGroupId]);
+
   const individualEmployees = useMemo(() => {
     return employees.filter(e => !e.group_id || e.group_id === '' || e.group_id === 'ungrouped');
   }, [employees]);
@@ -1279,7 +1286,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 }`}
               >
                 <Users className="w-3.5 h-3.5 text-bp-text" />
-                Worker Management ({groupEmployees.length})
+                Worker Management ({allGroupEmployees.length})
               </button>
 
               <button
@@ -1616,10 +1623,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               <div className="bg-white rounded-2xl border border-bp-border p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="space-y-0.5">
                   <h3 className="text-base font-bold text-bp-text">
-                    Workers in {activeGroup?.name}
+                    Workers in {activeGroup?.name} ({allGroupEmployees.length})
                   </h3>
                   <p className="text-xs text-bp-muted">
-                    Manage gang members, photo IDs, trade types, wages, and group assignments
+                    Active: {allGroupEmployees.filter(employee => employee.status === 'active').length} · Inactive: {allGroupEmployees.filter(employee => employee.status === 'inactive').length} · Resigned: {allGroupEmployees.filter(employee => employee.status === 'resigned').length}. Manage IDs, trades, wages, and group assignments.
                   </p>
                 </div>
 
@@ -1640,7 +1647,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
               {/* Workers Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {groupEmployees.map(emp => (
+                {allGroupEmployees.map(emp => (
                   <div
                     key={emp.id}
                     className="bg-white rounded-2xl border border-bp-border hover:border-bp-cyan shadow-xs p-4 flex flex-col justify-between space-y-3 transition-colors"
@@ -1957,7 +1964,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                 <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${salaryEmployee.status === 'active'
                                   ? 'bg-emerald-100 text-emerald-800'
                                   : 'bg-slate-100 text-slate-700'}`}>
-                                  {salaryEmployee.status === 'active' ? 'Active' : 'Inactive'}
+                                  {salaryEmployee.status === 'active' ? 'Active' : salaryEmployee.status === 'resigned' ? 'Resigned' : 'Inactive'}
                                 </span>
                               ) : (
                                 <span className="text-[10px] text-bp-muted">Unavailable</span>
